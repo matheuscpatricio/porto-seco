@@ -40,7 +40,7 @@ export const worlds: World[] = [
         theory: "`print()` mostra algo na tela. O texto vai entre aspas.",
         example: 'print("Olá, mundo!")',
         task: "Mostre na tela exatamente: Olá, Python!",
-        starter: "# Escreva seu código aqui\n",
+        starter: "",
         hints: ["Use print(...)", 'print("Olá, Python!")'],
         check: 'assert __out.strip() == "Olá, Python!", f"Esperado \'Olá, Python!\', recebi {__out.strip()!r}"',
         xp: 10,
