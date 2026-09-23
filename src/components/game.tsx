@@ -6,7 +6,26 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { VariantProps } from "class-variance-authority";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { sound } from "@/game/audio";
+import { useSyncExternalStore, type ReactNode } from "react";
+
+const serverAudio = { music: true, sfx: true };
+
+function SoundToggles() {
+  const a = useSyncExternalStore((l) => sound.subscribe(l), sound.getSettings, () => serverAudio);
+  const cls = (on: boolean) =>
+    `rounded-full border px-2 py-1 text-xs font-semibold transition ${on ? "border-white/20 bg-white/10 text-foreground" : "border-white/10 text-muted-foreground line-through"}`;
+  return (
+    <div className="flex gap-1.5">
+      <button className={cls(a.music)} onClick={() => sound.set({ music: !a.music })} aria-pressed={a.music} title="Música de fundo">
+        {a.music ? "🎵" : "🔇"} <span className="hidden sm:inline">Música</span>
+      </button>
+      <button className={cls(a.sfx)} onClick={() => sound.set({ sfx: !a.sfx })} aria-pressed={a.sfx} title="Efeitos sonoros">
+        {a.sfx ? "🔊" : "🔈"} <span className="hidden sm:inline">Efeitos</span>
+      </button>
+    </div>
+  );
+}
 
 export function LinkButton({ href, children, className, variant, size }: { href: string; children: ReactNode; className?: string } & VariantProps<typeof buttonVariants>) {
   return (
@@ -62,6 +81,7 @@ export function TopBar() {
           <span className="whitespace-nowrap text-xs text-muted-foreground">{p.xp} XP</span>
         </div>
         {p.streak > 0 && <span className="text-sm" title="Dias seguidos">🔥 {p.streak}</span>}
+        <SoundToggles />
       </div>
     </header>
   );

@@ -4,6 +4,7 @@ import { Md } from "@/components/game";
 import { Portrait } from "@/components/portrait";
 import { Button } from "@/components/ui/button";
 import type { Line, Who } from "@/content/types";
+import { sound } from "@/game/audio";
 import { people } from "@/game/characters";
 import { useCallback, useEffect, useState } from "react";
 
@@ -50,6 +51,7 @@ export function Dialogue({
   useEffect(() => onSpeaker?.(line.who), [line.who, onSpeaker]);
 
   const advance = useCallback(() => {
+    sound.sfx("click");
     if (!done) return finish();
     if (last) onDone();
     else setI((n) => n + 1);

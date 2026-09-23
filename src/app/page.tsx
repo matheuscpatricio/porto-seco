@@ -8,7 +8,8 @@ import { allLevels, prologue, worlds } from "@/content/worlds";
 import { people } from "@/game/characters";
 import { ACHIEVEMENTS, isUnlocked, markIntroSeen, resetProgress, useProgress } from "@/lib/progress";
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { sound } from "@/game/audio";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 const crew: Who[] = ["leo", "dani", "rui", "bia"];
 const villains: Who[] = ["vidal", "caveira"];
@@ -21,6 +22,7 @@ export default function Home() {
     () => false,
   );
   const [replay, setReplay] = useState(false);
+  useEffect(() => sound.setMusic("menu"), []);
   const done = Object.keys(p.stars).length;
   const nextLevel = allLevels.find((l) => !p.stars[l.id]) ?? allLevels[0];
 

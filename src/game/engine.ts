@@ -1,4 +1,5 @@
 import type { Level, Who, World } from "@/content/types";
+import { sound } from "@/game/audio";
 import { guardLook, Look, people } from "@/game/characters";
 import { drawCar, drawCrate, drawDrone, drawHuman, drawSky, drawSkyline, drawTerminal, Pose } from "@/game/draw";
 
@@ -147,8 +148,16 @@ export class Game {
   }
 
   setPhase(p: Phase) {
+    if (p === "hack" && this.phase !== "hack") sound.sfx("terminal");
     this.phase = p;
     this.ev.onPhase(p);
+    this.updateMusic();
+  }
+
+  updateMusic() {
+    const p = this.phase;
+    const bossAlive = this.actors.some((a) => a.kind === "boss" && a.hp > 0);
+    sound.setMusic(p === "brief" ? "menu" : p === "hack" || p === "result" ? "hack" : p === "escape" || p === "done" ? "off" : this.hacked && bossAlive ? "boss" : "play");
   }
 
   startPlay() {
@@ -168,16 +177,21 @@ export class Game {
     if (o.broken) {
       this.queue(at, () => {
         this.burst(this.terminalX, GROUND - 60, "#94a3b8", 24);
+        sound.sfx("lockBad");
         this.ev.onToast("O código deu erro e o terminal travou!", "bad");
       });
       at += 0.8;
     } else if (this.level.display.kind === "screen") {
-      this.queue(at, () => (this.screenText = o.screen || "(tela vazia)"));
+      this.queue(at, () => {
+        this.screenText = o.screen || "(tela vazia)";
+        sound.sfx("terminal");
+      });
       at += 1.2;
     } else if (o.locks) {
       o.locks.forEach((ok, i) => {
         this.queue(at, () => {
           this.locks[i] = ok ? "ok" : "bad";
+          sound.sfx(ok ? "lockOk" : "lockBad");
           this.burst(this.barrierX, GROUND - 170 + i * 26, ok ? "#22c55e" : "#ef4444", 8);
         });
         at += 0.55;
@@ -190,6 +204,8 @@ export class Game {
   private succeed() {
     this.hacked = true;
     this.player.cheerT = 1.4;
+    sound.sfx("success");
+    setTimeout(() => sound.sfx("gate"), 250);
     this.setPhase("open");
     this.ev.onToast(`${this.level.target}: acesso liberado!`, "good");
     this.queue(this.t + 1.6, () => {
@@ -202,6 +218,7 @@ export class Game {
 
   private fail() {
     this.alarmT = 3.5;
+    sound.sfx("alarm");
     this.shake = 0.5;
     this.spawn("guard", Math.max(40, this.camX + 30), 1).cooldown = 1.4;
     this.spawn("guard", this.terminalX + 120, 1).cooldown = 1.8;
@@ -277,11 +294,13 @@ export class Game {
         if (input.jump && !this.jumpHeld && p.grounded) {
           p.vy = -JUMP;
           p.grounded = false;
+          sound.sfx("jump");
         }
         if (input.shoot && p.cooldown <= 0) {
           p.cooldown = 0.28;
           p.shootT = 0.25;
           this.bullets.push({ x: p.x + p.dir * 30, y: p.y - 45, vx: p.dir * 760, vy: 0, mine: true, life: 1.1 });
+          sound.sfx("shoot");
         }
       }
       this.jumpHeld = input.jump;
@@ -296,6 +315,8 @@ export class Game {
     if (this.phase === "play" && this.hacked && p.x > this.carX - 90 && !this.actors.some((a) => a.kind === "boss" && a.hp > 0)) {
       this.phase = "escape";
       this.ev.onPhase("escape");
+      this.updateMusic();
+      sound.sfx("car");
       this.ev.onToast("Tio Rui: \"Entra, entra! Segura firme!\"", "good");
     }
     if (this.phase === "play" && this.hacked && p.x > this.carX - 200 && this.actors.some((a) => a.kind === "boss" && a.hp > 0) && Math.floor(this.t * 2) % 8 === 0) {
@@ -325,11 +346,16 @@ export class Game {
             b.life = 0;
             a.hp -= 1;
             a.flash = 0.12;
+            sound.sfx("hit");
             this.burst(b.x, b.y, "#60a5fa", 8);
             if (a.hp <= 0) {
               this.burst(a.x, a.y - 30, a.kind === "drone" ? "#f97316" : "#93c5fd", 20);
               this.shake = 0.2;
-              if (a.kind === "boss") this.ev.onToast(`${a.name} foi derrubado!`, "good");
+              sound.sfx(a.kind === "drone" ? "boom" : "enemyDown");
+              if (a.kind === "boss") {
+                this.ev.onToast(`${a.name} foi derrubado!`, "good");
+                this.updateMusic();
+              }
             }
           }
         }
@@ -361,6 +387,7 @@ export class Game {
     const p = this.player;
     p.hp -= 1;
     p.inv = 1;
+    sound.sfx("hurt");
     this.shake = 0.25;
     this.burst(p.x, p.y - 40, "#f87171", 10);
     if (p.hp <= 0) {
@@ -454,6 +481,7 @@ export class Game {
         a.cooldown = 1.6;
       }
       a.shootPose = 0.35;
+      if (Math.abs(dx) < 700) sound.sfx("enemyShoot");
     }
   }
 

@@ -10,6 +10,7 @@ import type { Phase } from "@/game/engine";
 import { people } from "@/game/characters";
 import { ACHIEVEMENTS, completeLevel, isUnlocked, saveCode, useProgress } from "@/lib/progress";
 import { onReadyChange, runPython, RunResult, warmUp } from "@/lib/runPython";
+import { sound } from "@/game/audio";
 import confetti from "canvas-confetti";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -75,6 +76,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
         const done = completeLevel(id, potentialRef.current);
         setWin({ stars: done.stars, xp: done.gainedXp, ach: done.newAch });
         confetti({ particleCount: level.boss ? 260 : 150, spread: 90, origin: { y: 0.55 } });
+        sound.sfx("fanfare");
       }
     },
     [id, level.boss],
