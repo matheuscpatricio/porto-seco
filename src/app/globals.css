@@ -147,3 +147,23 @@
 @media (prefers-reduced-motion: reduce) {
   .anim-float, .anim-jump, .anim-shake, .anim-pop, .anim-blink, .anim-caret, .anim-twinkle { animation: none; }
 }
+
+@keyframes walk-in { from { opacity: 0; transform: translateX(-60px) } to { opacity: 1; transform: none } }
+@keyframes cast { 0% { opacity: 0; transform: translateX(0) scale(0.5) rotate(0) } 15% { opacity: 1 } 100% { opacity: 0; transform: translateX(var(--cast-dist, 260px)) scale(1.6) rotate(360deg) } }
+@keyframes defeat { 0% { transform: none; opacity: 1 } 30% { transform: rotate(-15deg) scale(1.1) } 100% { transform: translateY(40px) rotate(90deg) scale(0.3); opacity: 0 } }
+@keyframes glow { 0%, 100% { box-shadow: 0 0 0 0 rgb(250 204 21 / 0) } 50% { box-shadow: 0 0 32px 6px rgb(250 204 21 / 0.55) } }
+@keyframes puff { 0% { opacity: 0; transform: scale(0.4) } 40% { opacity: 1; transform: scale(1.2) } 100% { opacity: 0.8; transform: scale(1) } }
+@keyframes sign-on { 0% { filter: brightness(0.4); box-shadow: none } 60% { filter: brightness(1.6) } 100% { filter: none; box-shadow: 0 0 28px 2px rgb(253 224 71 / 0.45) } }
+@keyframes big-in { from { opacity: 0; transform: scale(2.2) } to { opacity: 1; transform: none } }
+
+.anim-walk-in { animation: walk-in 0.6s ease-out both; }
+.anim-cast { animation: cast 0.9s ease-in forwards; }
+.anim-defeat { animation: defeat 1s ease-in forwards; }
+.anim-glow { animation: glow 1.2s ease-in-out infinite; }
+.anim-puff { animation: puff 0.6s ease-out both; }
+.anim-sign-on { animation: sign-on 0.9s ease-out both; }
+.anim-big-in { animation: big-in 0.35s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-walk-in, .anim-cast, .anim-defeat, .anim-glow, .anim-puff, .anim-sign-on, .anim-big-in { animation: none; }
+}

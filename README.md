@@ -2,6 +2,10 @@
 
 Um jogo web para aprender Python do zero ao avançado. Você atravessa 6 mundos, com 30 fases e um chefe no fim de cada mundo, escrevendo código Python de verdade. O código roda no próprio navegador com [Pyodide](https://pyodide.org), então não precisa de servidor Python.
 
+## História
+
+O Bug, o Bagunçador, embaralhou os feitiços do reino de Pythonia. A mentora Pytha acompanha o jogador, e cada mundo tem um guardião (Dona Vera, Dra. Coruja, Capitã Marina, Bruno, Rei Objeto III e Arquimaga Lua). Antes de cada fase há uma cena de diálogo animada que explica a ideia com analogias do dia a dia, pensada para quem nunca programou. As falas ficam em `src/content/story.ts`.
+
 ## Mundos
 
 1. Vila das Variáveis: `print`, variáveis, operadores, `input`, conversão de tipos

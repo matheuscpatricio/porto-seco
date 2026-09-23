@@ -4,7 +4,12 @@ export type RunResult = {
   error: string | null;
   failure: string | null;
   timedOut?: boolean;
+  probes?: ProbeResult[] | null;
 };
+
+export type ProbeEvent = { do?: string; expr: string; expect: string };
+export type Probe = { setup?: string; events: ProbeEvent[] };
+export type ProbeResult = { value: string | null; error: string | null; ok: boolean };
 
 type Listener = (ready: boolean) => void;
 
@@ -44,6 +49,7 @@ export function runPython(
   code: string,
   check = "",
   inputs: string[] = [],
+  probe?: Probe,
   timeoutMs = 8000,
 ): Promise<RunResult> {
   const w = getWorker();
@@ -57,7 +63,7 @@ export function runPython(
       resolve(e.data);
     };
     w.addEventListener("message", onMsg);
-    w.postMessage({ id, code, check, inputs });
+    w.postMessage({ id, code, check, inputs, probe });
     const armTimeout = () => {
       timer = setTimeout(() => {
         w.removeEventListener("message", onMsg);
