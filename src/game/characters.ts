@@ -91,3 +91,31 @@ export const people: Record<Who, { name: string; role: string; look: Look; ally:
     look: { skin: "#9c6b4a", hair: "#6b7280", hairStyle: "curly", shirt: "#78350f", pants: "#78350f", shoes: "#1c1917", extras: ["glasses", "beard"], build: "big" },
   },
 };
+
+const SKINS = ["#f1c9a5", "#e0ac84", "#c68b62", "#a86f4b", "#8a5a3b", "#6b4430", "#4a2f22"];
+const HAIRS = ["#0f0f0f", "#2b1a10", "#4a2f1b", "#8b5a2b", "#c9a26b", "#9ca3af", "#e5e7eb"];
+const SHIRTS = ["#f8fafc", "#1e3a8a", "#b91c1c", "#15803d", "#fde047", "#0e7490", "#f97316", "#7c3aed", "#e11d48", "#334155", "#a3a3a3", "#ec4899"];
+const PANTS = ["#1e3a5f", "#27272a", "#57534e", "#1f2937", "#78716c", "#3f6212", "#e7e5e4"];
+const STYLES: HairStyle[] = ["short", "ponytail", "curly", "slick", "bald", "buzz"];
+
+/** A random passer-by. `r` returns numbers in [0, 1). */
+export function randomLook(r: () => number): Look {
+  const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)];
+  const extras: Extra[] = [];
+  if (r() < 0.2) extras.push("glasses");
+  if (r() < 0.15) extras.push("cap");
+  if (r() < 0.12) extras.push("mustache");
+  if (r() < 0.25) extras.push("jacket");
+  return {
+    skin: pick(SKINS),
+    hair: pick(HAIRS),
+    hairStyle: pick(STYLES),
+    shirt: pick(SHIRTS),
+    jacket: pick(SHIRTS),
+    pants: pick(PANTS),
+    shoes: pick(["#111111", "#f5f5f4", "#78350f", "#1e3a8a"]),
+    extras,
+    build: r() < 0.25 ? "big" : r() < 0.5 ? "slim" : "normal",
+    accent: pick(SHIRTS),
+  };
+}

@@ -22,7 +22,7 @@ export default function Home() {
     () => false,
   );
   const [replay, setReplay] = useState(false);
-  useEffect(() => sound.setMusic("menu"), []);
+  useEffect(() => sound.setAmbience("menu"), []);
   const done = Object.keys(p.stars).length;
   const nextLevel = allLevels.find((l) => !p.stars[l.id]) ?? allLevels[0];
 

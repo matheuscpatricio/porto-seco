@@ -49,6 +49,7 @@ export function Dialogue({
   const person = people[line.who];
 
   useEffect(() => onSpeaker?.(line.who), [line.who, onSpeaker]);
+  useEffect(() => sound.speak(line.who, line.text), [line.who, line.text]);
 
   const advance = useCallback(() => {
     sound.sfx("click");

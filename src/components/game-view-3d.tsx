@@ -4,6 +4,7 @@ import { Dialogue } from "@/components/dialogue";
 import type { Level, Who, World } from "@/content/types";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 export type GameHandle = { applyHack: (o: HackOutcome) => void; closeHack: () => void; replayBrief: () => void };
@@ -91,6 +92,10 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
       const game = new Game3D(level, world, index, {
         onPhase: (p) => {
           setPhase(p);
@@ -100,10 +105,9 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
         onToast: toast,
       });
       gameRef.current = game;
-      if (skipBrief) {
-        game.startPlay();
-        toast("Siga a seta até o terminal e aperte E para hackear.", "info");
-      }
+      game.scene.environment = envMap;
+      game.scene.environmentIntensity = world.id === "w2" || world.id === "w5" || world.id === "w6" ? 0.25 : 0.55;
+      if (skipBrief) game.startPlay();
       const resize = () => {
         const w = wrap.clientWidth;
         const h = wrap.clientHeight;
@@ -154,7 +158,7 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
         }
         if (heartsRef.current) heartsRef.current.textContent = "❤️".repeat(Math.max(0, h.hp)) + "🖤".repeat(Math.max(0, 3 - h.hp));
         if (arrowRef.current) arrowRef.current.style.transform = `rotate(${-h.angle}rad)`;
-        if (objRef.current) objRef.current.textContent = `${h.objective} · ${h.distance} m`;
+        if (objRef.current) objRef.current.textContent = `${h.script} ${h.step}/${h.steps} · ${h.objective} · ${h.distance} m`;
         if (bossRef.current) bossRef.current.style.display = h.boss ? "block" : "none";
         if (h.boss && bossBarRef.current && bossNameRef.current) {
           bossBarRef.current.style.width = `${h.boss.pct * 100}%`;
@@ -168,6 +172,8 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
         cancelAnimationFrame(raf);
         ro.disconnect();
         game.dispose();
+        envMap.dispose();
+        pmrem.dispose();
         renderer.dispose();
       };
     }, [level, world, index, skipBrief, toast]);
@@ -301,7 +307,7 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
               <div ref={arrowRef} className="text-lg leading-none text-amber-300 transition-transform duration-75">
                 ⬆
               </div>
-              <span ref={objRef} className="max-w-[46vw] truncate font-semibold" />
+              <span ref={objRef} className="max-w-[70vw] truncate font-semibold sm:max-w-[52vw]" />
             </div>
             <div className="pointer-events-none absolute left-1/2 top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 shadow" />
             <div className="pointer-events-none absolute right-3 top-3 hidden rounded-lg bg-black/55 px-2.5 py-1 text-[11px] leading-tight text-white/80 md:block">
@@ -357,10 +363,7 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
               lines={level.brief}
               onSpeaker={setSpeaker}
               doneLabel="Começar missão ▶"
-              onDone={() => {
-                gameRef.current?.startPlay();
-                toast("Siga a seta até o terminal e aperte E para hackear.", "info");
-              }}
+              onDone={() => gameRef.current?.startPlay()}
             />
           </div>
         )}

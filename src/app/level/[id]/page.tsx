@@ -156,14 +156,14 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
                 </>
               ) : phase === "play" && !last?.ok ? (
                 <>
-                  Siga a seta ⬆ no topo até o terminal de <b>{level.target}</b> e aperte E. Objetivo: <Md text={level.task} />
+                  Siga a seta ⬆ e o objetivo no topo da tela. Quando chegar ao terminal de <b>{level.target}</b>, aperte E. Desafio: <Md text={level.task} />
                 </>
               ) : phase === "dive" || phase === "surface" || phase === "result" ? (
                 "Léo está dentro do sistema..."
               ) : phase === "done" || phase === "escape" ? (
                 "Fuga com o Tio Rui!"
               ) : (
-                "Acesso liberado! Entre no complexo e chegue ao carro do Tio Rui."
+                "Acesso liberado! Siga o próximo objetivo no topo da tela."
               )}
             </p>
           </div>
