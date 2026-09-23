@@ -230,13 +230,9 @@ export class Game {
   update(dt: number, input: Input) {
     this.t += dt;
     dt = Math.min(dt, 1 / 30);
-    this.resultQueue = this.resultQueue.filter((q) => {
-      if (this.t >= q.at) {
-        q.fn();
-        return false;
-      }
-      return true;
-    });
+    const due = this.resultQueue.filter((q) => this.t >= q.at);
+    this.resultQueue = this.resultQueue.filter((q) => this.t < q.at);
+    due.forEach((q) => q.fn());
     if (this.hacked && this.barrierLift < 1) this.barrierLift = Math.min(1, this.barrierLift + dt * 0.9);
     this.alarmT = Math.max(0, this.alarmT - dt);
     this.shake = Math.max(0, this.shake - dt);

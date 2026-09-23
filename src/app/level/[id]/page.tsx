@@ -42,6 +42,7 @@ export default function LevelPage() {
 function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: string; alreadyDone: boolean }) {
   const { level, world, next, index } = findLevel(id)!;
   const game = useRef<GameHandle>(null);
+  const [skipBrief] = useState(alreadyDone);
   const [phase, setPhase] = useState<Phase>("brief");
   const [code, setCode] = useState(savedCode ?? level.starter);
   const [busy, setBusy] = useState(false);
@@ -126,7 +127,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
           </button>
         </div>
 
-        <GameView ref={game} level={level} world={world} index={index} onPhase={onPhase} skipBrief={alreadyDone} />
+        <GameView ref={game} level={level} world={world} index={index} onPhase={onPhase} skipBrief={skipBrief} />
 
         {hacking ? (
           <HackPanel

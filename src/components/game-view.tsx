@@ -51,6 +51,7 @@ export const GameView = forwardRef<GameHandle, { level: Level; world: World; ind
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const gameRef = useRef<Game | null>(null);
     const input = useRef<Input>({ left: false, right: false, jump: false, shoot: false, use: false });
+    const tapped = useRef<Partial<Input>>({});
     const [phase, setPhase] = useState<Phase>("brief");
     const [hp, setHp] = useState(3);
     const [near, setNear] = useState(false);
@@ -93,7 +94,10 @@ export const GameView = forwardRef<GameHandle, { level: Level; world: World; ind
       const loop = (now: number) => {
         const dt = (now - last) / 1000;
         last = now;
-        game.update(dt, input.current);
+        const held = input.current;
+        const tap = tapped.current;
+        tapped.current = {};
+        game.update(dt, { left: held.left, right: held.right, jump: held.jump || !!tap.jump, shoot: held.shoot || !!tap.shoot, use: held.use || !!tap.use });
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         game.render(ctx);
         raf = requestAnimationFrame(loop);
@@ -113,6 +117,7 @@ export const GameView = forwardRef<GameHandle, { level: Level; world: World; ind
         if (gameRef.current?.phase !== "play") return;
         e.preventDefault();
         input.current[k] = true;
+        tapped.current[k] = true;
       };
       const up = (e: KeyboardEvent) => {
         const k = KEYS[e.key];
@@ -139,6 +144,7 @@ export const GameView = forwardRef<GameHandle, { level: Level; world: World; ind
 
     const press = useCallback((k: keyof Input, d: boolean) => {
       input.current[k] = d;
+      if (d) tapped.current[k] = true;
     }, []);
 
     const setSpeaker = useCallback((who: Who) => {
