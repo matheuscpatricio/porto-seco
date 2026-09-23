@@ -49,14 +49,14 @@ export function TopBar() {
   const w = wizardLevel(p.xp);
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-background/80 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-2.5">
         <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-          <span className="text-2xl">🐍</span>
-          <span className="hidden sm:inline">PyQuest</span>
+          <span className="rounded bg-rose-600 px-1.5 py-0.5 font-mono text-xs font-black text-white">PY</span>
+          <span className="hidden font-black uppercase tracking-widest sm:inline">Porto Seco</span>
         </Link>
         <div className="flex flex-1 items-center gap-3">
           <span className="whitespace-nowrap rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
-            Mago nv. {w.level}
+            Reputação nv. {w.level}
           </span>
           <Progress value={w.pct} className="h-2 max-w-48" />
           <span className="whitespace-nowrap text-xs text-muted-foreground">{p.xp} XP</span>

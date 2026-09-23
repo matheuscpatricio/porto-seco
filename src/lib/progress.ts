@@ -13,7 +13,7 @@ export type Progress = {
   introSeen?: boolean;
 };
 
-const KEY = "pyquest-progress-v1";
+const KEY = "porto-seco-progress-v1";
 const empty: Progress = { xp: 0, stars: {}, code: {}, achievements: [], lastDay: null, streak: 0 };
 
 let cache: Progress | null = null;
@@ -47,11 +47,11 @@ export function useProgress() {
 }
 
 export const ACHIEVEMENTS: Record<string, string> = {
-  first: "Primeiro feitiço: completou a primeira fase",
-  perfect: "Perfeccionista: 3 estrelas sem dicas",
-  boss: "Caçador de chefes: derrotou um chefe",
-  world: "Explorador: completou um mundo inteiro",
-  master: "Arquimago: completou todas as fases",
+  first: "Primeiro acesso: completou a primeira missão",
+  perfect: "Serviço limpo: 3 estrelas numa missão",
+  boss: "Derrubou um chefe da Vértice",
+  world: "Fechou um capítulo inteiro da história",
+  master: "Derrubou a Vértice: terminou o jogo",
 };
 
 export function wizardLevel(xp: number) {

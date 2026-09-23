@@ -1,21 +1,27 @@
-# PyQuest 🐍
+# Porto Seco
 
-Um jogo web para aprender Python do zero ao avançado. Você atravessa 6 mundos, com 30 fases e um chefe no fim de cada mundo, escrevendo código Python de verdade. O código roda no próprio navegador com [Pyodide](https://pyodide.org), então não precisa de servidor Python.
+Um jogo de ação no navegador para aprender Python do zero ao avançado.
 
-## História
+Léo é motoboy em Porto Seco, está devendo para o agiota Caveira e nunca programou. A hacker Dani recruta o Léo para derrubar a Vértice Segurança, a empresa de Augusto Vidal que controla a cidade. Ao longo de 30 missões em 6 capítulos, o jogador:
 
-O Bug, o Bagunçador, embaralhou os feitiços do reino de Pythonia. A mentora Pytha acompanha o jogador, e cada mundo tem um guardião (Dona Vera, Dra. Coruja, Capitã Marina, Bruno, Rei Objeto III e Arquimaga Lua). Antes de cada fase há uma cena de diálogo animada que explica a ideia com analogias do dia a dia, pensada para quem nunca programou. As falas ficam em `src/content/story.ts`.
+- controla o Léo num jogo de plataforma em 2D: corre, pula, atira com a pistola de choque e derruba seguranças, drones e chefes;
+- chega a um terminal e hackeia escrevendo Python de verdade, que roda no navegador com [Pyodide](https://pyodide.org);
+- vê o resultado no jogo: com o código certo, as travas acendem e o portão abre; com o código errado, o alarme dispara e chegam reforços;
+- foge no carro do Tio Rui no fim de cada missão.
 
-## Mundos
+## Capítulos
 
-1. Vila das Variáveis: `print`, variáveis, operadores, `input`, conversão de tipos
-2. Floresta das Condições: `if`, `elif`, `else` e lógica booleana
-3. Rio dos Loops: `for`, `while`, `range` e listas
-4. Montanha das Funções: parâmetros, dicionários, tuplas, sets e recursão
-5. Castelo dos Objetos: classes, herança, métodos mágicos e exceções
-6. Torre Avançada: compreensões, lambda, geradores, decorators, dataclasses e type hints
+1. Quebrada: `print`, variáveis, contas, `input` e `int`
+2. Centro: `if`, `elif`, `else`, `and`, `or` e `not`
+3. Porto: `for`, `while` e listas
+4. Desmanche: funções, dicionários, tuplas, conjuntos e recursão
+5. Torre Vértice: classes, herança, métodos especiais e exceções
+6. O Golpe: compreensões, `lambda`, geradores, decorators e dataclasses
 
-Cada fase tem teoria, exemplo, missão, dicas (que custam estrelas), testes automáticos e o botão **Resolver desafio**, que preenche a solução, roda os testes e explica o raciocínio. Revelar a solução conclui a fase com 1 estrela. Você ganha XP, níveis de mago, até 3 estrelas por fase, sequência de dias e conquistas. O progresso fica salvo no `localStorage`.
+## Controles
+
+- Teclado: ← → ou A D para andar, ↑, W ou espaço para pular, F ou J para atirar, E para hackear.
+- Celular: botões na tela.
 
 ## Como rodar
 
@@ -24,15 +30,16 @@ npm install
 npm run dev
 ```
 
-Depois abra http://localhost:43123. Na primeira execução o navegador baixa o Pyodide pela CDN, então é preciso internet.
+Depois abra http://localhost:43123. Na primeira execução, o navegador baixa o Pyodide pela CDN, então é preciso internet.
 
 ## Estrutura
 
-- `src/content/worlds.ts`: conteúdo e testes de todas as fases
-- `public/pyodide-worker.js`: Web Worker que executa o código do jogador
-- `src/lib/runPython.ts`: fala com o worker, aplica o tempo limite e traduz os erros
-- `src/lib/progress.ts`: XP, estrelas, conquistas e salvamento
-- `src/app/page.tsx`: mapa dos mundos
-- `src/app/level/[id]/page.tsx`: tela da fase
+- `src/content/chapters-a.ts` e `src/content/chapters-b.ts`: roteiro, diálogos, exercícios, testes e soluções de cada missão
+- `src/content/worlds.ts`: prólogo e junção dos capítulos
+- `src/game/engine.ts`: motor do jogo (física, inimigos, terminal, portão, alarme e fuga)
+- `src/game/draw.ts` e `src/game/characters.ts`: personagens de corpo inteiro desenhados no canvas e suas animações
+- `src/components/game-view.tsx`: canvas, controles e diálogos sobre o jogo
+- `src/components/hack-panel.tsx`: terminal compacto onde o jogador escreve o código
+- `public/pyodide-worker.js`: executa o código do jogador e testa cada trava
 
-Para criar uma fase nova, adicione um objeto `Level` em `worlds.ts`. O campo `check` é código Python executado depois do código do jogador; a variável `__out` contém o que foi impresso.
+Numa missão, `check` é código Python executado depois do código do jogador (a variável `__out` guarda o que foi impresso). Em `display.events`, cada item é uma trava do portão: `expr` é avaliado e comparado com `expect`. Um `expect` que começa com `!` espera um erro com esse nome.
