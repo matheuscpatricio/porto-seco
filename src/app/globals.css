@@ -167,3 +167,9 @@
 @media (prefers-reduced-motion: reduce) {
   .anim-walk-in, .anim-cast, .anim-defeat, .anim-glow, .anim-puff, .anim-sign-on, .anim-big-in { animation: none; }
 }
+
+@keyframes dive { 0%, 55% { opacity: 0; transform: scale(0.2) } 85% { opacity: 1; transform: scale(1) } 100% { opacity: 1; transform: scale(1.4) } }
+@keyframes dive-in { from { opacity: 1 } to { opacity: 0 } }
+.anim-dive { background: radial-gradient(circle, #ecfccb 0%, #4ade80 25%, #052e16 70%); animation: dive 1.8s ease-in forwards; }
+.anim-dive-in { background: radial-gradient(circle, #d9f99d 0%, #16a34a 40%, #022c22 90%); animation: dive-in 0.7s ease-out forwards; }
+.scanlines { background: repeating-linear-gradient(to bottom, rgb(16 185 129 / 0.07) 0 2px, transparent 2px 4px); }

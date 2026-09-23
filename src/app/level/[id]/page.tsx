@@ -2,11 +2,11 @@
 
 import { Dialogue } from "@/components/dialogue";
 import { LinkButton, Md, Stars, TopBar } from "@/components/game";
-import { GameHandle, GameView } from "@/components/game-view";
+import { GameHandle, GameView3D } from "@/components/game-view-3d";
 import { feedback, HackPanel } from "@/components/hack-panel";
 import { Button } from "@/components/ui/button";
 import { findLevel } from "@/content/worlds";
-import type { Phase } from "@/game/engine";
+import type { Phase } from "@/game3d/engine";
 import { people } from "@/game/characters";
 import { ACHIEVEMENTS, completeLevel, isUnlocked, saveCode, useProgress } from "@/lib/progress";
 import { onReadyChange, runPython, RunResult, warmUp } from "@/lib/runPython";
@@ -129,7 +129,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
           </button>
         </div>
 
-        <GameView ref={game} level={level} world={world} index={index} onPhase={onPhase} skipBrief={skipBrief} />
+        <GameView3D ref={game} level={level} world={world} index={index} onPhase={onPhase} skipBrief={skipBrief} />
 
         {hacking ? (
           <HackPanel
@@ -156,12 +156,14 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
                 </>
               ) : phase === "play" && !last?.ok ? (
                 <>
-                  Chegue ao <b>{level.target}</b> e hackeie o terminal. Objetivo: <Md text={level.task} />
+                  Siga a seta ⬆ no topo até o terminal de <b>{level.target}</b> e aperte E. Objetivo: <Md text={level.task} />
                 </>
+              ) : phase === "dive" || phase === "surface" || phase === "result" ? (
+                "Léo está dentro do sistema..."
               ) : phase === "done" || phase === "escape" ? (
                 "Fuga com o Tio Rui!"
               ) : (
-                "Acesso liberado! Siga até o carro do Tio Rui no fim da rua."
+                "Acesso liberado! Entre no complexo e chegue ao carro do Tio Rui."
               )}
             </p>
           </div>
