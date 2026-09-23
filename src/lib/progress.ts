@@ -90,7 +90,7 @@ export function completeLevel(id: string, stars: number) {
   if (allLevels.every((l) => next.stars[l.id])) add("master");
   next.achievements = [...next.achievements, ...newAch];
   save(next);
-  return { gainedXp, newAch };
+  return { gainedXp, newAch, stars: next.stars[id] };
 }
 
 export function resetProgress() {

@@ -1,3 +1,5 @@
+import { solutions } from "@/content/solutions";
+
 export type Level = {
   id: string;
   title: string;
@@ -12,6 +14,8 @@ export type Level = {
   inputs?: string[];
   xp: number;
 };
+
+export type PlayableLevel = Level & { solution: string; explain: string; worldId: string };
 
 export type World = {
   id: string;
@@ -427,7 +431,13 @@ export const worlds: World[] = [
   },
 ];
 
-export const allLevels = worlds.flatMap((w) => w.levels.map((l) => ({ ...l, worldId: w.id })));
+export const allLevels: PlayableLevel[] = worlds.flatMap((w) =>
+  w.levels.map((l) => {
+    const solved = solutions[l.id];
+    if (!solved) throw new Error(`Fase ${l.id} sem solução`);
+    return { ...l, solution: solved.code, explain: solved.explain, worldId: w.id };
+  }),
+);
 
 export function findLevel(id: string) {
   const idx = allLevels.findIndex((l) => l.id === id);

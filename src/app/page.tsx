@@ -1,7 +1,6 @@
 "use client";
 
 import { LinkButton, Stars, TopBar } from "@/components/game";
-import { Button } from "@/components/ui/button";
 import { allLevels, worlds } from "@/content/worlds";
 import { ACHIEVEMENTS, isUnlocked, resetProgress, useProgress } from "@/lib/progress";
 import Link from "next/link";

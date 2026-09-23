@@ -56,6 +56,7 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
   const [hintsShown, setHintsShown] = useState(0);
   const [attempts, setAttempts] = useState(0);
   const [win, setWin] = useState<Win | null>(null);
+  const [explain, setExplain] = useState<string | null>(null);
 
   useEffect(() => {
     warmUp();
@@ -66,6 +67,22 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
     const t = setTimeout(() => saveCode(id, code), 400);
     return () => clearTimeout(t);
   }, [id, code]);
+
+  async function solve() {
+    const ok = confirm("Revelar a solução? O código entra no editor, os testes rodam e a explicação aparece. Esta fase vale 1 estrela.");
+    if (!ok) return;
+    setCode(level.solution);
+    setExplain(level.explain);
+    setRunning(true);
+    setResult(null);
+    const res = await runPython(level.solution, level.check, level.inputs);
+    setRunning(false);
+    setResult(res);
+    if (!res.ok) return;
+    const done = completeLevel(id, 1);
+    setWin({ stars: done.stars, xp: done.gainedXp, ach: done.newAch });
+    confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+  }
 
   async function run(withCheck: boolean) {
     setRunning(true);
@@ -78,8 +95,8 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
     setAttempts(tries);
     if (res.ok) {
       const stars = Math.max(1, 3 - hintsShown - (tries > 2 ? 1 : 0));
-      const { gainedXp, newAch } = completeLevel(id, stars);
-      setWin({ stars, xp: gainedXp, ach: newAch });
+      const done = completeLevel(id, stars);
+      setWin({ stars: done.stars, xp: done.gainedXp, ach: done.newAch });
       confetti({ particleCount: level.boss ? 250 : 120, spread: 80, origin: { y: 0.7 } });
     }
   }
@@ -167,8 +184,20 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
             <Button disabled={running} onClick={() => run(true)} className="flex-1 sm:flex-none">
               ✨ Lançar feitiço (verificar)
             </Button>
+            <Button variant="outline" disabled={running} onClick={solve}>
+              🪄 Resolver desafio
+            </Button>
             {!ready && <span className="self-center text-xs text-muted-foreground">Carregando Python…</span>}
           </div>
+
+          {explain && (
+            <div className="rounded-xl border border-amber-300/40 bg-amber-400/10 p-4">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-amber-200">Como foi resolvido</h2>
+              <p className="font-sans leading-relaxed">
+                <Md text={explain} />
+              </p>
+            </div>
+          )}
 
           <div className="min-h-40 rounded-xl border border-white/10 bg-black/50 p-4 font-mono text-sm">
             {running && <p className="animate-pulse text-muted-foreground">{ready ? "Executando…" : "Invocando o interpretador Python (só na primeira vez)…"}</p>}
