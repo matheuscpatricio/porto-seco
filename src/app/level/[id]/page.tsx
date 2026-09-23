@@ -2,6 +2,8 @@
 
 import { LinkButton, Md, Stars, TopBar } from "@/components/game";
 import { Button } from "@/components/ui/button";
+import { Cutscene, Speech } from "@/components/story";
+import { cheers, oops, scenes } from "@/content/story";
 import { findLevel } from "@/content/worlds";
 import { ACHIEVEMENTS, completeLevel, isUnlocked, saveCode, useProgress } from "@/lib/progress";
 import { friendlyError, onReadyChange, runPython, RunResult, warmUp } from "@/lib/runPython";
@@ -44,11 +46,14 @@ export default function LevelPage() {
       </>
     );
   }
-  return <Level key={id} id={id} savedCode={p.code[id]} />;
+  return <Level key={id} id={id} savedCode={p.code[id]} alreadyDone={!!p.stars[id]} />;
 }
 
-function Level({ id, savedCode }: { id: string; savedCode?: string }) {
+function Level({ id, savedCode, alreadyDone }: { id: string; savedCode?: string; alreadyDone: boolean }) {
   const { level, world, next, index } = findLevel(id)!;
+  const scene = scenes[id];
+  const [mode, setMode] = useState<"story" | "play">(alreadyDone ? "play" : "story");
+  const [tries, setTriesCount] = useState(0);
   const [code, setCode] = useState(savedCode ?? level.starter);
   const [ready, setReady] = useState(false);
   const [running, setRunning] = useState(false);
@@ -90,6 +95,7 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
     const res = await runPython(code, withCheck ? level.check : "", level.inputs);
     setRunning(false);
     setResult(res);
+    setTriesCount((n) => n + 1);
     if (!withCheck) return;
     const tries = attempts + 1;
     setAttempts(tries);
@@ -106,6 +112,24 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
   return (
     <>
       <TopBar />
+      {mode === "story" ? (
+        <main className="relative flex flex-1 flex-col justify-center overflow-hidden px-4 py-10">
+          <div className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${world.color} opacity-15`} />
+          <div className="relative mb-8 text-center">
+            <p className="text-5xl">{world.emoji}</p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              {world.name} · Fase {index + 1}
+            </p>
+            <h1 className="mt-1 text-3xl font-black">
+              {level.boss && "👹 "}
+              {level.title}
+            </h1>
+          </div>
+          <div className="relative">
+            <Cutscene lines={scene.intro} onDone={() => setMode("play")} doneLabel="Escrever o feitiço ✨" />
+          </div>
+        </main>
+      ) : (
       <main className="mx-auto grid max-w-6xl gap-4 px-4 py-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <section className="space-y-4">
           <div>
@@ -117,12 +141,15 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
               {level.title}
             </h1>
             <p className="text-xs text-muted-foreground">
-              Fase {index + 1} · {level.xp} XP
+              Fase {index + 1} · {level.xp} XP ·{" "}
+              <button className="underline hover:text-foreground" onClick={() => setMode("story")}>
+                Rever a história e a explicação
+              </button>
             </p>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-card p-4">
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">📜 Pergaminho</h2>
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">📜 Resumo da Pytha</h2>
             <p className="leading-relaxed">
               <Md text={level.theory} />
             </p>
@@ -208,7 +235,6 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
                 {result.error && (
                   <div className="mt-2 space-y-2">
                     <pre className="whitespace-pre-wrap text-rose-400">{result.error}</pre>
-                    {err && <p className="font-sans text-amber-200">🧙 {err}</p>}
                   </div>
                 )}
                 {result.failure && <p className="mt-2 font-sans text-amber-300">❌ {result.failure}</p>}
@@ -218,8 +244,32 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
             )}
           </div>
 
+          {!running && result && !win && (
+            <Speech
+              who="pytha"
+              mood={result.ok ? "happy" : "sad"}
+              text={
+                result.ok
+                  ? "Seu código rodou sem erros. Quando achar que está pronto, aperte \"Lançar feitiço\" para eu conferir a missão."
+                  : `${oops[tries % oops.length]} ${
+                      err ??
+                      (result.failure
+                        ? `O feitiço rodou, mas o resultado ainda não é o que a missão pede. Veja a pista em amarelo acima e compare com a missão.`
+                        : "Leia a última linha vermelha: ela diz o tipo do erro e onde ele aconteceu.")
+                    }${attempts >= 2 && hintsShown === 0 ? " Se travar, a caixa de dicas ao lado ajuda." : ""}`
+              }
+            />
+          )}
+
           {win && (
-            <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 p-5 text-center">
+            <div className="space-y-3">
+              <Speech who={scene.win.who} text={scene.win.text} mood="happy" />
+              {!explain && <Speech who="pytha" text={`${cheers[index % cheers.length]} Por que funcionou: ${level.explain}`} mood="happy" />}
+            </div>
+          )}
+
+          {win && (
+            <div className="anim-pop rounded-xl border border-emerald-400/40 bg-emerald-500/10 p-5 text-center">
               <p className="text-lg font-bold">{level.boss ? "Chefe derrotado!" : "Fase concluída!"}</p>
               <Stars n={win.stars} size="text-4xl" />
               <p className="text-sm text-muted-foreground">+{win.xp} XP</p>
@@ -238,6 +288,7 @@ function Level({ id, savedCode }: { id: string; savedCode?: string }) {
           )}
         </section>
       </main>
+      )}
     </>
   );
 }

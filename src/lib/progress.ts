@@ -10,6 +10,7 @@ export type Progress = {
   achievements: string[];
   lastDay: string | null;
   streak: number;
+  introSeen?: boolean;
 };
 
 const KEY = "pyquest-progress-v1";
@@ -91,6 +92,10 @@ export function completeLevel(id: string, stars: number) {
   next.achievements = [...next.achievements, ...newAch];
   save(next);
   return { gainedXp, newAch, stars: next.stars[id] };
+}
+
+export function markIntroSeen() {
+  save({ ...load(), introSeen: true });
 }
 
 export function resetProgress() {
