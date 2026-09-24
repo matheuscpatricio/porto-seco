@@ -438,6 +438,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
         </div>
 
         <button
+          data-exit-full={fullscreen ? "" : undefined}
           className="absolute right-3 top-3 z-10 rounded-full border border-white/30 bg-black/60 px-2.5 py-1 text-xs font-bold text-white backdrop-blur hover:bg-black/80"
           onClick={onFullscreen}
           title={fullscreen ? "Sair da tela cheia" : "Tela cheia"}

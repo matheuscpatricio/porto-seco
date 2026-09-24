@@ -11,6 +11,7 @@ import { people } from "@/game/characters";
 import { ACHIEVEMENTS, completeLevel, isUnlocked, saveCode, useProgress } from "@/lib/progress";
 import { onReadyChange, runPython, RunResult, warmUp } from "@/lib/runPython";
 import { sound } from "@/game/audio";
+import { requestGameFullscreen } from "@/game/fullscreen";
 import confetti from "canvas-confetti";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -45,7 +46,8 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
   const game = useRef<GameHandle>(null);
   const [skipBrief] = useState(alreadyDone);
   const [phase, setPhase] = useState<Phase>("brief");
-  const [full, setFull] = useState(false);
+  const [full, setFull] = useState(true);
+  const [round, setRound] = useState(0);
   const shell = useRef<HTMLElement>(null);
   const apiFull = useRef(false);
   const [code, setCode] = useState(savedCode ?? level.starter);
@@ -111,12 +113,9 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
 
   function enterFull() {
     setFull(true);
-    const el = shell.current;
-    if (el && !document.fullscreenElement) {
-      el.requestFullscreen?.().then(() => {
-        apiFull.current = true;
-      }).catch(() => {});
-    }
+    requestGameFullscreen()?.then(() => {
+      apiFull.current = true;
+    }).catch(() => {});
   }
 
   function toggleFull() {
@@ -129,15 +128,42 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
     enterFull();
   }
 
+  function replay() {
+    setWin(null);
+    setPhase(skipBrief ? "play" : "brief");
+    setLast(null);
+    setHints(0);
+    setFails(0);
+    setSolved(false);
+    setBusy(false);
+    setCode(savedCode ?? level.starter);
+    setRound((n) => n + 1);
+  }
+
   useEffect(() => {
+    if (document.fullscreenElement) apiFull.current = true;
     const sync = () => {
-      if (!document.fullscreenElement && apiFull.current) {
+      if (document.fullscreenElement) {
+        apiFull.current = true;
+        setFull(true);
+      } else if (apiFull.current) {
         apiFull.current = false;
         setFull(false);
       }
     };
+    const arm = (e: PointerEvent) => {
+      const t = e.target;
+      if (t instanceof Element && t.closest("[data-exit-full], a, button")) return;
+      requestGameFullscreen()?.then(() => {
+        apiFull.current = true;
+      }).catch(() => {});
+    };
     document.addEventListener("fullscreenchange", sync);
-    return () => document.removeEventListener("fullscreenchange", sync);
+    window.addEventListener("pointerdown", arm);
+    return () => {
+      document.removeEventListener("fullscreenchange", sync);
+      window.removeEventListener("pointerdown", arm);
+    };
   }, []);
 
   return (
@@ -171,6 +197,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
             index={index}
             onPhase={onPhase}
             skipBrief={skipBrief}
+            key={round}
             fullscreen={full}
             onFullscreen={toggleFull}
             onStart={enterFull}
@@ -216,9 +243,8 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
             </p>
           </div>
         ) : null}
-      </main>
 
-      {win && (
+        {win && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center">
           <div className="anim-pop max-h-[92vh] w-full max-w-xl space-y-3 overflow-y-auto rounded-2xl border border-emerald-400/40 bg-card p-5 shadow-2xl">
             <div className="text-center">
@@ -241,7 +267,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
               </p>
             ))}
             <div className="flex flex-wrap justify-center gap-2 pt-1">
-              <Button variant="ghost" onClick={() => location.reload()}>
+              <Button variant="ghost" onClick={replay}>
                 Jogar de novo
               </Button>
               <LinkButton href="/" variant="secondary">
@@ -251,7 +277,8 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
             </div>
           </div>
         </div>
-      )}
+        )}
+      </main>
     </>
   );
 }

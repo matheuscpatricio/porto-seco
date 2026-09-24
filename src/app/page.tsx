@@ -9,6 +9,7 @@ import { people } from "@/game/characters";
 import { ACHIEVEMENTS, isUnlocked, markIntroSeen, resetProgress, useProgress } from "@/lib/progress";
 import Link from "next/link";
 import { sound } from "@/game/audio";
+import { requestGameFullscreen } from "@/game/fullscreen";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 const crew: Who[] = ["leo", "dani", "rui", "bia"];
@@ -123,7 +124,7 @@ export default function Home() {
                       </div>
                     );
                     return open ? (
-                      <Link key={l.id} href={`/level/${l.id}`}>
+                      <Link key={l.id} href={`/level/${l.id}`} onClick={() => requestGameFullscreen()?.catch(() => {})}>
                         {inner}
                       </Link>
                     ) : (

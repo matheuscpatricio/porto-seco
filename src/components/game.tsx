@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { VariantProps } from "class-variance-authority";
 import Link from "next/link";
 import { sound } from "@/game/audio";
+import { requestGameFullscreen } from "@/game/fullscreen";
 import { useSyncExternalStore, type ReactNode } from "react";
 
 const serverAudio = { sfx: true };
@@ -22,9 +23,16 @@ function SoundToggles() {
   );
 }
 
-export function LinkButton({ href, children, className, variant, size }: { href: string; children: ReactNode; className?: string } & VariantProps<typeof buttonVariants>) {
+export function LinkButton({ href, children, className, variant, size, onClick }: { href: string; children: ReactNode; className?: string; onClick?: () => void } & VariantProps<typeof buttonVariants>) {
   return (
-    <Link href={href} className={cn(buttonVariants({ variant, size }), className)}>
+    <Link
+      href={href}
+      onClick={() => {
+        onClick?.();
+        if (href.startsWith("/level")) requestGameFullscreen()?.catch(() => {});
+      }}
+      className={cn(buttonVariants({ variant, size }), className)}
+    >
       {children}
     </Link>
   );
