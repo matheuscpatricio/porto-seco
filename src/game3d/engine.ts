@@ -1,7 +1,7 @@
 import type { Level, Who, World } from "@/content/types";
 import { allLevels } from "@/content/worlds";
 import { sound } from "@/game/audio";
-import { guardLook, people, policeLooks, randomLook, thugLook } from "@/game/characters";
+import { diverseLook, guardLook, people, policeLooks, randomLook, thugLook } from "@/game/characters";
 import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
@@ -556,7 +556,9 @@ export class Game3D {
     let mesh: THREE.Object3D;
     if (kind === "drone") mesh = buildDrone();
     else {
-      rig = buildHuman(opts?.look ?? guardLook, { simple: true });
+      const authored = opts?.look ?? guardLook;
+      const look = authored.extras.includes("vest") ? diverseLook(authored, Math.random) : authored;
+      rig = buildHuman(look, { simple: true });
       mesh = rig.root;
     }
     const pos = a.clone();

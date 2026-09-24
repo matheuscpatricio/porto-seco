@@ -145,30 +145,45 @@ export const people: Record<Who, { name: string; role: string; look: Look; ally:
   },
 };
 
-const SKINS = ["#f1c9a5", "#e0ac84", "#c68b62", "#a86f4b", "#8a5a3b", "#6b4430", "#4a2f22"];
+const SKINS = ["#f6d3bc", "#f3d2b3", "#e0ac84", "#c68642", "#a86f4b", "#8d5524", "#6b4430", "#4a2f22", "#3d2918"];
 const HAIRS = ["#0f0f0f", "#2b1a10", "#4a2f1b", "#8b5a2b", "#c9a26b", "#9ca3af", "#e5e7eb"];
 const SHIRTS = ["#f8fafc", "#1e3a8a", "#b91c1c", "#15803d", "#fde047", "#0e7490", "#f97316", "#7c3aed", "#e11d48", "#334155", "#a3a3a3", "#ec4899"];
 const PANTS = ["#1e3a5f", "#27272a", "#57534e", "#1f2937", "#78716c", "#3f6212", "#e7e5e4"];
-const STYLES: HairStyle[] = ["short", "ponytail", "curly", "slick", "bald", "buzz"];
+const FACE_SKINS = ["#f6d3bc", "#e7b892", "#c68642", "#8d5524", "#5c3317", "#3d2918"];
 
-/** A random passer-by. `r` returns numbers in [0, 1). */
+/** A new skin on the same uniform, so officers and capangas are not one face. */
+export function diverseLook(look: Look, r: () => number): Look {
+  return { ...look, extras: [...look.extras], skin: FACE_SKINS[Math.floor(r() * FACE_SKINS.length)] };
+}
+
+/** A random passer-by. About half are women. Skins run from light to dark. `r` returns numbers in [0, 1). */
 export function randomLook(r: () => number): Look {
   const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)];
+  const woman = r() < 0.48;
   const extras: Extra[] = [];
-  if (r() < 0.2) extras.push("glasses");
-  if (r() < 0.15) extras.push("cap");
-  if (r() < 0.12) extras.push("mustache");
-  if (r() < 0.25) extras.push("jacket");
+  if (r() < 0.18) extras.push("glasses");
+  if (r() < 0.12) extras.push("cap");
+  if (!woman && r() < 0.14) extras.push("mustache");
+  if (r() < 0.28) extras.push("jacket");
+  let hairStyle: HairStyle;
+  let build: Look["build"];
+  if (woman) {
+    hairStyle = r() < 0.6 ? "ponytail" : "curly";
+    build = r() < 0.65 ? "slim" : "normal";
+  } else {
+    hairStyle = pick(["short", "slick", "bald", "buzz", "curly"] as HairStyle[]);
+    build = hairStyle === "curly" ? "big" : r() < 0.28 ? "big" : r() < 0.5 ? "slim" : "normal";
+  }
   return {
     skin: pick(SKINS),
     hair: pick(HAIRS),
-    hairStyle: pick(STYLES),
+    hairStyle,
     shirt: pick(SHIRTS),
     jacket: pick(SHIRTS),
     pants: pick(PANTS),
     shoes: pick(["#111111", "#f5f5f4", "#78350f", "#1e3a8a"]),
     extras,
-    build: r() < 0.25 ? "big" : r() < 0.5 ? "slim" : "normal",
+    build,
     accent: pick(SHIRTS),
   };
 }

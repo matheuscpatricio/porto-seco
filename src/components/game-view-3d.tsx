@@ -181,6 +181,40 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
   g.stroke();
 }
 
+const DOCKS = [28, 44, 72, 36, 96, 54, 30, 68, 42, 58];
+
+function CityBoot({ pct, label }: { pct: number; label: string }) {
+  const width = `${Math.max(6, Math.round(pct * 100))}%`;
+  return (
+    <div className="absolute inset-0 z-20 overflow-hidden" role="status" aria-live="polite">
+      <div className="absolute inset-0 bg-gradient-to-b from-[#1a1033] via-[#c45c3a] to-[#123044]" />
+      <div className="absolute left-1/2 top-[16%] h-28 w-[70%] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(255,214,160,0.7),transparent_70%)]" />
+      <div className="absolute inset-x-0 bottom-[36%] flex items-end gap-1 px-[6%] sm:gap-2">
+        {DOCKS.map((h, i) => (
+          <div key={i} className="relative flex-1 bg-[#120c16]/90" style={{ height: `${h}%`, minHeight: 28 }}>
+            <div className={`absolute right-[18%] top-[18%] h-1.5 w-1.5 rounded-full bg-amber-200 ${i % 3 === 0 ? "anim-lamp" : "opacity-40"}`} />
+          </div>
+        ))}
+      </div>
+      <div className="absolute inset-x-0 bottom-0 h-[40%] overflow-hidden bg-gradient-to-b from-[#1a5670] to-[#071018]">
+        <div className="anim-tide absolute inset-y-0 left-0 w-[200%] bg-[repeating-linear-gradient(90deg,transparent_0,transparent_42px,rgba(255,255,255,0.14)_42px,rgba(255,255,255,0.14)_43px)]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-amber-100/80" />
+      </div>
+      <div className="relative z-10 flex h-full flex-col items-center justify-center px-5 pb-10 text-center">
+        <p className="text-[10px] font-semibold tracking-[0.38em] text-amber-100/85 sm:text-[11px]">ILHA DE VÉRTICE</p>
+        <h1 className="mt-2 text-4xl font-black tracking-tight text-white drop-shadow-md sm:text-6xl">Porto Seco</h1>
+        <p className="mt-3 max-w-sm text-sm text-amber-50/85">O Léo espera na doca, jaqueta vermelha e moto ligada.</p>
+        <div className="mt-8 w-full max-w-xs sm:max-w-sm">
+          <div className="h-1.5 overflow-hidden rounded-full bg-black/45">
+            <div className="h-full rounded-full bg-gradient-to-r from-amber-100 via-orange-400 to-rose-400 transition-[width] duration-500 ease-out" style={{ width }} />
+          </div>
+          <p className="mt-3 text-xs tracking-wide text-white/85">{label}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const GameView3D = forwardRef<GameHandle, ViewProps>(
   function GameView3D({ level, world, index, onPhase, skipBrief, fullscreen, onFullscreen, onStart }, ref) {
     const wrapRef = useRef<HTMLDivElement>(null);
@@ -205,6 +239,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
     const [near, setNear] = useState(false);
     const [locked, setLocked] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [boot, setBoot] = useState({ pct: 0.06, label: "A maré encosta no cais" });
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [briefKey, setBriefKey] = useState(0);
     const [pass, setPass] = useState<"link" | "lesson">("link");
@@ -243,7 +278,10 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
       renderer.toneMappingExposure = 1.05;
       const boot = async () => {
       try {
-        await preloadScene();
+        await preloadScene((label, pct) => {
+          if (!cancel) setBoot({ label, pct });
+        });
+        if (!cancel) setBoot({ label: "Os prédios sobem na ilha", pct: 0.98 });
       } catch (err) {
         console.warn(err);
       }
@@ -498,7 +536,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
           onPointerCancel={onPointerUp}
         />
 
-        {loading && <div className="absolute inset-0 grid place-items-center bg-black text-sm text-white/70">Montando a cidade…</div>}
+        {loading && <CityBoot pct={boot.pct} label={boot.label} />}
 
         <div ref={alarmRef} className="pointer-events-none absolute inset-0 bg-red-600 opacity-0 mix-blend-screen" />
 

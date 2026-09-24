@@ -173,6 +173,13 @@
 @media (prefers-reduced-motion: reduce) {
   .anim-monitor { animation: none; }
 }
+@keyframes tide { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+.anim-tide { animation: tide 8s linear infinite; }
+@keyframes lamp { 0%, 100% { opacity: 0.35 } 50% { opacity: 1 } }
+.anim-lamp { animation: lamp 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-tide, .anim-lamp { animation: none; }
+}
 @keyframes dive { 0%, 55% { opacity: 0; transform: scale(0.2) } 85% { opacity: 1; transform: scale(1) } 100% { opacity: 1; transform: scale(1.4) } }
 @keyframes dive-in { from { opacity: 1 } to { opacity: 0 } }
 .anim-dive { background: radial-gradient(circle, #ecfccb 0%, #4ade80 25%, #052e16 70%); animation: dive 1.8s ease-in forwards; }

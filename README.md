@@ -49,7 +49,7 @@ Depois abra http://localhost:43123. Na primeira execução, o navegador baixa o 
 - `src/game3d/engine.ts`: motor 3D com Three.js (câmera em terceira pessoa, física, inimigos, pedestres, trânsito, objetivos da missão, mergulho no terminal, alarme e fuga)
 - `src/game3d/missions.ts`: escolhe o roteiro de cada missão e monta a lista de objetivos
 - `src/game3d/world.ts`: gerador do bairro. O chão usa fotos reais (asfalto, areia, grama, concreto, reboco e telha) com relevo. Os carros são uma malha de conceito com cerca de 213 mil triângulos
-- `src/game3d/human.ts` e `src/game3d/cast.ts`: o Léo, a Dani, a polícia e os pedestres usam malhas com esqueleto e foto (Soldier e Michelle, da Mixamo). O Xbot tem mais triângulos, mas vem sem foto, então só empresta as animações
+- `src/game3d/human.ts` e `src/game3d/cast.ts`: o Léo e os pedestres homens usam o Xbot pintado (pele, cabelo, roupa e olhos). As mulheres usam a Michelle, de pé, com peles claras e escuras. Polícia e capangas ficam no Soldier fotografado, com o rosto recolorido
 - `src/game3d/vehicles.ts`: o carro escaneado, sem a placa e sem o emblema do volante
 
 ## Créditos das malhas e fotos
