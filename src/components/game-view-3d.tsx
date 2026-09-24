@@ -3,6 +3,7 @@
 import { Dialogue } from "@/components/dialogue";
 import type { Level, Who, World } from "@/content/types";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
+import { BLOCK, blockStart } from "@/game3d/world";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -48,8 +49,96 @@ function Btn({ label, onPress, className = "" }: { label: string; onPress: (d: b
   );
 }
 
-export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; index: number; onPhase: (p: Phase) => void; skipBrief: boolean }>(
-  function GameView3D({ level, world, index, onPhase, skipBrief }, ref) {
+type ViewProps = { level: Level; world: World; index: number; onPhase: (p: Phase) => void; skipBrief: boolean; fullscreen: boolean; onFullscreen: () => void; onStart: () => void };
+
+const MAP_R = 70;
+
+function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
+  const g = c.getContext("2d");
+  if (!g) return;
+  const W = c.width;
+  const half = W / 2;
+  const s = half / MAP_R;
+  const cos = Math.cos(m.player.cam);
+  const sin = Math.sin(m.player.cam);
+  const toScreen = (x: number, z: number) => {
+    const dx = x - m.player.x;
+    const dz = z - m.player.z;
+    return [half + (-cos * dx + sin * dz) * s, half + (-sin * dx - cos * dz) * s] as const;
+  };
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, W, W);
+  g.save();
+  g.beginPath();
+  g.arc(half, half, half - 2, 0, Math.PI * 2);
+  g.clip();
+  g.fillStyle = "#2b2f36";
+  g.fillRect(0, 0, W, W);
+  const a = -cos * s;
+  const b = -sin * s;
+  const cc = sin * s;
+  const d = -cos * s;
+  g.setTransform(a, b, cc, d, half - (a * m.player.x + cc * m.player.z), half - (b * m.player.x + d * m.player.z));
+  for (let i = 0; i < 3; i++)
+    for (let j = 0; j < 3; j++) {
+      const inCompound = blockStart(i) === m.compound.minX && blockStart(j) === m.compound.minZ;
+      g.fillStyle = inCompound ? "#4c3a6b" : "#5b6270";
+      g.fillRect(blockStart(i) - 1.5, blockStart(j) - 1.5, BLOCK + 3, BLOCK + 3);
+      g.fillStyle = inCompound ? "#5e4a82" : "#7a8190";
+      g.fillRect(blockStart(i) + 1.5, blockStart(j) + 1.5, BLOCK - 3, BLOCK - 3);
+    }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const dot = (x: number, z: number, r: number, color: string) => {
+    const [sx, sy] = toScreen(x, z);
+    g.fillStyle = color;
+    g.beginPath();
+    g.arc(sx, sy, r, 0, Math.PI * 2);
+    g.fill();
+  };
+  for (const car of m.cars) dot(car.x, car.z, 2.5, "#cbd5e1");
+  dot(m.escape.x, m.escape.z, 4, "#f43f5e");
+  if (m.runner) dot(m.runner.x, m.runner.z, 4, "#fb923c");
+  for (const al of m.allies) dot(al.x, al.z, 3.5, "#38bdf8");
+  for (const e of m.enemies) dot(e.x, e.z, e.boss ? 5 : 3.5, e.boss ? "#ff0040" : "#ef4444");
+  g.restore();
+  let [tx, ty] = toScreen(m.target.x, m.target.z);
+  const dist = Math.hypot(tx - half, ty - half);
+  const edge = half - 9;
+  if (dist > edge) {
+    tx = half + ((tx - half) / dist) * edge;
+    ty = half + ((ty - half) / dist) * edge;
+  }
+  g.fillStyle = "#fbbf24";
+  g.strokeStyle = "#000";
+  g.lineWidth = 2;
+  g.beginPath();
+  g.arc(tx, ty, 6, 0, Math.PI * 2);
+  g.fill();
+  g.stroke();
+  const rel = m.player.yaw - m.player.cam;
+  g.save();
+  g.translate(half, half);
+  g.rotate(-rel);
+  g.fillStyle = "#ffffff";
+  g.strokeStyle = "#000";
+  g.beginPath();
+  g.moveTo(0, -8);
+  g.lineTo(6, 6);
+  g.lineTo(0, 3);
+  g.lineTo(-6, 6);
+  g.closePath();
+  g.fill();
+  g.stroke();
+  g.restore();
+  g.strokeStyle = "rgba(255,255,255,0.35)";
+  g.lineWidth = 3;
+  g.beginPath();
+  g.arc(half, half, half - 2, 0, Math.PI * 2);
+  g.stroke();
+}
+
+export const GameView3D = forwardRef<GameHandle, ViewProps>(
+  function GameView3D({ level, world, index, onPhase, skipBrief, fullscreen, onFullscreen, onStart }, ref) {
     const wrapRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const gameRef = useRef<Game3D | null>(null);
@@ -66,6 +155,7 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
     const bossNameRef = useRef<HTMLSpanElement>(null);
     const alarmRef = useRef<HTMLDivElement>(null);
     const knobRef = useRef<HTMLDivElement>(null);
+    const mapRef = useRef<HTMLCanvasElement>(null);
     const [phase, setPhase] = useState<Phase>("brief");
     const [near, setNear] = useState(false);
     const [locked, setLocked] = useState(false);
@@ -165,6 +255,7 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
           bossBarRef.current.style.width = `${h.boss.pct * 100}%`;
           bossNameRef.current.textContent = h.boss.name;
         }
+        if (mapRef.current && frames % 3 === 0 && (game.phase === "play" || game.phase === "open")) drawMinimap(mapRef.current, game.minimap());
         if (alarmRef.current) alarmRef.current.style.opacity = h.alarm ? String(0.25 + Math.sin(now / 90) * 0.15) : "0";
         raf = requestAnimationFrame(loop);
       };
@@ -287,7 +378,7 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
     const inCyber = phase === "hack" || phase === "result";
 
     return (
-      <div ref={wrapRef} className="relative h-[min(68vh,620px)] min-h-[340px] w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl">
+      <div ref={wrapRef} className={`overflow-hidden bg-black ${fullscreen ? "absolute inset-0" : "relative h-[min(68vh,620px)] min-h-[340px] w-full rounded-xl border border-white/10 shadow-2xl"}`}>
         <canvas
           ref={canvasRef}
           className="block h-full w-full touch-none"
@@ -311,7 +402,8 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
               <span ref={objRef} className="max-w-[70vw] truncate font-semibold sm:max-w-[52vw]" />
             </div>
             <div className="pointer-events-none absolute left-1/2 top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 shadow" />
-            <div className="pointer-events-none absolute right-3 top-3 hidden rounded-lg bg-black/55 px-2.5 py-1 text-[11px] leading-tight text-white/80 md:block">
+            <canvas ref={mapRef} width={160} height={160} className="pointer-events-none absolute right-3 top-12 size-28 drop-shadow-lg sm:size-36" />
+            <div className="pointer-events-none absolute bottom-3 left-3 hidden max-w-[60%] rounded-lg bg-black/55 px-2.5 py-1 text-[11px] leading-tight text-white/80 md:block">
               {locked ? (
                 <>
                   <b>WASD</b> andar · <b>Shift</b> correr · <b>Mouse</b> olhar · <b>Clique/F</b> atirar · <b>Espaço</b> pular · <b>E</b> hackear · <b>Esc</b> soltar o mouse
@@ -345,6 +437,14 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
           ))}
         </div>
 
+        <button
+          className="absolute right-3 top-3 z-10 rounded-full border border-white/30 bg-black/60 px-2.5 py-1 text-xs font-bold text-white backdrop-blur hover:bg-black/80"
+          onClick={onFullscreen}
+          title={fullscreen ? "Sair da tela cheia" : "Tela cheia"}
+        >
+          {fullscreen ? "✕ Sair" : "⛶ Tela cheia"}
+        </button>
+
         {phase === "dive" && <div key="dive" className="anim-dive pointer-events-none absolute inset-0" />}
         {phase === "hack" && <div key="in" className="anim-dive-in pointer-events-none absolute inset-0" />}
         {phase === "surface" && <div key="out" className="anim-dive-in pointer-events-none absolute inset-0" />}
@@ -364,7 +464,10 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
               lines={level.brief}
               onSpeaker={setSpeaker}
               doneLabel="Começar missão ▶"
-              onDone={() => gameRef.current?.startPlay()}
+              onDone={() => {
+                onStart();
+                gameRef.current?.startPlay();
+              }}
             />
           </div>
         )}

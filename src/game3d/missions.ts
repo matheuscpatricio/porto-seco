@@ -146,5 +146,6 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       break;
     }
   }
+  if (!m.gate && !m.pickup) m.pickup = pickupNear(far(L.spots, L.spawn, 30, r));
   return m;
 }

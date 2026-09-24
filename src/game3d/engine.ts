@@ -5,7 +5,7 @@ import { guardLook, people, randomLook } from "@/game/characters";
 import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
-import { buildCar, buildWorld, Collider, LANE, Layout, streetCenter, THEMES, updateScreen } from "@/game3d/world";
+import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
 export type Phase = "brief" | "play" | "dive" | "hack" | "result" | "surface" | "open" | "escape" | "done";
@@ -193,7 +193,7 @@ export class Game3D {
     this.scene.add(this.sun, this.sun.target);
 
     if (M.terminal) this.moveTerminal(M.terminal);
-    if (M.pickup) this.moveCar(M.pickup.pos, M.pickup.yaw);
+    if (M.pickup) this.moveCar(this.openCurb(M.pickup.pos, M.pickup.yaw), M.pickup.yaw);
 
     const rig = buildHuman(people.leo.look);
     this.scene.add(rig.root);
@@ -299,6 +299,44 @@ export class Game3D {
     const c = L.car.userData.collider as Collider;
     const along = Math.abs(Math.sin(yaw)) > 0.5;
     Object.assign(c, along ? { minX: p.x - 2.2, maxX: p.x + 2.2, minZ: p.z - 1, maxZ: p.z + 1 } : { minX: p.x - 1, maxX: p.x + 1, minZ: p.z - 2.2, maxZ: p.z + 2.2 });
+  }
+
+  /** Slides the escape car along the curb until the player can walk up to the driver's door. */
+  private openCurb(want: THREE.Vector3, yaw: number) {
+    const along = Math.abs(Math.sin(yaw)) > 0.5;
+    const axis: "x" | "z" = along ? "x" : "z";
+    const candidates = [0];
+    for (let d = 4; d <= 48; d += 4) candidates.push(d, -d);
+    for (const delta of candidates) {
+      const p = want.clone();
+      p[axis] += delta;
+      if (this.curbFits(p, along)) return p;
+    }
+    const fallback = new THREE.Vector3(streetCenter(1) + 4.9, 0, streetCenter(1));
+    return this.curbFits(fallback, false) ? fallback : want;
+  }
+
+  private curbFits(p: THREE.Vector3, along: boolean) {
+    if (p.x < 4 || p.z < 4 || p.x > SIZE - 4 || p.z > SIZE - 4) return false;
+    const box = along
+      ? { minX: p.x - 2.5, maxX: p.x + 2.5, minZ: p.z - 1.3, maxZ: p.z + 1.3 }
+      : { minX: p.x - 1.3, maxX: p.x + 1.3, minZ: p.z - 2.5, maxZ: p.z + 2.5 };
+    const own = this.layout.car.userData.collider as Collider;
+    const comp = this.layout.compound;
+    const inside = (x: number, z: number, pad: number) => x > comp.minX - pad && x < comp.maxX + pad && z > comp.minZ - pad && z < comp.maxZ + pad;
+    if (inside(p.x, p.z, 1.5)) return false;
+    const hits = (x: number, z: number, padX: number, padZ: number) => {
+      for (const c of this.layout.colliders) {
+        if (c === own || c.top < 1 || c.top > 80) continue;
+        if (x + padX > c.minX && x - padX < c.maxX && z + padZ > c.minZ && z - padZ < c.maxZ) return true;
+      }
+      return false;
+    };
+    if (hits((box.minX + box.maxX) / 2, (box.minZ + box.maxZ) / 2, (box.maxX - box.minX) / 2, (box.maxZ - box.minZ) / 2)) return false;
+    const door = along ? new THREE.Vector3(p.x, 0, p.z + 2.4) : new THREE.Vector3(p.x - 2.4, 0, p.z);
+    if (door.x < 1.5 || door.z < 1.5 || door.x > SIZE - 1.5 || door.z > SIZE - 1.5) return false;
+    if (inside(door.x, door.z, 0) || hits(door.x, door.z, 0.5, 0.5)) return false;
+    return door.distanceTo(p) < 3.2;
   }
 
   private spawnBoss(p: THREE.Vector3, zone: 1 | 2) {
@@ -667,6 +705,20 @@ export class Game3D {
       script: this.mission.title,
       step: Math.min(this.stepIdx + 1, this.mission.steps.length),
       steps: this.mission.steps.length,
+    };
+  }
+
+  minimap() {
+    const alive = (e: Enemy) => e.hp > 0;
+    return {
+      player: { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw, cam: this.camYaw },
+      target: this.targetPos(),
+      enemies: this.enemies.filter(alive).map((e) => ({ x: e.pos.x, z: e.pos.z, boss: e.kind === "boss" })),
+      allies: this.allies.map((a) => ({ x: a.pos.x, z: a.pos.z })),
+      cars: this.traffic.map((c) => ({ x: c.pos.x, z: c.pos.z })),
+      escape: { x: this.layout.car.position.x, z: this.layout.car.position.z },
+      runner: this.runner ? { x: this.runner.pos.x, z: this.runner.pos.z } : null,
+      compound: this.layout.compound,
     };
   }
 

@@ -45,6 +45,9 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
   const game = useRef<GameHandle>(null);
   const [skipBrief] = useState(alreadyDone);
   const [phase, setPhase] = useState<Phase>("brief");
+  const [full, setFull] = useState(false);
+  const shell = useRef<HTMLElement>(null);
+  const apiFull = useRef(false);
   const [code, setCode] = useState(savedCode ?? level.starter);
   const [busy, setBusy] = useState(false);
   const [last, setLast] = useState<RunResult | null>(null);
@@ -106,11 +109,42 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
 
   const hacking = phase === "hack" || (phase === "result" && busy);
 
+  function enterFull() {
+    setFull(true);
+    const el = shell.current;
+    if (el && !document.fullscreenElement) {
+      el.requestFullscreen?.().then(() => {
+        apiFull.current = true;
+      }).catch(() => {});
+    }
+  }
+
+  function toggleFull() {
+    if (full) {
+      setFull(false);
+      apiFull.current = false;
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      return;
+    }
+    enterFull();
+  }
+
+  useEffect(() => {
+    const sync = () => {
+      if (!document.fullscreenElement && apiFull.current) {
+        apiFull.current = false;
+        setFull(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
   return (
     <>
-      <TopBar />
-      <main className="mx-auto w-full max-w-6xl space-y-2 px-2 py-2 sm:px-4 sm:py-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
+      {!full && <TopBar />}
+      <main ref={shell} className={full ? "fixed inset-0 z-30 flex h-dvh flex-col bg-black" : "mx-auto w-full max-w-6xl space-y-2 px-2 py-2 sm:px-4 sm:py-3"}>
+        {!full && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
           <LinkButton href="/" size="sm" variant="ghost">
             ← Mapa
           </LinkButton>
@@ -127,24 +161,38 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
           <button className="text-xs text-muted-foreground underline hover:text-foreground" onClick={() => game.current?.replayBrief()} disabled={phase !== "play"}>
             Rever o briefing
           </button>
+        </div>}
+
+        <div className={full ? "relative min-h-0 flex-1" : undefined}>
+          <GameView3D
+            ref={game}
+            level={level}
+            world={world}
+            index={index}
+            onPhase={onPhase}
+            skipBrief={skipBrief}
+            fullscreen={full}
+            onFullscreen={toggleFull}
+            onStart={enterFull}
+          />
         </div>
 
-        <GameView3D ref={game} level={level} world={world} index={index} onPhase={onPhase} skipBrief={skipBrief} />
-
         {hacking ? (
-          <HackPanel
-            level={level}
-            code={code}
-            setCode={setCode}
-            busy={busy}
-            last={last}
-            hintsShown={hints}
-            onHint={() => setHints((h) => h + 1)}
-            onRun={() => run(code)}
-            onSolve={solve}
-            onExit={() => game.current?.closeHack()}
-          />
-        ) : (
+          <div className={full ? "max-h-[42vh] shrink-0 overflow-y-auto" : undefined}>
+            <HackPanel
+              level={level}
+              code={code}
+              setCode={setCode}
+              busy={busy}
+              last={last}
+              hintsShown={hints}
+              onHint={() => setHints((h) => h + 1)}
+              onRun={() => run(code)}
+              onSolve={solve}
+              onExit={() => game.current?.closeHack()}
+            />
+          </div>
+        ) : !full ? (
           <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-card/70 px-3 py-2 text-sm">
             <span className="text-lg">🎯</span>
             <p className="min-w-0 flex-1 leading-snug">
@@ -167,7 +215,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
               )}
             </p>
           </div>
-        )}
+        ) : null}
       </main>
 
       {win && (
