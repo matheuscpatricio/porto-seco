@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test src/lib/progress-rules.test.ts src/game3d/rules.test.ts src/content/story.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/progress-rules.test.ts src/game3d/rules.test.ts src/content/story.test.ts src/content/phone.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

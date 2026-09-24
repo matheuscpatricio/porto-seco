@@ -1,8 +1,8 @@
-import { BIKE_PARK, BLOCK, COAST, districtAt, GREEN, HOME, ISLAND, SAND, SHOP_A, SHOP_B, STREET, type RoomGap } from "@/game3d/rules";
+import { BIKE_PARK, BLOCK, CENTRAL, COAST, districtAt, GREEN, HOME, ISLAND, JET, PIER, QUAY, SAND, SHOP_A, SHOP_B, STREET, type RoomGap } from "@/game3d/rules";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
-export type DoorPlace = "home" | "shop" | "target";
+export type DoorPlace = "home" | "shop" | "target" | "central";
 export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean; door?: DoorPlace; shut?: number };
 
 export { BLOCK, COAST, GREEN, STREET };
@@ -57,6 +57,9 @@ export type Layout = {
   screen: { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture };
   beacon: THREE.Mesh;
   night: boolean;
+  bike: THREE.Group;
+  jet: THREE.Group;
+  ships: THREE.Group[];
 };
 
 function rng(seed: number) {
@@ -419,6 +422,7 @@ function addCoast(scene: THREE.Scene, night: boolean) {
   const side = (axis: "x" | "z", sign: -1 | 1) => {
     for (let t = 8; t < ISLAND - 8; t += 8) {
       const along = t + (c() - 0.5) * 2.4;
+      if (axis === "z" && sign < 0 && along > QUAY.minX - 2 && along < QUAY.maxX + 2) continue;
       const bush = 2.4 + c() * 4;
       const palm = 6.5 + c() * 5.5;
       const rock = GREEN + 3 + c() * (SAND - 5);
@@ -480,6 +484,65 @@ function addCoast(scene: THREE.Scene, night: boolean) {
   rockMesh.count = rocks.length;
   scene.add(rockMesh);
   return cols;
+}
+
+function buildPort(scene: THREE.Scene) {
+  const concrete = std({ color: "#9aa0a6", roughness: 0.9 });
+  const wood = std({ color: "#8a5a32", roughness: 0.85 });
+  const deck = (w: number, d: number, x: number, z: number, mat: THREE.Material) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, d), mat);
+    m.position.set(x, 0.2, z);
+    m.receiveShadow = true;
+    m.castShadow = true;
+    scene.add(m);
+  };
+  const quayW = QUAY.maxX - QUAY.minX;
+  const quayD = 0.2 - QUAY.minZ;
+  deck(quayW, quayD, (QUAY.minX + QUAY.maxX) / 2, (QUAY.minZ + 0.2) / 2, concrete);
+  const pierW = PIER.maxX - PIER.minX;
+  const pierD = 0.2 - PIER.minZ;
+  deck(pierW, pierD, (PIER.minX + PIER.maxX) / 2, (PIER.minZ + 0.2) / 2, wood);
+  for (const x of [QUAY.minX + 4, QUAY.maxX - 4, 80]) {
+    mesh(new THREE.CylinderGeometry(0.28, 0.32, 1.1, 8), std({ color: "#1f2937" }), x, 0.7, -1.2, scene, true);
+  }
+  const sign = labelPlane("PORTO", "#fbbf24");
+  sign.position.set(80, 3.2, 0.4);
+  scene.add(sign);
+  const ships = [buildShip("#1e3a5f"), buildShip("#7f1d1d")];
+  ships[0].position.set(63, 0, -16);
+  ships[1].position.set(97, 0, -22);
+  ships.forEach((s) => scene.add(s));
+  return ships;
+}
+
+function labelPlane(text: string, color: string) {
+  const [c, g] = canvas(512, 96);
+  g.fillStyle = "#0b1220";
+  g.fillRect(0, 0, 512, 96);
+  g.fillStyle = color;
+  g.font = "bold 42px sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(text, 256, 48);
+  const map = tex(c);
+  return new THREE.Mesh(new THREE.PlaneGeometry(4.4, 0.82), new THREE.MeshBasicMaterial({ map, toneMapped: false }));
+}
+
+function buildShip(hullColor: string) {
+  const g = new THREE.Group();
+  const hull = std({ color: hullColor, roughness: 0.55, metalness: 0.35 });
+  const cabin = std({ color: "#e7e5e4", roughness: 0.6 });
+  box(16, 2.4, 4.2, hull, 0, 1.3, 0, g, true, 0.15);
+  box(5, 2.2, 3.2, cabin, -2.2, 3.2, 0, g, true, 0.08);
+  box(0.45, 2.4, 0.45, std({ color: "#44403c" }), 2.4, 4.2, 0, g, true);
+  return g;
+}
+
+function buildJet() {
+  const g = new THREE.Group();
+  box(1.7, 0.28, 0.55, std({ color: "#f97316", roughness: 0.45, metalness: 0.2 }), 0, 0.35, 0, g, true, 0.08);
+  box(0.45, 0.35, 0.4, std({ color: "#111827" }), -0.35, 0.6, 0, g, true, 0.05);
+  return g;
 }
 
 function buildLamp(night: boolean) {
@@ -795,8 +858,9 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
           const cx = bx + 9 + li * 18;
           const cz = bz + 9 + lj * 18;
           const homeLot = i === 0 && j === 0 && li === 0 && lj === 0;
+          const centralLot = i === 0 && j === 0 && li === 1 && lj === 0;
           const shopLot = (i === 2 && j === 0 && li === 1 && lj === 0) || (i === 0 && j === 2 && li === 0 && lj === 1);
-          if (homeLot || shopLot) continue;
+          if (homeLot || centralLot || shopLot) continue;
           const roll = r();
           if (roll < 0.2 && !(i === 0 && j === 0)) {
             for (let k = 0; k < 3; k++) {
@@ -1002,8 +1066,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
 
   const roomWall = std({ color: "#e7d3b0", roughness: 0.85 });
   const shopMat = std({ color: "#d6d3d1", roughness: 0.8 });
-  const placeRoom = (minX: number, maxX: number, minZ: number, maxZ: number, door: "home" | "shop", gap: RoomGap) => {
-    const mat = door === "home" ? roomWall : shopMat;
+  const placeRoom = (minX: number, maxX: number, minZ: number, maxZ: number, door: "home" | "shop" | "central", gap: RoomGap) => {
+    const mat = door === "home" ? roomWall : door === "central" ? std({ color: "#dbe7f0", roughness: 0.7 }) : shopMat;
     const midX = (minX + maxX) / 2;
     const midZ = (minZ + maxZ) / 2;
     box(maxX - minX, 0.1, maxZ - minZ, mat, midX, 0.26, midZ, scene, false);
@@ -1054,6 +1118,12 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   placeRoom(HOME.minX, HOME.maxX, HOME.minZ, HOME.maxZ, "home", HOME.gap);
   placeRoom(SHOP_A.minX, SHOP_A.maxX, SHOP_A.minZ, SHOP_A.maxZ, "shop", SHOP_A.gap);
   placeRoom(SHOP_B.minX, SHOP_B.maxX, SHOP_B.minZ, SHOP_B.maxZ, "shop", SHOP_B.gap);
+  placeRoom(CENTRAL.minX, CENTRAL.maxX, CENTRAL.minZ, CENTRAL.maxZ, "central", CENTRAL.gap);
+  const centralSign = labelPlane("CENTRAL DA DANI", "#38bdf8");
+  centralSign.position.set((CENTRAL.minX + CENTRAL.maxX) / 2, 3.15, CENTRAL.minZ - 0.05);
+  scene.add(centralSign);
+  box(0.35, 0.12, 0.5, std({ color: "#0f172a" }), 41, 0.9, 22.4, scene, false);
+  box(0.22, 0.08, 0.16, std({ color: "#111827" }), 41, 1.02, 22.2, scene, false);
   const yard = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), grassMat);
   yard.rotation.x = -Math.PI / 2;
   yard.position.set(23.2, 0.22, 23.2);
@@ -1069,9 +1139,17 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     scene.add(tree);
     addCol(tx - 0.25, tx + 0.25, tz - 0.25, tz + 0.25, 3);
   }
-  const bike = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 0.5), std({ color: "#111827", metalness: 0.4, roughness: 0.45 }));
-  bike.position.set(BIKE_PARK.x, 0.55, BIKE_PARK.z);
+  const bike = new THREE.Group();
+  box(1.7, 0.45, 0.28, std({ color: "#111827", metalness: 0.45, roughness: 0.4 }), 0, 0.55, 0, bike, true, 0.06);
+  box(0.35, 0.55, 0.12, std({ color: "#1f2937" }), -0.15, 0.85, 0, bike, true, 0.04);
+  mesh(new THREE.TorusGeometry(0.32, 0.08, 8, 16), std({ color: "#0a0a0a" }), 0.55, 0.32, 0, bike, true).rotation.y = Math.PI / 2;
+  mesh(new THREE.TorusGeometry(0.32, 0.08, 8, 16), std({ color: "#0a0a0a" }), -0.7, 0.32, 0, bike, true).rotation.y = Math.PI / 2;
+  bike.position.set(BIKE_PARK.x, 0, BIKE_PARK.z);
   scene.add(bike);
+  const port = buildPort(scene);
+  const jet = buildJet();
+  jet.position.set(JET.x, 0, JET.z);
+  scene.add(jet);
   for (const c of addCoast(scene, night)) addCol(c.minX, c.maxX, c.minZ, c.maxZ, 3);
 
   const spawn = new THREE.Vector3(BIKE_PARK.x + 2.2, 0, BIKE_PARK.z);
@@ -1100,5 +1178,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     screen: layoutScreen,
     beacon,
     night,
+    bike,
+    jet,
+    ships: port,
   };
 }

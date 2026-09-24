@@ -3,7 +3,7 @@ export type Life = {
   bike: boolean;
 };
 
-export const EMPTY_LIFE: Life = { money: 0, bike: false };
+export const EMPTY_LIFE: Life = { money: 0, bike: true };
 
 export function mergeRecord<T extends Record<string, unknown>>(empty: T, parsed: unknown): T {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { ...empty };

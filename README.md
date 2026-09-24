@@ -5,13 +5,13 @@ Um jogo de ação no navegador para aprender Python do zero ao avançado.
 Léo é motoboy em Porto Seco, está devendo para o agiota Caveira e nunca programou. A hacker Dani recruta o Léo para derrubar a Vértice Segurança, a empresa de Augusto Vidal que controla a cidade. Ao longo de 30 missões em 6 capítulos, o jogador:
 
 - controla o Léo em 3D, em terceira pessoa, num bairro aberto com prédios, sacadas, toldos, árvores, postes, calçada de pedra portuguesa, pedestres andando e carros circulando: anda, corre, pula, atira com a pistola de choque e derruba seguranças, drones e chefes (todos com uma seta vermelha em cima da cabeça);
-- joga missões com roteiros diferentes: invasão do complexo, entrega com um contato na rua, perseguição de carro (atirando nos pneus), escolta da Dani, fuga a pé com alarme e confronto com o chefe na praça;
+- joga missões com roteiros diferentes: invasão do complexo, entrega com um contato na rua, perseguição de carro (atirando nos pneus), fuga de jet ski pelo mar, fuga a pé com alarme e confronto com o chefe na praça;
 - chega ao terminal e, ao apertar E, vê o Léo digitando e mergulhando dentro do computador, num ciberespaço onde as travas do sistema são cadeados 3D;
 - hackeia escrevendo Python de verdade, que roda no navegador com [Pyodide](https://pyodide.org): cada trava abre ou quebra conforme o resultado do código;
 - volta para a rua: com o código certo, a missão avança; com o código errado, o alarme dispara, os pedestres correm e chegam reforços;
 - termina a missão no próprio objetivo. A fuga de carro com o Tio Rui fica para a perseguição e para o confronto com o chefe.
 
-A cidade é uma ilha só. Entre a última rua e o mar tem grama, palmeiras e uma praia. Continuar a história deixa o Léo em casa, no mesmo mapa, com o dinheiro da missão. A casa e as oficinas ficam no lote, fora da pista. Em casa ele estuda o Python da próxima lição. Na oficina, com 500, compra a moto e pilota a rua entre uma missão e outra. Atirar num pedestre chama a polícia. O mar devolve o Léo para o último ponto seguro.
+A cidade é uma ilha só. Entre a última rua e o mar tem grama, palmeiras e uma praia. No sul, um porto com cais, pier e navios que entram e saem. Continuar a história deixa o Léo em casa, no mesmo mapa, com o dinheiro da missão. A casa, a Central da Dani e as oficinas ficam no lote, fora da pista. Em casa ele estuda o Python da próxima lição. Na Central da Dani, o telefone liga para ela: a explicação da lição sai em linguagem bem simples, e ela não aparece no meio da rua. A moto já é dele desde o começo. Perto dela, E sobe; E de novo desce. Dá para pilotar na rua, na ilha e durante a missão. Depois de alguns hacks, duas viaturas saem atrás dele até o porto. Carros se empurram, e um impacto forte derruba o Léo sem falhar a missão. Numa das missões ele hackeia o portão do porto e foge de jet ski até uma boia no mar. Atirar num pedestre chama a polícia. O mar, sem o jet ski, devolve o Léo para o último ponto seguro.
 
 Os carros param para pedestres e buzinam se o Léo ficar na frente. Tiros assustam quem está por perto.
 
@@ -30,7 +30,7 @@ Não há música. Todo o som é gerado no navegador com a Web Audio API (`src/ga
 
 ## Controles
 
-- Teclado e mouse: clique no jogo para prender o mouse na câmera. W A S D (ou ↑ ↓) andam, ← → giram a câmera, Shift corre, espaço pula, clique ou F atira (com mira assistida), E hackeia e Esc solta o mouse.
+- Teclado e mouse: clique no jogo para prender o mouse na câmera. W A S D (ou ↑ ↓) andam, ← → giram a câmera, Shift corre, espaço pula, clique ou F atira (com mira assistida), E hackeia, sobe e desce da moto ou do jet ski, estuda em casa e liga para a Dani na central. Esc solta o mouse.
 - Celular: joystick virtual no lado esquerdo, arraste no lado direito para girar a câmera, e botões de pular, atirar e hackear.
 
 ## Como rodar

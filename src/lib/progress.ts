@@ -37,6 +37,7 @@ function load(): Progress {
   } catch {
     cache = { ...empty };
   }
+  cache.bike = true;
   return cache!;
 }
 

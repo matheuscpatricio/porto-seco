@@ -1,9 +1,9 @@
 import type { Level } from "@/content/types";
-import { endingFor, liveScript } from "@/game3d/rules";
+import { BUOY, endingFor, liveScript, policeAfterHack, PORT_GATE } from "@/game3d/rules";
 import { BLOCK, blockStart, Layout, Spot, streetCenter } from "@/game3d/world";
 import * as THREE from "three";
 
-export type ScriptKind = "invasao" | "entrega" | "perseguicao" | "escolta" | "fuga" | "confronto";
+export type ScriptKind = "invasao" | "entrega" | "perseguicao" | "escolta" | "fuga" | "confronto" | "mar";
 
 export type Step =
   | { k: "go"; to: THREE.Vector3; text: string; arrive: string; spawnBoss?: boolean }
@@ -12,7 +12,9 @@ export type Step =
   | { k: "chase"; text: string }
   | { k: "escort"; path: THREE.Vector3[]; text: string }
   | { k: "boss"; text: string }
-  | { k: "car"; text: string };
+  | { k: "car"; text: string }
+  | { k: "cops"; to: THREE.Vector3; text: string }
+  | { k: "jet"; to: THREE.Vector3; text: string };
 
 export type Mission = {
   kind: ScriptKind;
@@ -34,6 +36,7 @@ export const SCRIPT_LABEL: Record<ScriptKind, string> = {
   escolta: "Escolta",
   fuga: "Fuga a pé",
   confronto: "Confronto",
+  mar: "Fuga no mar",
 };
 
 export function scriptFor(level: Level, index: number, bossOrder: number): ScriptKind {
@@ -129,6 +132,14 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       m.steps = [{ k: "hack" }, { k: "go", to: L.spawn.clone(), text: "Alarme! Volte para casa a pé", arrive: "Você chegou em casa." }];
       break;
     }
+    case "mar": {
+      m.terminal = new THREE.Vector3(PORT_GATE.x, 0, PORT_GATE.z);
+      m.steps = [
+        { k: "hack" },
+        { k: "jet", to: new THREE.Vector3(BUOY.x, 0, BUOY.z), text: "Suba no jet ski do porto e fuja até a boia" },
+      ];
+      break;
+    }
     case "confronto": {
       const plaza = far(L.spots, L.spawn, 50, r);
       const t = far(L.spots, plaza.pos, 25, r);
@@ -141,6 +152,12 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
         { k: "hack" },
       ];
       break;
+    }
+  }
+  if (policeAfterHack(kind, !!level.boss)) {
+    const hackAt = m.steps.findIndex((s) => s.k === "hack");
+    if (hackAt >= 0) {
+      m.steps.splice(hackAt + 1, 0, { k: "cops", to: new THREE.Vector3(PORT_GATE.x, 0, PORT_GATE.z), text: "Viatura no seu encalço. Chegue ao porto." });
     }
   }
   if (endingFor(kind) === "car") m.steps.push(car);

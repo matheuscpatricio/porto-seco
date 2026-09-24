@@ -15,9 +15,15 @@ import {
   inSea,
   ISLAND,
   knockdownWanted,
+  BUOY,
+  CENTRAL,
+  JET,
   liveScript,
+  onPier,
   overlapsStreet,
+  policeAfterHack,
   roomExit,
+  separateCircles,
   shirtFor,
   SHOP_A,
   SHOP_B,
@@ -37,6 +43,9 @@ test("the beach is walkable and the sea starts past it", () => {
   assert.equal(inSea(ISLAND + 4, 20), false);
   assert.equal(inSea(-COAST - 1, 20), true);
   assert.equal(inSea(ISLAND + COAST + 1, 20), true);
+  assert.equal(inSea(JET.x, JET.z), false);
+  assert.equal(onPier(JET.x, JET.z), true);
+  assert.equal(inSea(BUOY.x, BUOY.z), true);
 });
 
 test("home and shops sit off the roadway", () => {
@@ -44,6 +53,7 @@ test("home and shops sit off the roadway", () => {
   assert.equal(overlapsStreet(HOME), false);
   assert.equal(overlapsStreet(SHOP_A), false);
   assert.equal(overlapsStreet(SHOP_B), false);
+  assert.equal(overlapsStreet(CENTRAL), false);
   assert.equal(indoors(HOME_STUDY.x, HOME_STUDY.z), true);
   assert.equal(indoors(BIKE_PARK.x, BIKE_PARK.z), false);
   const out = roomExit(HOME_STUDY.x, HOME_STUDY.z);
@@ -98,6 +108,8 @@ test("doors follow the step", () => {
   assert.equal(doorOpen("target", "hack"), true);
   assert.equal(doorOpen("street", "none"), false);
   assert.equal(doorOpen("street", "hack"), false);
+  assert.equal(doorOpen("central", "other"), true);
+  assert.equal(doorOpen("central", "none"), true);
 });
 
 test("a pedestrian hit raises wanted and allies or enemies do not", () => {
@@ -116,12 +128,29 @@ test("a knockdown clears wanted", () => {
   assert.equal(knockdownWanted(), 0);
 });
 
-test("the bike stays on the street between missions", () => {
+test("the bike is ridden on the street", () => {
   assert.equal(canMount("street", true), true);
   assert.equal(canMount("indoor", true), false);
   assert.equal(canMount("sea", true), false);
-  assert.equal(canMount("mission", true), false);
   assert.equal(canMount("street", false), false);
+});
+
+test("every fifth lesson slot is a sea getaway and street jobs call the police", () => {
+  assert.equal(liveScript(3), "mar");
+  assert.deepEqual(stepKinds("mar", false), ["hack", "jet"]);
+  assert.equal(endingFor("mar"), "done");
+  assert.equal(policeAfterHack("invasao", false), true);
+  assert.equal(policeAfterHack("entrega", false), true);
+  assert.equal(policeAfterHack("mar", false), false);
+  assert.equal(policeAfterHack("invasao", true), false);
+});
+
+test("overlapping vehicles are pushed apart", () => {
+  const hit = separateCircles(0, 0, 1, 0, 3);
+  assert.ok(hit);
+  assert.ok(hit.ax < 0);
+  assert.ok(hit.bx > 1);
+  assert.equal(separateCircles(0, 0, 5, 0, 3), null);
 });
 
 test("chapters wear different shirts", () => {

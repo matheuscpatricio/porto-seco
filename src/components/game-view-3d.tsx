@@ -3,10 +3,12 @@
 import { Dialogue } from "@/components/dialogue";
 import { Button } from "@/components/ui/button";
 import type { Level, Who, World } from "@/content/types";
+import { phoneLines } from "@/content/phone";
 import { connector } from "@/content/story";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
+import { PIER, QUAY } from "@/game3d/rules";
 import { BLOCK, blockStart, COAST, GREEN, SIZE } from "@/game3d/world";
-import { purchaseBike, useProgress } from "@/lib/progress";
+import { useProgress } from "@/lib/progress";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -96,6 +98,10 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
       g.fillStyle = inCompound ? "#5e4a82" : "#7a8190";
       g.fillRect(blockStart(i) + 1.5, blockStart(j) + 1.5, BLOCK - 3, BLOCK - 3);
     }
+  g.fillStyle = "#9a8b73";
+  g.fillRect(QUAY.minX, QUAY.minZ, QUAY.maxX - QUAY.minX, QUAY.maxZ - QUAY.minZ);
+  g.fillStyle = "#6b5344";
+  g.fillRect(PIER.minX, PIER.minZ, PIER.maxX - PIER.minX, PIER.maxZ - PIER.minZ);
   g.setTransform(1, 0, 0, 1, 0, 0);
   const dot = (x: number, z: number, r: number, color: string) => {
     const [sx, sy] = toScreen(x, z);
@@ -105,6 +111,7 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
     g.fill();
   };
   for (const car of m.cars) dot(car.x, car.z, 2.5, "#cbd5e1");
+  for (const cop of m.cops) dot(cop.x, cop.z, 3, "#2563eb");
   dot(m.escape.x, m.escape.z, 4, "#f43f5e");
   if (m.runner) dot(m.runner.x, m.runner.z, 4, "#fb923c");
   for (const al of m.allies) dot(al.x, al.z, 3.5, "#38bdf8");
@@ -176,6 +183,9 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
     const hubRef = useRef(false);
     const [notes, setNotes] = useState(false);
     const [shop, setShop] = useState(false);
+    const [phone, setPhone] = useState(false);
+    const overlayRef = useRef(false);
+    overlayRef.current = notes || shop || phone;
     const progress = useProgress();
     const link = connector(level.id);
     const toastId = useRef(0);
@@ -211,6 +221,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
         onToast: toast,
         onStudy: () => setNotes(true),
         onShop: () => setShop(true),
+        onPhone: () => setPhone(true),
       });
       gameRef.current = game;
       game.scene.environment = envMap;
@@ -247,16 +258,19 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
           mz = -s.y;
         }
         const turn = ((k.tr ? 1 : 0) - (k.tl ? 1 : 0)) * 2.4 * dt;
-        const input: Input3 = {
-          mx,
-          mz,
-          jump: k.jump || !!tp.jump,
-          shoot: k.shoot || !!tp.shoot,
-          use: k.use || !!tp.use,
-          run: k.run,
-          yaw: look.current.yaw + turn,
-          pitch: look.current.pitch,
-        };
+        const blocked = overlayRef.current;
+        const input: Input3 = blocked
+          ? { mx: 0, mz: 0, jump: false, shoot: false, use: false, run: false, yaw: 0, pitch: 0 }
+          : {
+              mx,
+              mz,
+              jump: k.jump || !!tp.jump,
+              shoot: k.shoot || !!tp.shoot,
+              use: k.use || !!tp.use,
+              run: k.run,
+              yaw: look.current.yaw + turn,
+              pitch: look.current.pitch,
+            };
         look.current = { yaw: 0, pitch: 0 };
         game.update(dt, input);
         game.render(renderer);
@@ -305,7 +319,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
       };
       const down = (e: KeyboardEvent) => {
         const k = KEYMAP[e.code];
-        if (!k || typing(e) || gameRef.current?.phase !== "play") return;
+        if (!k || typing(e) || overlayRef.current || gameRef.current?.phase !== "play") return;
         e.preventDefault();
         keys.current[k] = true;
         taps.current[k] = true;
@@ -530,7 +544,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
             >
               Começar missão
             </Button>
-            <p className="w-full text-center text-xs text-white/80">R$ {progress.money}{progress.bike ? " · moto" : ""}</p>
+            <p className="w-full text-center text-xs text-white/80">R$ {progress.money} · moto na calçada</p>
           </div>
         )}
 
@@ -545,28 +559,23 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
           </div>
         )}
 
+        {phone && (
+          <div className="absolute inset-x-0 bottom-0 z-20 p-2 sm:p-4">
+            <Dialogue
+              lines={phoneLines(level)}
+              doneLabel="Desligar"
+              onDone={() => setPhone(false)}
+            />
+          </div>
+        )}
+
         {shop && (
           <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/60 p-3 sm:items-center">
             <div className="w-full max-w-sm space-y-3 rounded-2xl bg-card p-4">
               <p className="text-xs font-black uppercase tracking-widest text-amber-200">Oficina</p>
-              <p className="text-sm">A moto custa 500. Você tem R$ {progress.money}.</p>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    const deal = purchaseBike();
-                    if (deal.bought) {
-                      gameRef.current?.setOwned(true);
-                      toast("A moto é sua. Ela está na porta de casa.", "good");
-                    } else toast(progress.bike ? "Você já tem a moto." : "Ainda falta dinheiro.", "bad");
-                    setShop(false);
-                  }}
-                >
-                  Comprar
-                </Button>
-                <Button variant="ghost" onClick={() => setShop(false)}>
-                  Sair
-                </Button>
-              </div>
+              <p className="text-sm">A moto já é sua, desde o primeiro dia. Ela fica na calçada da casa. Chegue perto e aperte E para subir. Aperte E de novo para descer.</p>
+              <p className="text-sm text-white/70">Você tem R$ {progress.money}. O dinheiro continua contando nas missões.</p>
+              <Button onClick={() => setShop(false)}>Sair</Button>
             </div>
           </div>
         )}
