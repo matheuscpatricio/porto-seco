@@ -189,9 +189,9 @@ function CityBoot({ pct, label }: { pct: number; label: string }) {
     <div className="absolute inset-0 z-20 overflow-hidden" role="status" aria-live="polite">
       <div className="absolute inset-0 bg-gradient-to-b from-[#1a1033] via-[#c45c3a] to-[#123044]" />
       <div className="absolute left-1/2 top-[16%] h-28 w-[70%] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(255,214,160,0.7),transparent_70%)]" />
-      <div className="absolute inset-x-0 bottom-[36%] flex items-end gap-1 px-[6%] sm:gap-2">
+      <div className="absolute inset-x-0 bottom-[38%] flex h-28 items-end gap-1 px-[6%] sm:h-40 sm:gap-2">
         {DOCKS.map((h, i) => (
-          <div key={i} className="relative flex-1 bg-[#120c16]/90" style={{ height: `${h}%`, minHeight: 28 }}>
+          <div key={i} className="relative flex-1 bg-[#120c16]/90" style={{ height: `${h}%` }}>
             <div className={`absolute right-[18%] top-[18%] h-1.5 w-1.5 rounded-full bg-amber-200 ${i % 3 === 0 ? "anim-lamp" : "opacity-40"}`} />
           </div>
         ))}
@@ -200,7 +200,7 @@ function CityBoot({ pct, label }: { pct: number; label: string }) {
         <div className="anim-tide absolute inset-y-0 left-0 w-[200%] bg-[repeating-linear-gradient(90deg,transparent_0,transparent_42px,rgba(255,255,255,0.14)_42px,rgba(255,255,255,0.14)_43px)]" />
         <div className="absolute inset-x-0 top-0 h-px bg-amber-100/80" />
       </div>
-      <div className="relative z-10 flex h-full flex-col items-center justify-center px-5 pb-10 text-center">
+      <div className="relative z-10 flex h-[58%] flex-col items-center justify-center px-5 text-center">
         <p className="text-[10px] font-semibold tracking-[0.38em] text-amber-100/85 sm:text-[11px]">ILHA DE VÉRTICE</p>
         <h1 className="mt-2 text-4xl font-black tracking-tight text-white drop-shadow-md sm:text-6xl">Porto Seco</h1>
         <p className="mt-3 max-w-sm text-sm text-amber-50/85">O Léo espera na doca, jaqueta vermelha e moto ligada.</p>
