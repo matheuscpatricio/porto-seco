@@ -27,7 +27,18 @@ export default function Home() {
   const done = Object.keys(p.stars).length;
   const nextLevel = allLevels.find((l) => !p.stars[l.id]) ?? allLevels[0];
 
-  if (!mounted) return <TopBar />;
+  if (!mounted) {
+    return (
+      <>
+        <TopBar />
+        <main className="relative flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-orange-600/30 via-rose-950/40 to-background px-4 py-16">
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-300">Porto Seco, 2026</p>
+          <h1 className="mt-1 text-center text-4xl font-black uppercase tracking-tight sm:text-6xl">A dívida</h1>
+          <p className="mt-4 text-sm text-white/70">Abrindo a cidade…</p>
+        </main>
+      </>
+    );
+  }
 
   if (!p.introSeen || replay) {
     return (
