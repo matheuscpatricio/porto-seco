@@ -1,5 +1,5 @@
 import type { RideId } from "@/lib/progress-rules";
-import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, COAST, DANI_CHAIR, DECK, districtAt, ELEVATOR, GREEN, HIDEOUT, HOME, ISLAND, JET, PIER, QUAY, ROOF, SAND, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
+import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, COAST, coastReach, DANI_CHAIR, DECK, districtAt, ELEVATOR, GREEN, HIDEOUT, HOME, ISLAND, JET, pastShore, PIER, QUAY, ROOF, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
@@ -24,12 +24,12 @@ export type Theme = {
 };
 
 export const THEMES: Record<string, Theme> = {
-  w1: { sky: ["#6d9fd6", "#f5c08a"], fog: "#e7b98f", sun: "#ffd9ae", sunIntensity: 2.6, hemi: ["#ffe2c4", "#6b5040", 0.7], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [5, 11], night: false, peds: 22, traffic: 7 },
-  w2: { sky: ["#070b1f", "#2b3566"], fog: "#1b2246", sun: "#b8c8ff", sunIntensity: 0.9, hemi: ["#8ea6ff", "#1b1b2e", 0.45], kind: "towers", palette: ["#5b6778", "#3e4b63", "#6f7b8a", "#44615d", "#57565e"], heights: [18, 48], night: true, peds: 14, traffic: 8 },
-  w3: { sky: ["#5d97c9", "#cfe0e2"], fog: "#a9c3c6", sun: "#fff3dc", sunIntensity: 2.4, hemi: ["#d6ecee", "#3a4545", 0.65], kind: "containers", palette: ["#a8322b", "#2c5aa0", "#2f7a47", "#c08f1e", "#cf6a2a", "#2a7c8c"], heights: [2.6, 10.4], night: false, peds: 12, traffic: 6 },
-  w4: { sky: ["#7f8fa6", "#e0b27a"], fog: "#b89468", sun: "#ffd29a", sunIntensity: 2.2, hemi: ["#f2d3a0", "#3a2a1a", 0.65], kind: "sheds", palette: ["#8d8680", "#6b6661", "#aaa39c", "#8c4a1f", "#57524d"], heights: [5, 9], night: false, peds: 14, traffic: 6 },
-  w5: { sky: ["#07040f", "#2a1a4a"], fog: "#1b1233", sun: "#c9bbff", sunIntensity: 0.8, hemi: ["#a78bfa", "#120a22", 0.45], kind: "corporate", palette: ["#4a4d6b", "#35344f", "#51405f", "#3b3b40", "#5a4c7a"], heights: [22, 60], night: true, peds: 16, traffic: 9 },
-  w6: { sky: ["#0a0306", "#3b1018"], fog: "#2a0c12", sun: "#fdb4be", sunIntensity: 0.8, hemi: ["#fb7185", "#14060a", 0.4], kind: "corporate", palette: ["#3a3432", "#3b3b40", "#5a2a2a", "#2e2e33"], heights: [24, 64], night: true, peds: 12, traffic: 9 },
+  w1: { sky: ["#6d9fd6", "#f5c08a"], fog: "#e7b98f", sun: "#ffd9ae", sunIntensity: 2.6, hemi: ["#ffe2c4", "#6b5040", 0.7], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [5, 11], night: false, peds: 42, traffic: 7 },
+  w2: { sky: ["#070b1f", "#2b3566"], fog: "#1b2246", sun: "#b8c8ff", sunIntensity: 0.9, hemi: ["#8ea6ff", "#1b1b2e", 0.45], kind: "towers", palette: ["#5b6778", "#3e4b63", "#6f7b8a", "#44615d", "#57565e"], heights: [18, 48], night: true, peds: 30, traffic: 8 },
+  w3: { sky: ["#5d97c9", "#cfe0e2"], fog: "#a9c3c6", sun: "#fff3dc", sunIntensity: 2.4, hemi: ["#d6ecee", "#3a4545", 0.65], kind: "containers", palette: ["#a8322b", "#2c5aa0", "#2f7a47", "#c08f1e", "#cf6a2a", "#2a7c8c"], heights: [2.6, 10.4], night: false, peds: 28, traffic: 6 },
+  w4: { sky: ["#7f8fa6", "#e0b27a"], fog: "#b89468", sun: "#ffd29a", sunIntensity: 2.2, hemi: ["#f2d3a0", "#3a2a1a", 0.65], kind: "sheds", palette: ["#8d8680", "#6b6661", "#aaa39c", "#8c4a1f", "#57524d"], heights: [5, 9], night: false, peds: 30, traffic: 6 },
+  w5: { sky: ["#07040f", "#2a1a4a"], fog: "#1b1233", sun: "#c9bbff", sunIntensity: 0.8, hemi: ["#a78bfa", "#120a22", 0.45], kind: "corporate", palette: ["#4a4d6b", "#35344f", "#51405f", "#3b3b40", "#5a4c7a"], heights: [22, 60], night: true, peds: 32, traffic: 9 },
+  w6: { sky: ["#0a0306", "#3b1018"], fog: "#2a0c12", sun: "#fdb4be", sunIntensity: 0.8, hemi: ["#fb7185", "#14060a", 0.4], kind: "corporate", palette: ["#3a3432", "#3b3b40", "#5a2a2a", "#2e2e33"], heights: [24, 64], night: true, peds: 28, traffic: 9 },
 };
 
 export const LANE = 2.2;
@@ -422,28 +422,29 @@ function addCoast(scene: THREE.Scene, night: boolean) {
   const c = rng(19);
   type Spot = { x: number; z: number; kind: "bush" | "palm" | "rock"; s: number };
   const spots: Spot[] = [];
-  const side = (axis: "x" | "z", sign: -1 | 1) => {
-    for (let t = 8; t < ISLAND - 8; t += 8) {
-      const along = t + (c() - 0.5) * 2.4;
-      if (axis === "z" && sign < 0 && along > QUAY.minX - 2 && along < QUAY.maxX + 2) continue;
-      const bush = 2.4 + c() * 4;
-      const palm = 6.5 + c() * 5.5;
-      const rock = GREEN + 3 + c() * (SAND - 5);
-      const at = (dist: number) => (sign < 0 ? -dist : ISLAND + dist);
-      const put = (dist: number, kind: Spot["kind"], s: number) => {
-        if (axis === "z") spots.push({ x: along, z: at(dist), kind, s });
-        else spots.push({ x: at(dist), z: along, kind, s });
+  const place = (side: 0 | 1 | 2 | 3) => {
+    for (let i = 1; i < 18; i++) {
+      const along = (i / 18) * ISLAND + (c() - 0.5) * 3;
+      const clamped = Math.max(0, Math.min(ISLAND, along));
+      if (side === 0 && clamped > QUAY.minX - 2 && clamped < QUAY.maxX + 2) continue;
+      const reach = coastReach(side, clamped);
+      const at = (dist: number) => {
+        if (side === 0) return { x: clamped, z: -dist };
+        if (side === 1) return { x: ISLAND + dist, z: clamped };
+        if (side === 2) return { x: clamped, z: ISLAND + dist };
+        return { x: -dist, z: clamped };
       };
-      put(bush, "bush", 0.55 + c() * 0.55);
-      if (c() > 0.35) put(bush + 2.2, "bush", 0.4 + c() * 0.4);
-      put(palm, "palm", 0.85 + c() * 0.35);
-      if (c() > 0.55) put(rock, "rock", 0.35 + c() * 0.45);
+      const put = (dist: number, kind: Spot["kind"], s: number) => spots.push({ ...at(dist), kind, s });
+      put(reach * (0.16 + c() * 0.1), "bush", 0.55 + c() * 0.55);
+      if (c() > 0.35) put(reach * (0.28 + c() * 0.08), "bush", 0.4 + c() * 0.4);
+      put(reach * (0.42 + c() * 0.1), "palm", 0.85 + c() * 0.35);
+      if (c() > 0.5) put(reach * (0.66 + c() * 0.1), "rock", 0.35 + c() * 0.45);
     }
   };
-  side("z", -1);
-  side("z", 1);
-  side("x", -1);
-  side("x", 1);
+  place(0);
+  place(1);
+  place(2);
+  place(3);
 
   const bushes = spots.filter((s) => s.kind === "bush");
   const palms = spots.filter((s) => s.kind === "palm");
@@ -962,6 +963,92 @@ function buildSkyHideout(scene: THREE.Scene, night: boolean, addCol: (minX: numb
   return car;
 }
 
+/** RGBA coast mask. Canvas row py maps to world Z with Three's default flipY. */
+function coastTex(span: number, origin: number, mode: "sand" | "grass" | "depth") {
+  const S = 512;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d")!;
+  const img = g.createImageData(S, S);
+  const px = img.data;
+  for (let py = 0; py < S; py++) {
+    for (let x = 0; x < S; x++) {
+      const wx = origin + (x / (S - 1)) * span;
+      const wz = origin + (py / (S - 1)) * span;
+      const past = pastShore(wx, wz);
+      const i = (py * S + x) * 4;
+      if (mode === "depth") {
+        const w = Math.max(0, Math.min(1, past / 7));
+        px[i] = px[i + 1] = px[i + 2] = Math.round(w * 255);
+        px[i + 3] = 255;
+      } else if (mode === "grass") {
+        const land = past < -1.15;
+        px[i] = 62;
+        px[i + 1] = 124;
+        px[i + 2] = 70;
+        px[i + 3] = land ? 255 : 0;
+      } else {
+        const land = past < 0.4;
+        const wet = past > -2.4;
+        px[i] = wet ? 176 : 230;
+        px[i + 1] = wet ? 156 : 208;
+        px[i + 2] = wet ? 112 : 158;
+        px[i + 3] = land ? 255 : 0;
+      }
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = mode === "depth" ? THREE.NoColorSpace : THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const SEA_SPAN = SIZE + 240;
+const SEA_ORIGIN = SIZE / 2 - SEA_SPAN / 2;
+
+function seaMaterial() {
+  return new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3,
+    uniforms: {
+      uTime: { value: 0 },
+      uDepth: { value: coastTex(SEA_SPAN, SEA_ORIGIN, "depth") },
+    },
+    transparent: true,
+    vertexShader: `
+      out vec2 vUv;
+      out vec3 vWorld;
+      uniform float uTime;
+      void main() {
+        vUv = uv;
+        vec3 p = position;
+        p.z += sin(p.x * 0.31 + uTime * 1.3) * cos(p.y * 0.24 + uTime) * 0.035;
+        vec4 world = modelMatrix * vec4(p, 1.0);
+        vWorld = world.xyz;
+        gl_Position = projectionMatrix * viewMatrix * world;
+      }
+    `,
+    fragmentShader: `
+      in vec2 vUv;
+      in vec3 vWorld;
+      uniform float uTime;
+      uniform sampler2D uDepth;
+      out vec4 fragColor;
+      void main() {
+        float depth = texture(uDepth, vUv).r;
+        vec3 shallow = vec3(0.20, 0.62, 0.66);
+        vec3 mid = vec3(0.06, 0.28, 0.42);
+        vec3 deep = vec3(0.015, 0.07, 0.14);
+        vec3 col = mix(shallow, mid, smoothstep(0.0, 0.4, depth));
+        col = mix(col, deep, smoothstep(0.32, 0.9, depth));
+        float spark = sin(vWorld.x * 0.75 + uTime * 1.8) * sin(vWorld.z * 0.62 - uTime * 1.4);
+        col += vec3(0.18, 0.24, 0.26) * smoothstep(0.78, 1.0, spark) * (1.0 - depth * 0.65);
+        fragColor = vec4(col, 0.94);
+      }
+    `,
+  });
+}
+
 export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, target: string): Layout {
   const theme = THEMES[themeId] ?? THEMES.w1;
   const night = theme.night;
@@ -976,38 +1063,27 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   scene.background = skyTexture(theme.sky[0], theme.sky[1], theme.sun, night);
   scene.fog = new THREE.Fog(theme.fog, 45, night ? 140 : 190);
 
-  const water = new THREE.Mesh(
-    new THREE.PlaneGeometry(SIZE + 240, SIZE + 240),
-    std({ color: "#1a4a68", roughness: 0.28, metalness: 0.2 }),
-  );
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(SEA_SPAN, SEA_SPAN), seaMaterial());
+  water.name = "sea";
   water.rotation.x = -Math.PI / 2;
-  water.position.set(SIZE / 2, -0.12, SIZE / 2);
+  water.position.set(SIZE / 2, -0.1, SIZE / 2);
   scene.add(water);
-  const sandMat = std({ color: "#e6d2a4", roughness: 1 });
-  const sand = new THREE.Mesh(new THREE.PlaneGeometry(SIZE + COAST * 2, SIZE + COAST * 2), sandMat);
+  const sandSpan = SIZE + COAST * 2;
+  const sandMat = std({ map: coastTex(sandSpan, -COAST, "sand"), roughness: 1, color: "#ffffff" });
+  sandMat.alphaTest = 0.45;
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(sandSpan, sandSpan), sandMat);
   sand.rotation.x = -Math.PI / 2;
   sand.position.set(SIZE / 2, -0.06, SIZE / 2);
   sand.receiveShadow = true;
   scene.add(sand);
-  const grassMat = std({ color: "#3c7a46", roughness: 1 });
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(SIZE + GREEN * 2, SIZE + GREEN * 2), grassMat);
+  const grassSpan = SIZE + GREEN * 2;
+  const grassMat = std({ map: coastTex(grassSpan, -GREEN, "grass"), roughness: 1, color: "#ffffff" });
+  grassMat.alphaTest = 0.45;
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(grassSpan, grassSpan), grassMat);
   grass.rotation.x = -Math.PI / 2;
   grass.position.set(SIZE / 2, -0.03, SIZE / 2);
   grass.receiveShadow = true;
   scene.add(grass);
-  const wetMat = std({ color: "#c9b48a", roughness: 0.72 });
-  const wet = (w: number, d: number, x: number, z: number) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), wetMat);
-    m.rotation.x = -Math.PI / 2;
-    m.position.set(x, -0.045, z);
-    m.receiveShadow = true;
-    scene.add(m);
-  };
-  const lip = 4.5;
-  wet(SIZE + COAST * 2, lip, SIZE / 2, -COAST + lip / 2);
-  wet(SIZE + COAST * 2, lip, SIZE / 2, SIZE + COAST - lip / 2);
-  wet(lip, SIZE, -COAST + lip / 2, SIZE / 2);
-  wet(lip, SIZE, SIZE + COAST - lip / 2, SIZE / 2);
   const asphalt = asphaltTextures();
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(SIZE, SIZE),

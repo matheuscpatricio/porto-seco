@@ -39,6 +39,28 @@ export type Rig = {
   armed: boolean;
 };
 
+let clothBump: THREE.Texture | null = null;
+function clothNoise() {
+  if (clothBump) return clothBump;
+  if (typeof document === "undefined") return null;
+  const c = document.createElement("canvas");
+  c.width = c.height = 48;
+  const g = c.getContext("2d");
+  if (!g) return null;
+  const img = g.createImageData(48, 48);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = 90 + Math.random() * 140;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = n;
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  clothBump = new THREE.CanvasTexture(c);
+  clothBump.wrapS = clothBump.wrapT = THREE.RepeatWrapping;
+  clothBump.repeat.set(2, 2);
+  clothBump.colorSpace = THREE.NoColorSpace;
+  return clothBump;
+}
+
 const lathe = (pts: [number, number][], seg = 18) =>
   new THREE.LatheGeometry(
     pts.map(([r, y]) => new THREE.Vector2(r, y)),
@@ -122,6 +144,8 @@ export function buildHuman(
           color,
           roughness: rough,
           metalness: metal,
+          bumpMap: clothNoise(),
+          bumpScale: rough < 0.7 ? 0.12 : 0.05,
         });
     materials.push(m);
     return m;

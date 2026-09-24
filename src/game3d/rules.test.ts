@@ -14,8 +14,13 @@ import {
   HOME,
   HOME_STUDY,
   indoors,
+  coastReach,
   inSea,
   ISLAND,
+  pastShore,
+  policeRoster,
+  SWIM_HEIGHT,
+  waterDepth,
   knockdownWanted,
   POLICE_RANK,
   policeRank,
@@ -147,6 +152,26 @@ test("police ranks escalate in health and damage", () => {
   assert.equal(policeRankForMission(0), "guarda");
   assert.equal(policeRankForMission(10), "especial");
   assert.equal(policeRankForMission(24), "federal");
+});
+
+test("the shore bends and the water gets deep enough to cover Léo", () => {
+  const east = [10, 40, 80, 120, 150].map((along) => coastReach(1, along));
+  assert.ok(Math.max(...east) - Math.min(...east) > 4);
+  assert.equal(waterDepth(-2, 20), 0);
+  assert.equal(waterDepth(20, 8), 0);
+  assert.equal(waterDepth(JET.x, JET.z), 0);
+  assert.ok(waterDepth(-COAST - 1, 20) > 0);
+  assert.ok(waterDepth(BUOY.x, BUOY.z) > 0);
+  assert.ok(waterDepth(80, -48) >= SWIM_HEIGHT);
+  assert.ok(BERTHS.every((b) => pastShore(b.x, b.z) > 0));
+});
+
+test("special and federal patrols grow with the mission", () => {
+  assert.deepEqual(policeRoster(0), { especial: 0, federal: 0 });
+  assert.deepEqual(policeRoster(4), { especial: 2, federal: 0 });
+  assert.deepEqual(policeRoster(9), { especial: 4, federal: 1 });
+  assert.deepEqual(policeRoster(15), { especial: 7, federal: 3 });
+  assert.deepEqual(policeRoster(24), { especial: 10, federal: 6 });
 });
 
 test("the bike is ridden on the street", () => {

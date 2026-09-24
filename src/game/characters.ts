@@ -55,6 +55,20 @@ export const policeLooks: Record<"guarda" | "especial" | "federal", Look> = {
   },
 };
 
+/** Caveira's men. Dark clothes, mask, vest, gold accent. They are not police. */
+export const thugLook: Look = {
+  skin: "#6b4a33",
+  hair: "#111111",
+  hairStyle: "buzz",
+  shirt: "#171717",
+  jacket: "#0a0a0a",
+  pants: "#111111",
+  shoes: "#0a0a0a",
+  extras: ["mask", "vest"],
+  build: "big",
+  accent: "#eab308",
+};
+
 export const guardLook: Look = {
   skin: "#c89a74",
   hair: "#1f2937",

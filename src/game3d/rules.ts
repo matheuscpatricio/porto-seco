@@ -145,11 +145,63 @@ export function overlapsStreet(box: { minX: number; maxX: number; minZ: number; 
   return hitX || hitZ;
 }
 
+/** 0 south, 1 east, 2 north, 3 west. Meters of land outside the city grid. */
+export function coastReach(side: 0 | 1 | 2 | 3, along: number): number {
+  const t = along / ISLAND;
+  const a = Math.sin(t * Math.PI * 2 + side * 1.3) * 6;
+  const b = Math.sin(t * Math.PI * 4.5 + side * 2.1) * 3.5;
+  const c = Math.sin(t * Math.PI * 1.1 + 0.6) * 2;
+  let reach = 20 + a + b + c;
+  if (side === 0) reach = 22 + a * 0.45;
+  return Math.max(16, Math.min(28, reach));
+}
+
+/** Meters past the irregular shore. Negative on land. The pier stays dry. */
+export function pastShore(x: number, z: number): number {
+  if (onPier(x, z)) return -1;
+  if (x >= 0 && x <= ISLAND && z >= 0 && z <= ISLAND) return -Math.min(x, z, ISLAND - x, ISLAND - z);
+  const outS = -z;
+  const outN = z - ISLAND;
+  const outW = -x;
+  const outE = x - ISLAND;
+  const south = outS > 0;
+  const north = outN > 0;
+  const west = outW > 0;
+  const east = outE > 0;
+  if ((south || north) && (west || east)) {
+    const alongA = Math.max(0, Math.min(ISLAND, x));
+    const alongB = Math.max(0, Math.min(ISLAND, z));
+    const reachA = coastReach(south ? 0 : 2, alongA);
+    const reachB = coastReach(west ? 3 : 1, alongB);
+    return Math.hypot(south ? outS : outN, west ? outW : outE) - Math.hypot(reachA, reachB) * 0.82;
+  }
+  if (south) return outS - coastReach(0, Math.max(0, Math.min(ISLAND, x)));
+  if (north) return outN - coastReach(2, Math.max(0, Math.min(ISLAND, x)));
+  if (west) return outW - coastReach(3, Math.max(0, Math.min(ISLAND, z)));
+  return outE - coastReach(1, Math.max(0, Math.min(ISLAND, z)));
+}
+
+/** 0 on land. About 1.75 m roughly 8 m past the shore. */
+export function waterDepth(x: number, z: number): number {
+  const past = pastShore(x, z);
+  if (past <= 0) return 0;
+  return past * 0.22;
+}
+
 export function inSea(x: number, z: number): boolean {
-  if (onPier(x, z)) return false;
-  const min = -COAST + 1.2;
-  const max = ISLAND + COAST - 1.2;
-  return x < min || z < min || x > max || z > max;
+  return waterDepth(x, z) > 0.05;
+}
+
+/** Water past this covers Léo and the shark attacks. */
+export const SWIM_HEIGHT = 1.75;
+
+/** Ambient special and federal officers grow with the mission index. */
+export function policeRoster(missionsDone: number): { especial: number; federal: number } {
+  const n = Math.max(0, missionsDone);
+  return {
+    especial: Math.min(10, Math.floor(n / 2)),
+    federal: Math.min(8, Math.floor(Math.max(0, n - 6) / 3)),
+  };
 }
 
 /** Pushes two circles apart when they overlap. Returns null when they already clear. */

@@ -79,8 +79,8 @@ export default function Home() {
             <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-300">Um jogo de ação para aprender Python do zero</p>
             <h1 className="mt-2 text-4xl font-black uppercase leading-none tracking-tight sm:text-6xl">Porto Seco</h1>
             <p className="mt-3 text-white/80">
-              O Léo é motoboy, está endividado e nunca programou. Com a ajuda da Dani, ele corre, pula, enfrenta os seguranças da Vértice e hackeia a cidade inteira, aprendendo
-              Python a cada missão.
+              O Léo é motoboy, está endividado e nunca programou. Com a ajuda da Dani, ele corre, pula, enfrenta os capangas do Caveira e hackeia a cidade inteira, aprendendo
+              Python a cada missão. A ilha tem costa irregular. A polícia só reage a um hack ou a uma morte, e a água funda traz um tubarão.
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <LinkButton size="lg" href={done ? `/level/${nextLevel.id}?hub=1` : `/level/${nextLevel.id}`} className="bg-orange-500 text-black hover:bg-orange-400">

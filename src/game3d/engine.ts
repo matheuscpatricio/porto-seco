@@ -1,12 +1,12 @@
 import type { Level, Who, World } from "@/content/types";
 import { allLevels } from "@/content/worlds";
 import { sound } from "@/game/audio";
-import { guardLook, people, policeLooks, randomLook } from "@/game/characters";
+import { guardLook, people, policeLooks, randomLook, thugLook } from "@/game/characters";
 import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
-import { BERTHS, canMount, CENTRAL_PHONE, DANI_CHAIR, decayWanted, DECK, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, PLAYER_MAX_HP, POLICE_RANK, policeRank, policeRankForMission, ROOF, roomExit, SECURITY_HIT, separateCircles, SHOPS, shirtFor, TOWER, type PoliceRank } from "@/game3d/rules";
+import { BERTHS, canMount, CENTRAL_PHONE, DANI_CHAIR, decayWanted, DECK, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, PLAYER_MAX_HP, POLICE_RANK, policeRank, policeRankForMission, policeRoster, ROOF, roomExit, SECURITY_HIT, separateCircles, SHOPS, shirtFor, SWIM_HEIGHT, TOWER, waterDepth, type PoliceRank } from "@/game3d/rules";
 import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
@@ -59,12 +59,13 @@ type Enemy = {
   name?: string;
   police?: boolean;
   rank?: PoliceRank;
-  detail?: "street" | "chase";
+  detail?: "street" | "chase" | "patrol";
+  faction?: "caveira";
   damage: number;
   fireGap: number;
   t: number;
 };
-type Ped = { rig: Rig; pos: THREE.Vector3; yaw: number; loop: number; wp: number; dir: 1 | -1; speed: number; panic: number; t: number; talkT: number; still: boolean; pitch: number; stepD: number };
+type Ped = { rig: Rig; pos: THREE.Vector3; yaw: number; loop: number; wp: number; dir: 1 | -1; speed: number; panic: number; t: number; talkT: number; still: boolean; pitch: number; stepD: number; hp: number; dead: number };
 type Traffic = { mesh: THREE.Group; pos: THREE.Vector3; from: [number, number]; to: [number, number]; speed: number; want: number; blockedT: number; honkT: number; ignoreT: number; yaw: number };
 type Bullet = { mesh: THREE.Mesh; vel: THREE.Vector3; mine: boolean; life: number; damage: number };
 type Particle = { mesh: THREE.Mesh; vel: THREE.Vector3; life: number };
@@ -135,6 +136,42 @@ function buildDrone() {
   return g;
 }
 
+function buildShark() {
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: "#4c5c68", roughness: 0.4, metalness: 0.2 });
+  const bellyMat = new THREE.MeshStandardMaterial({ color: "#d7dee4", roughness: 0.55 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.48, 18, 12), bodyMat);
+  body.scale.set(0.9, 0.7, 2.7);
+  body.castShadow = true;
+  g.add(body);
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 10), bellyMat);
+  belly.scale.set(0.7, 0.38, 2.15);
+  belly.position.set(0, -0.16, 0.05);
+  g.add(belly);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.72, 12), bodyMat);
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, 0.02, 1.4);
+  g.add(nose);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 10), bodyMat);
+  tail.rotation.x = -Math.PI / 2;
+  tail.position.set(0, 0.08, -1.4);
+  g.add(tail);
+  const fin = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.55, 8), bodyMat);
+  fin.position.set(0, 0.42, -0.15);
+  g.add(fin);
+  for (const s of [-1, 1]) {
+    const pec = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.55, 6), bodyMat);
+    pec.rotation.z = s * 1.1;
+    pec.position.set(s * 0.28, -0.1, 0.3);
+    g.add(pec);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshBasicMaterial({ color: "#0a0a0a" }));
+    eye.position.set(s * 0.2, 0.08, 0.85);
+    g.add(eye);
+  }
+  g.visible = false;
+  return g;
+}
+
 function rand(seed: number) {
   let s = seed * 97 + 5;
   return () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -184,6 +221,13 @@ export class Game3D {
   private free = false;
   private wanted = 0;
   private heat = 0;
+  /** Set when this mission's hack succeeds. Patrol police may shoot after that. */
+  private provoked = false;
+  private shark = buildShark();
+  private sharkT = 0;
+  private sharkBite = 0;
+  private wadeNote = false;
+  private seaMat: THREE.ShaderMaterial | null = null;
   private mounted = false;
   private rideSpeed = 0;
   private weapon: WeaponId = "choque";
@@ -308,6 +352,10 @@ export class Game3D {
     }
 
     this.spawnCity(theme.peds, theme.traffic);
+    this.spawnRoster();
+    this.scene.add(this.shark);
+    const sea = this.scene.getObjectByName("sea");
+    if (sea && sea instanceof THREE.Mesh && sea.material instanceof THREE.ShaderMaterial) this.seaMat = sea.material;
     this.cyber = new Cyber(level.display.kind === "locks" ? level.display.events.map((e) => e.label) : null, level.target);
 
     if (M.gate) {
@@ -466,7 +514,7 @@ export class Game3D {
       const rig = buildHuman(randomLook(r), { simple: true });
       rig.armed = false;
       this.scene.add(rig.root);
-      this.peds.push({ rig, pos, yaw: 0, loop, wp: (wp + 1) % 4, dir: r() < 0.5 ? 1 : -1, speed: 1.1 + r() * 0.6, panic: 0, t: r() * 10, talkT: 2 + r() * 8, still, pitch: 100 + r() * 160, stepD: 0 });
+      this.peds.push({ rig, pos, yaw: 0, loop, wp: (wp + 1) % 4, dir: r() < 0.5 ? 1 : -1, speed: 1.1 + r() * 0.6, panic: 0, t: r() * 10, talkT: 2 + r() * 8, still, pitch: 100 + r() * 160, stepD: 0, hp: 5, dead: 0 });
     }
     const colors = ["#2a2f36", "#b8bcc2", "#8e1b1b", "#1f3f8a", "#f1f1ef", "#1d5a45", "#c7a14a", "#5b3a7a"];
     const kinds = ["sedan", "hatch", "sedan", "van", "hatch"] as const;
@@ -499,7 +547,7 @@ export class Game3D {
     return a.lerp(b, s).add(off);
   }
 
-  private spawn(kind: Enemy["kind"], a: THREE.Vector3, b: THREE.Vector3, zone: 1 | 2, opts?: { look?: (typeof guardLook); rank?: PoliceRank; detail?: "street" | "chase"; hp?: number; damage?: number }) {
+  private spawn(kind: Enemy["kind"], a: THREE.Vector3, b: THREE.Vector3, zone: 1 | 2, opts?: { look?: (typeof guardLook); rank?: PoliceRank; detail?: "street" | "chase" | "patrol"; hp?: number; damage?: number; faction?: "caveira" }) {
     const hp = opts?.hp ?? (kind === "boss" ? 14 + Math.floor(this.index / 2) : kind === "drone" ? 2 : 3);
     const rank = opts?.rank;
     const stats = rank ? POLICE_RANK[rank] : null;
@@ -538,6 +586,7 @@ export class Game3D {
       fireGap,
       rank,
       detail: opts?.detail,
+      faction: opts?.faction,
       police: !!rank,
       name: stats?.name,
       t: Math.random() * 10,
@@ -546,11 +595,94 @@ export class Game3D {
     return e;
   }
 
-  private spawnPolice(rank: PoliceRank, at: THREE.Vector3, detail: "street" | "chase") {
+  private spawnPolice(rank: PoliceRank, at: THREE.Vector3, detail: "street" | "chase" | "patrol", goal?: THREE.Vector3) {
+    const b = goal ?? this.player.pos.clone();
     const stats = POLICE_RANK[rank];
-    const e = this.spawn("guard", at, this.player.pos.clone(), 1, { look: policeLooks[rank], rank, detail, hp: stats.hp, damage: stats.damage });
+    const e = this.spawn("guard", at, b, 1, { look: policeLooks[rank], rank, detail, hp: stats.hp, damage: stats.damage });
     e.cooldown = 0.6;
     return e;
+  }
+
+  private sidewalkSpot() {
+    const loops = this.layout.pedLoops;
+    const pts = loops[Math.floor(this.r() * loops.length)];
+    const p = pts[Math.floor(this.r() * pts.length)].clone();
+    p.y = 0.2;
+    return p;
+  }
+
+  /** Special and federal officers patrol. Caveira's men hunt Léo on sight. */
+  private spawnRoster() {
+    const roster = policeRoster(this.index);
+    const wave = (rank: PoliceRank, n: number) => {
+      for (let i = 0; i < n; i++) {
+        const a = this.sidewalkSpot();
+        this.spawnPolice(rank, a, "patrol", this.sidewalkSpot());
+      }
+    };
+    wave("especial", roster.especial);
+    wave("federal", roster.federal);
+    for (let i = 0; i < 8; i++) {
+      const a = this.sidewalkSpot();
+      const e = this.spawn("guard", a, this.sidewalkSpot(), 1, { look: thugLook, hp: 8, damage: 26, faction: "caveira" });
+      e.name = "Capanga";
+      e.fireGap = 1.45;
+      e.marker.material = new THREE.MeshBasicMaterial({ color: "#eab308", toneMapped: false });
+    }
+  }
+
+  private respawnPed(p: Ped) {
+    const loops = this.layout.pedLoops;
+    let best = p.pos.clone();
+    let bestD = 0;
+    for (let n = 0; n < 14; n++) {
+      const loop = Math.floor(this.r() * loops.length);
+      const pts = loops[loop];
+      const wp = Math.floor(this.r() * pts.length);
+      const q = pts[wp].clone();
+      const d = q.distanceTo(this.player.pos);
+      if (d > bestD) {
+        best = q;
+        bestD = d;
+        p.loop = loop;
+        p.wp = (wp + 1) % pts.length;
+      }
+      if (d > 28) break;
+    }
+    best.y = 0.2;
+    p.pos.copy(best);
+    p.hp = 5;
+    p.dead = 0;
+    p.panic = 0;
+    p.still = this.r() < 0.2;
+    p.rig.root.position.copy(p.pos);
+  }
+
+  private updateShark(dt: number) {
+    const P = this.player;
+    const depth = waterDepth(P.pos.x, P.pos.z);
+    const hunt = !this.jetting && !this.lift && P.downT <= 0 && depth >= 1.05 && (this.phase === "play" || this.phase === "open");
+    this.shark.visible = hunt;
+    if (!hunt) return;
+    this.sharkT += dt;
+    const bite = depth >= SWIM_HEIGHT;
+    const orbit = bite ? 1.35 : 4.4;
+    const ang = this.sharkT * (bite ? 2.6 : 0.85);
+    const y = Math.min(-0.45, P.pos.y + 0.7);
+    this.shark.position.set(P.pos.x + Math.cos(ang) * orbit, y, P.pos.z + Math.sin(ang) * orbit);
+    const dx = P.pos.x - this.shark.position.x;
+    const dz = P.pos.z - this.shark.position.z;
+    this.shark.rotation.set(0, Math.atan2(dx, dz), Math.sin(this.sharkT * 7) * 0.12);
+    if (!bite) return;
+    this.sharkBite -= dt;
+    if (this.sharkBite > 0) return;
+    this.sharkBite = 1.35;
+    P.hp -= 62;
+    P.inv = 0.45;
+    this.shake = 0.5;
+    sound.sfx("hurt");
+    this.ev.onToast("O tubarão mordeu você.", "bad");
+    if (P.hp <= 0) P.downT = 1.6;
   }
 
   get step(): Step | undefined {
@@ -612,6 +744,7 @@ export class Game3D {
     for (const c of this.cops) this.scene.remove(c.mesh);
     this.cops = [];
     this.wanted = knockdownWanted();
+    this.provoked = false;
     this.clearPolice(true);
     this.player.pos.copy(this.layout.spawn);
     this.checkpoint = this.layout.spawn.clone();
@@ -629,6 +762,7 @@ export class Game3D {
     this.jetting = false;
     for (const c of this.cops) this.scene.remove(c.mesh);
     this.cops = [];
+    this.provoked = false;
     this.clearPolice(true);
     this.leaveRooms();
     this.stepIdx = 0;
@@ -646,7 +780,7 @@ export class Game3D {
 
   private clearPolice(all = false) {
     for (const e of this.enemies) {
-      if (!e.rank) continue;
+      if (!e.rank || e.detail === "patrol") continue;
       if (!all && e.detail === "chase") continue;
       e.hp = 0;
     }
@@ -734,6 +868,7 @@ export class Game3D {
 
   private succeed(o: HackOutcome) {
     this.hacked = true;
+    this.provoked = true;
     this.player.cheerT = 1.6;
     for (const l of this.lockLights) (l.material as THREE.MeshBasicMaterial).color.set("#22c55e");
     updateScreen(this.layout, this.level.target.toUpperCase(), o.screen ? o.screen.split("\n").slice(-2) : ["ACESSO", "LIBERADO"], "#4ade80");
@@ -942,7 +1077,7 @@ export class Game3D {
     return {
       player: { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw, cam: this.camYaw },
       target: this.targetPos(),
-      enemies: this.enemies.filter(alive).map((e) => ({ x: e.pos.x, z: e.pos.z, boss: e.kind === "boss", police: !!e.rank, rank: e.rank ?? null })),
+      enemies: this.enemies.filter(alive).map((e) => ({ x: e.pos.x, z: e.pos.z, boss: e.kind === "boss", police: !!e.rank, rank: e.rank ?? null, faction: e.faction ?? null })),
       allies: this.allies.map((a) => ({ x: a.pos.x, z: a.pos.z })),
       cars: this.traffic.map((c) => ({ x: c.pos.x, z: c.pos.z })),
       cops: this.cops.map((c) => ({ x: c.pos.x, z: c.pos.z })),
@@ -1010,7 +1145,9 @@ export class Game3D {
         vx /= Math.max(1, len);
         vz /= Math.max(1, len);
         P.running = input.run || len > 0.95;
-        const speed = (P.running ? 7.5 : 4.2) * (this.jetting ? 2.15 : this.mounted ? RIDES[this.ride].speed : 1);
+        const depthNow = waterDepth(P.pos.x, P.pos.z);
+        const drag = !this.jetting && depthNow > 0.25 ? (depthNow >= SWIM_HEIGHT ? 0.28 : 0.48) : 1;
+        const speed = (P.running ? 7.5 : 4.2) * (this.jetting ? 2.15 : this.mounted ? RIDES[this.ride].speed : 1) * drag;
         this.rideSpeed = speed;
         P.pos.x += vx * speed * dt;
         P.pos.z += vz * speed * dt;
@@ -1028,11 +1165,12 @@ export class Game3D {
           }
         }
       }
-      if (inSea(P.pos.x, P.pos.z) && !this.jetting && P.downT <= 0) {
-        P.downT = 1.6;
-        this.mounted = false;
-        this.ev.onToast("Você caiu no mar.", "bad");
+      const depth = waterDepth(P.pos.x, P.pos.z);
+      if (!this.jetting && depth > 0.45 && !this.wadeNote) {
+        this.wadeNote = true;
+        this.ev.onToast("Você entrou no mar. Se a água cobrir você, o tubarão ataca.", "info");
       }
+      if (depth < 0.1) this.wadeNote = false;
       const ridePlace = indoors(P.pos.x, P.pos.z) ? "indoor" : inSea(P.pos.x, P.pos.z) && !this.jetting ? "sea" : "street";
       if (this.mounted && !canMount(ridePlace, true)) {
         this.mounted = false;
@@ -1053,7 +1191,9 @@ export class Game3D {
       const wasAir = !P.grounded;
       P.vy -= GRAV * dt;
       P.pos.y += P.vy * dt;
-      const g = this.groundAt(P.pos, P.pos.y - P.vy * dt);
+      let g = this.groundAt(P.pos, P.pos.y - P.vy * dt);
+      const depth = waterDepth(P.pos.x, P.pos.z);
+      if (!this.jetting && depth > 0.05) g = Math.min(g, -Math.min(depth, 2.05));
       if (P.pos.y <= g) {
         if (wasAir && P.vy < -6) sound.sfx("land");
         P.pos.y = g;
@@ -1096,6 +1236,8 @@ export class Game3D {
     this.updateTraffic(dt);
     this.updateCops(dt);
     this.updateShips();
+    this.updateShark(dt);
+    if (this.seaMat) this.seaMat.uniforms.uTime.value = this.t;
     this.resolveVehicles();
     this.updateRunner(dt);
     this.updateBullets(dt);
@@ -1348,8 +1490,17 @@ export class Game3D {
     for (const p of this.peds) {
       p.t += dt;
       p.panic = Math.max(0, p.panic - dt);
-      let pose: Pose3 = "idle";
       const near = p.pos.distanceTo(camPos) < 55;
+      if (p.dead > 0) {
+        p.dead -= dt;
+        p.pos.y = 0.2;
+        p.rig.root.visible = near;
+        p.rig.root.position.copy(p.pos);
+        if (p.dead <= 0) this.respawnPed(p);
+        else if (near) animate(p.rig, "down", p.t, dt);
+        continue;
+      }
+      let pose: Pose3 = "idle";
       if (p.panic > 0) {
         const away = p.pos.clone().sub(P.pos);
         away.y = 0;
@@ -1409,7 +1560,7 @@ export class Game3D {
       return a > 0.5 && a < reach && Math.abs(rel.dot(rt)) < width;
     };
     if (check(this.player.pos, 7.5, 1.6)) return "player";
-    for (const p of this.peds) if (check(p.pos, 6.5, 1.5)) return "ped";
+    for (const p of this.peds) if (p.dead <= 0 && p.hp > 0 && check(p.pos, 6.5, 1.5)) return "ped";
     for (const e of this.enemies) if (e.hp > 0 && e.kind !== "drone" && check(e.pos, 6.5, 1.5)) return "ped";
     for (const a of this.allies) if (check(a.pos, 6.5, 1.5)) return "ped";
     if (ignoreCars) return null;
@@ -1804,7 +1955,8 @@ export class Game3D {
     const chest = P.pos.clone().add(new THREE.Vector3(0, 1.2, 0));
     const dist = eye.distanceTo(chest);
     const range = e.kind === "boss" ? 26 : e.kind === "drone" ? 24 : 20;
-    const sees = active && zoneOk && P.downT <= 0 && dist < range && !this.blocked(eye, chest);
+    const hostile = e.faction === "caveira" || e.detail === "chase" || e.detail === "street" || !e.rank || this.wanted > 0 || this.provoked;
+    const sees = active && zoneOk && hostile && P.downT <= 0 && dist < range && !this.blocked(eye, chest);
     e.moving = false;
 
     if (e.kind === "drone") {
@@ -1924,10 +2076,17 @@ export class Game3D {
         }
         if (b.life > 0) {
           for (const ped of this.peds) {
+            if (ped.dead > 0 || ped.hp <= 0) continue;
             if (Math.abs(pos.x - ped.pos.x) < 0.55 && Math.abs(pos.z - ped.pos.z) < 0.55 && pos.y < 1.8) {
               b.life = 0;
+              ped.hp -= b.damage;
+              ped.rig.flash = 0.1;
               ped.panic = 4;
-              this.callPolice(ped.pos);
+              if (ped.hp <= 0) {
+                ped.hp = 0;
+                ped.dead = 2.6;
+                this.callPolice(ped.pos);
+              }
               break;
             }
           }

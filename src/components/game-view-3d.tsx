@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import type { Level, Who, World } from "@/content/types";
 import { connector } from "@/content/story";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
-import { PIER, POLICE_RANK, policeRank, QUAY } from "@/game3d/rules";
-import { BLOCK, blockStart, COAST, GREEN, SIZE } from "@/game3d/world";
+import { coastReach, PIER, POLICE_RANK, policeRank, QUAY } from "@/game3d/rules";
+import { BLOCK, blockStart, SIZE } from "@/game3d/world";
 import { purchaseRide, purchaseWeapon, useProgress } from "@/lib/progress";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
 import * as THREE from "three";
@@ -85,10 +85,32 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
   const cc = sin * s;
   const d = -cos * s;
   g.setTransform(a, b, cc, d, half - (a * m.player.x + cc * m.player.z), half - (b * m.player.x + d * m.player.z));
+  const coast = (inset: number) => {
+    const steps = 32;
+    g.beginPath();
+    const at = (side: 0 | 1 | 2 | 3, i: number) => {
+      const along = (i / steps) * SIZE;
+      const reach = Math.max(2, coastReach(side, along) - inset);
+      if (side === 0) return [along, -reach] as const;
+      if (side === 1) return [SIZE + reach, along] as const;
+      if (side === 2) return [SIZE - along, SIZE + reach] as const;
+      return [-reach, SIZE - along] as const;
+    };
+    for (const side of [0, 1, 2, 3] as const) {
+      for (let i = 0; i <= steps; i++) {
+        const [x, z] = at(side, i);
+        if (side === 0 && i === 0) g.moveTo(x, z);
+        else g.lineTo(x, z);
+      }
+    }
+    g.closePath();
+  };
   g.fillStyle = "#e4d2a4";
-  g.fillRect(-COAST, -COAST, SIZE + COAST * 2, SIZE + COAST * 2);
+  coast(0);
+  g.fill();
   g.fillStyle = "#3e7a48";
-  g.fillRect(-GREEN, -GREEN, SIZE + GREEN * 2, SIZE + GREEN * 2);
+  coast(12);
+  g.fill();
   g.fillStyle = "#3f4550";
   g.fillRect(0, 0, SIZE, SIZE);
   for (let i = 0; i < 3; i++)
@@ -118,7 +140,7 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
   if (m.runner) dot(m.runner.x, m.runner.z, 4, "#fb923c");
   for (const al of m.allies) dot(al.x, al.z, 3.5, "#38bdf8");
   for (const e of m.enemies) {
-    const police = e.rank ? POLICE_RANK[e.rank].color : e.police ? "#60a5fa" : "";
+    const police = e.faction === "caveira" ? "#eab308" : e.rank ? POLICE_RANK[e.rank].color : e.police ? "#60a5fa" : "";
     dot(e.x, e.z, e.boss ? 5 : 3.5, police || (e.boss ? "#ff0040" : "#ef4444"));
   }
   g.restore();
