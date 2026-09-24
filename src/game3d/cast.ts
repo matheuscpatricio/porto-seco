@@ -36,6 +36,9 @@ const HAND = 6;
 const TORSO = 7;
 const SCLERA = 8;
 const IRIS = 9;
+const LIP = 10;
+const BROW = 11;
+const NOSE = 12;
 const ATLAS = 512;
 
 const templates = new Map<string, Template>();
@@ -45,7 +48,6 @@ const photoCache = new Map<string, THREE.CanvasTexture>();
 let michelleSrc: ImageData | null = null;
 let soldierSrc: ImageData | null = null;
 let soldierFace: { x0: number; y0: number; x1: number; y1: number } | null = null;
-let clothNormal: THREE.Texture | null = null;
 
 const gunGeo = {
   slide: new THREE.BoxGeometry(0.045, 0.055, 0.16),
@@ -187,18 +189,21 @@ function buildAtlas(mesh: THREE.SkinnedMesh): Atlas | null {
   left?.getWorldPosition(le);
   right?.getWorldPosition(re);
   const v = new THREE.Vector3();
-  const head: { i: number; y: number; d: number }[] = [];
+  const eyeY = left && right ? (le.y + re.y) * 0.5 : 1.66;
+  const eyeZ = left && right ? (le.z + re.z) * 0.5 : 0.08;
+  const head: { i: number; x: number; y: number; z: number; d: number }[] = [];
   for (let i = 0; i < pos.count; i++) {
     if (!dominant(geo, bones, i).toLowerCase().includes("head")) continue;
     v.fromBufferAttribute(pos, i);
     mesh.applyBoneTransform(i, v);
     v.applyMatrix4(mesh.matrixWorld);
     const d = left && right ? Math.min(v.distanceTo(le), v.distanceTo(re)) : 99;
-    head.push({ i, y: v.y, d });
+    head.push({ i, x: v.x, y: v.y, z: v.z, d });
   }
   const ys = head.map((h) => h.y).sort((a, b) => a - b);
   const hairCut = ys.length ? ys[Math.min(ys.length - 1, Math.floor(ys.length * 0.72))] : 99;
   const near = new Map(head.map((h) => [h.i, h]));
+  const marks: { u: number; v: number; part: number; r: number }[] = [];
   const vertPart = new Uint8Array(pos.count);
   const vertShade = new Uint8Array(pos.count);
   const normal = geo.attributes.normal;
@@ -207,13 +212,22 @@ function buildAtlas(mesh: THREE.SkinnedMesh): Atlas | null {
     const hit = near.get(i);
     let part = partOf(name);
     if (hit) {
-      if (hit.d < 0.058) part = SCLERA;
+      const ax = Math.abs(hit.x);
+      if (hit.d < 0.052) part = SCLERA;
+      else if (hit.y > eyeY + 0.008 && hit.y < eyeY + 0.038 && hit.z > eyeZ - 0.03 && ax > 0.01 && ax < 0.06) part = BROW;
+      else if (hit.y > eyeY - 0.095 && hit.y < eyeY - 0.055 && hit.z > eyeZ - 0.01 && ax < 0.028) part = LIP;
+      else if (hit.y > eyeY - 0.05 && hit.y < eyeY - 0.01 && hit.z > eyeZ && ax < 0.012) part = NOSE;
       else if (hit.y > hairCut) part = HAIR;
       else part = FACE;
+      if (part === BROW) marks.push({ u: uv.getX(i), v: uv.getY(i), part, r: 9 });
+      if (part === LIP) marks.push({ u: uv.getX(i), v: uv.getY(i), part, r: 7 });
+      if (part === NOSE) marks.push({ u: uv.getX(i), v: uv.getY(i), part, r: 5 });
     }
     vertPart[i] = part;
-    const ny = normal ? normal.getY(i) : 0.4;
-    vertShade[i] = Math.round((0.78 + 0.22 * Math.min(1, Math.max(0, ny * 0.5 + 0.5))) * 255);
+    const ny = normal ? normal.getY(i) : 0.2;
+    const nz = normal ? normal.getZ(i) : 0.4;
+    const light = Math.min(1, Math.max(0, ny * 0.42 + nz * 0.7 + 0.2));
+    vertShade[i] = Math.round((0.52 + 0.52 * light) * 255);
   }
   const ids = new Uint8Array(ATLAS * ATLAS);
   const shade = new Uint8Array(ATLAS * ATLAS);
@@ -278,8 +292,28 @@ function buildAtlas(mesh: THREE.SkinnedMesh): Atlas | null {
       }
     }
   }
+  for (const m of marks) stampDisc(ids, m.u, m.v, m.part, m.r);
   stampIrises(ids);
   return { ids, shade, size: ATLAS };
+}
+
+function stampDisc(ids: Uint8Array, u: number, v: number, part: number, radius: number) {
+  const cx = u * (ATLAS - 1);
+  const cy = (1 - v) * (ATLAS - 1);
+  const r2 = radius * radius;
+  const y0 = Math.max(0, Math.floor(cy - radius));
+  const y1 = Math.min(ATLAS - 1, Math.ceil(cy + radius));
+  const x0 = Math.max(0, Math.floor(cx - radius));
+  const x1 = Math.min(ATLAS - 1, Math.ceil(cx + radius));
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      if (dx * dx + dy * dy > r2) continue;
+      const i = y * ATLAS + x;
+      if (ids[i]) ids[i] = part;
+    }
+  }
 }
 
 function stampIrises(ids: Uint8Array) {
@@ -348,7 +382,9 @@ function colorize(atlas: Atlas, look: Look) {
         d[o + 3] = 0;
         continue;
       }
-      const rgb = id === HAIR ? hair : id === SLEEVE || id === TORSO ? cloth : id === PANTS ? pants : id === SHOE ? shoes : id === SCLERA ? [244, 240, 230] : id === IRIS ? [18, 12, 9] : skin;
+      const lip: [number, number, number] = [Math.min(255, skin[0] * 0.62 + 48), skin[1] * 0.38, skin[2] * 0.34];
+      const nose: [number, number, number] = [Math.min(255, skin[0] * 1.14), Math.min(255, skin[1] * 1.08), Math.min(255, skin[2] * 1.04)];
+      const rgb = id === HAIR || id === BROW ? hair : id === SLEEVE || id === TORSO ? cloth : id === PANTS ? pants : id === SHOE ? shoes : id === SCLERA ? [236, 232, 226] : id === IRIS ? [28, 16, 10] : id === LIP ? lip : id === NOSE ? nose : skin;
       const s = (atlas.shade[i] / 255) * grain(x, y);
       d[o] = Math.min(255, rgb[0] * s);
       d[o + 1] = Math.min(255, rgb[1] * s);
@@ -372,38 +408,6 @@ function xbotMaps(look: Look) {
   const maps = xbotAtlases.map((a) => colorize(a, look)).filter((t): t is THREE.CanvasTexture => !!t);
   paintCache.set(key, maps);
   return maps;
-}
-
-function softNormal() {
-  if (clothNormal || typeof document === "undefined") return clothNormal;
-  const S = 64;
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = S;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  const img = ctx.createImageData(S, S);
-  const h = (x: number, y: number) => Math.sin((x / S) * 46) * 0.16 + Math.sin((y / S) * 30 + x * 0.2) * 0.1;
-  for (let y = 0; y < S; y++) {
-    for (let x = 0; x < S; x++) {
-      const dx = h(x + 1, y) - h(x - 1, y);
-      const dy = h(x, y + 1) - h(x, y - 1);
-      const nx = -dx;
-      const ny = -dy;
-      const nz = 1;
-      const len = Math.hypot(nx, ny, nz) || 1;
-      const o = (y * S + x) * 4;
-      img.data[o] = (nx / len) * 127 + 128;
-      img.data[o + 1] = (ny / len) * 127 + 128;
-      img.data[o + 2] = (nz / len) * 127 + 128;
-      img.data[o + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.NoColorSpace;
-  clothNormal = tex;
-  return tex;
 }
 
 function readImage(image: CanvasImageSource & { width?: number; height?: number }) {
@@ -527,14 +531,13 @@ function photoMap(kind: "michelle" | "soldier", look: Look) {
   const { width: w, height: h, data } = src;
   const cls = new Uint8Array(w * h);
   const face = soldierFace;
-  let skinN = 0;
-  let skinL = 0;
-  let clothN = 0;
-  let clothL = 0;
-  let hairN = 0;
-  let hairL = 0;
-  let faceN = 0;
-  let faceL = 0;
+  const acc = [0, 1, 2, 3, 4].map(() => [0, 0, 0, 0]);
+  const add = (k: number, r: number, g: number, b: number) => {
+    acc[k][0] += r;
+    acc[k][1] += g;
+    acc[k][2] += b;
+    acc[k][3]++;
+  };
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
@@ -542,12 +545,10 @@ function photoMap(kind: "michelle" | "soldier", look: Look) {
       const r = data[o];
       const g = data[o + 1];
       const b = data[o + 2];
-      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
       if (kind === "soldier") {
         if (face && x >= face.x0 && x < face.x1 && y >= face.y0 && y < face.y1 && r > 70 && g > 40 && b > 25 && r + 15 > g && r > b + 8 && r < 250) {
           cls[i] = 4;
-          faceN++;
-          faceL += lum;
+          add(4, r, g, b);
         }
         continue;
       }
@@ -556,20 +557,17 @@ function photoMap(kind: "michelle" | "soldier", look: Look) {
       const isHair = !isSkin && !isCloth && r > 45 && r < 160 && g < r * 0.78 && b < 90 && r - b > 20 && g > 20 && Math.max(r, g, b) > 40;
       if (isSkin) {
         cls[i] = 1;
-        skinN++;
-        skinL += lum;
+        add(1, r, g, b);
       } else if (isCloth) {
         cls[i] = 2;
-        clothN++;
-        clothL += lum;
+        add(2, r, g, b);
       } else if (isHair) {
         cls[i] = 3;
-        hairN++;
-        hairL += lum;
+        add(3, r, g, b);
       }
     }
   }
-  const avg = (n: number, sum: number) => (n > 20 ? sum / n : 180);
+  const meanOf = (k: number) => (acc[k][3] > 20 ? [acc[k][0] / acc[k][3], acc[k][1] / acc[k][3], acc[k][2] / acc[k][3]] : [180, 140, 110]);
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -577,23 +575,25 @@ function photoMap(kind: "michelle" | "soldier", look: Look) {
   if (!ctx) return null;
   const img = ctx.createImageData(w, h);
   img.data.set(data);
-  const write = (i: number, rgb: [number, number, number], mean: number) => {
+  const grade = (i: number, rgb: [number, number, number], avg: number[]) => {
     const o = i * 4;
-    const lum = 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
-    const s = Math.min(1.45, Math.max(0.35, lum / mean));
-    img.data[o] = Math.min(255, rgb[0] * s);
-    img.data[o + 1] = Math.min(255, rgb[1] * s);
-    img.data[o + 2] = Math.min(255, rgb[2] * s);
+    const r = data[o];
+    const g = data[o + 1];
+    const b = data[o + 2];
+    if (Math.max(r, g, b) < 42) return;
+    img.data[o] = Math.min(255, (r * rgb[0]) / Math.max(12, avg[0]));
+    img.data[o + 1] = Math.min(255, (g * rgb[1]) / Math.max(12, avg[1]));
+    img.data[o + 2] = Math.min(255, (b * rgb[2]) / Math.max(12, avg[2]));
   };
-  const aSkin = avg(skinN, skinL);
-  const aCloth = avg(clothN, clothL);
-  const aHair = avg(hairN, hairL);
-  const aFace = avg(faceN, faceL);
+  const aSkin = meanOf(1);
+  const aCloth = meanOf(2);
+  const aHair = meanOf(3);
+  const aFace = meanOf(4);
   for (let i = 0; i < cls.length; i++) {
-    if (cls[i] === 1) write(i, skin, aSkin);
-    else if (cls[i] === 2) write(i, shirt, aCloth);
-    else if (cls[i] === 3) write(i, hair, aHair);
-    else if (cls[i] === 4) write(i, skin, aFace);
+    if (cls[i] === 1) grade(i, skin, aSkin);
+    else if (cls[i] === 2) grade(i, shirt, aCloth);
+    else if (cls[i] === 3) grade(i, hair, aHair);
+    else if (cls[i] === 4) grade(i, skin, aFace);
   }
   ctx.putImageData(img, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
@@ -625,12 +625,17 @@ export async function preloadCast(onStatus?: (label: string, pct: number) => voi
   xbot.scene.traverse((o) => {
     const mesh = o as THREE.SkinnedMesh;
     if (!mesh.isSkinnedMesh) return;
+    if (mesh.name === "Beta_Joints") {
+      mesh.visible = false;
+      return;
+    }
     const atlas = buildAtlas(mesh);
     if (atlas) xbotAtlases.push(atlas);
   });
   onStatus?.("Os rostos ganham cor", 0.78);
-  const male = prepare(xbot, Math.PI);
-  const female = prepare(michelle, Math.PI);
+  // Xbot and Michelle already face +Z. The soldier's photo faces the other way.
+  const male = prepare(xbot, 0);
+  const female = prepare(michelle, 0);
   const guard = prepare(soldier, Math.PI);
   michelleSrc = albedoOf(female.scene);
   soldierSrc = albedoOf(guard.scene);
@@ -680,24 +685,20 @@ function blank(): Rig {
 }
 
 function dressXbot(model: THREE.Object3D, look: Look, rig: Rig) {
-  const maps = xbotMaps(look);
-  const normal = softNormal();
-  let i = 0;
+  const map = xbotMaps(look)[0];
   model.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
-    const map = maps[i++] ?? maps[0];
-    const mat = new THREE.MeshPhysicalMaterial({
+    if (mesh.name === "Beta_Joints") {
+      mesh.visible = false;
+      return;
+    }
+    const mat = new THREE.MeshStandardMaterial({
       color: "#ffffff",
       map: map ?? null,
-      roughness: 0.58,
-      metalness: 0.03,
-      sheen: 0.28,
-      sheenRoughness: 0.62,
-      sheenColor: new THREE.Color("#fff4ec"),
-      normalMap: normal,
-      normalScale: new THREE.Vector2(0.32, 0.32),
-      envMapIntensity: 0.42,
+      roughness: 0.8,
+      metalness: 0,
+      envMapIntensity: 0.18,
     });
     if (!map) mat.color.set(look.skin);
     mesh.material = mat;
