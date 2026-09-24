@@ -39,26 +39,58 @@ export type Rig = {
   armed: boolean;
 };
 
-let clothBump: THREE.Texture | null = null;
-function clothNoise() {
-  if (clothBump) return clothBump;
+const normals = new Map<string, THREE.Texture>();
+
+/** Height field turned into a tangent-space normal map. Shared by every hero. */
+function normalMap(key: string, heightAt: (x: number, y: number) => number) {
+  const cached = normals.get(key);
+  if (cached) return cached;
   if (typeof document === "undefined") return null;
+  const S = 64;
+  const h = new Float32Array(S * S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) h[y * S + x] = heightAt(x / S, y / S);
   const c = document.createElement("canvas");
-  c.width = c.height = 48;
+  c.width = c.height = S;
   const g = c.getContext("2d");
   if (!g) return null;
-  const img = g.createImageData(48, 48);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const n = 90 + Math.random() * 140;
-    img.data[i] = img.data[i + 1] = img.data[i + 2] = n;
-    img.data[i + 3] = 255;
+  const img = g.createImageData(S, S);
+  const at = (x: number, y: number) => h[((y + S) % S) * S + ((x + S) % S)];
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const dx = at(x + 1, y) - at(x - 1, y);
+      const dy = at(x, y + 1) - at(x, y - 1);
+      const nx = -dx;
+      const ny = -dy;
+      const nz = 0.35;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      const i = (y * S + x) * 4;
+      img.data[i] = 128 + (nx / len) * 127;
+      img.data[i + 1] = 128 + (ny / len) * 127;
+      img.data[i + 2] = 128 + (nz / len) * 127;
+      img.data[i + 3] = 255;
+    }
   }
   g.putImageData(img, 0, 0);
-  clothBump = new THREE.CanvasTexture(c);
-  clothBump.wrapS = clothBump.wrapT = THREE.RepeatWrapping;
-  clothBump.repeat.set(2, 2);
-  clothBump.colorSpace = THREE.NoColorSpace;
-  return clothBump;
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.NoColorSpace;
+  normals.set(key, t);
+  return t;
+}
+
+function skinNormal() {
+  return normalMap("skin", (x, y) => {
+    const pore = Math.sin(x * 90) * Math.sin(y * 70) * 0.35 + Math.sin(x * 40 + y * 25) * 0.2;
+    return pore;
+  });
+}
+
+function clothNormal() {
+  return normalMap("cloth", (x, y) => {
+    const weave = (Math.sin(x * 48) + Math.sin(y * 48)) * 0.5;
+    const fold = Math.sin(y * 8) * 0.35;
+    return weave * 0.45 + fold;
+  });
 }
 
 const lathe = (pts: [number, number][], seg = 18) =>
@@ -132,7 +164,7 @@ export function buildHuman(
 ): Rig {
   const fine = !opts.simple;
   const materials: THREE.MeshStandardMaterial[] = [];
-  const mat = (color: string, rough = 0.8, metal = 0) => {
+  const mat = (color: string, rough = 0.8, metal = 0, kind: "flat" | "skin" | "cloth" | "leather" = "flat") => {
     const m = opts.wire
       ? new THREE.MeshStandardMaterial({
           color: opts.wire,
@@ -140,24 +172,27 @@ export function buildHuman(
           emissiveIntensity: 0.8,
           wireframe: true,
         })
-      : new THREE.MeshStandardMaterial({
-          color,
-          roughness: rough,
-          metalness: metal,
-          bumpMap: clothNoise(),
-          bumpScale: rough < 0.7 ? 0.12 : 0.05,
-        });
+      : fine && kind !== "flat"
+        ? new THREE.MeshPhysicalMaterial({
+            color,
+            roughness: kind === "skin" ? 0.46 : kind === "leather" ? 0.42 : rough,
+            metalness: kind === "leather" ? 0.08 : metal,
+            sheen: kind === "skin" ? 0.4 : kind === "cloth" ? 0.55 : 0.15,
+            sheenRoughness: kind === "leather" ? 0.35 : 0.65,
+            sheenColor: new THREE.Color(color),
+            normalMap: kind === "skin" ? skinNormal() : clothNormal(),
+            normalScale: new THREE.Vector2(kind === "skin" ? 0.28 : 0.45, kind === "skin" ? 0.28 : 0.45),
+            envMapIntensity: kind === "leather" ? 0.7 : 0.35,
+          })
+        : new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
     materials.push(m);
     return m;
   };
-  const skin = mat(look.skin, 0.6);
-  const shirt = mat(look.shirt, 0.9);
-  const outer = mat(
-    look.jacket ?? look.shirt,
-    look.extras.includes("jacket") ? 0.55 : 0.9,
-  );
-  const pants = mat(look.pants, 0.95);
-  const shoes = mat(look.shoes, 0.45);
+  const skin = mat(look.skin, 0.55, 0, "skin");
+  const shirt = mat(look.shirt, 0.86, 0, "cloth");
+  const outer = mat(look.jacket ?? look.shirt, look.extras.includes("jacket") ? 0.48 : 0.86, 0, look.extras.includes("jacket") ? "leather" : "cloth");
+  const pants = mat(look.pants, 0.9, 0, "cloth");
+  const shoes = mat(look.shoes, 0.42, 0, "leather");
   const hairM = mat(look.hair, 0.7);
   const big = look.build === "big" ? 1.15 : look.build === "slim" ? 0.92 : 1;
   const jacket = look.extras.includes("jacket");
@@ -191,7 +226,15 @@ export function buildHuman(
   const torso = part(geo.torso, jacket ? outer : shirt);
   torso.scale.set(1.12 * big, 1, 0.68 * big);
   chest.add(torso);
-  if (jacket) {
+    if (jacket && fine) {
+      for (const sx of [-1, 1]) {
+        const lapel = part(new RoundedBoxGeometry(0.045, 0.22, 0.012, 2, 0.004), outer, false);
+        lapel.position.set(sx * 0.05, 0.34, 0.125 * big);
+        lapel.rotation.z = sx * -0.35;
+        chest.add(lapel);
+      }
+    }
+    if (jacket) {
     const front = part(geo.torso, shirt, false);
     front.scale.set(0.42 * big, 0.95, 0.66 * big);
     front.position.z = 0.012;
@@ -238,7 +281,7 @@ export function buildHuman(
   chest.add(head);
   const faceM = mask ? mat("#141414", 0.9) : skin;
   const skull = part(geo.sphere, faceM);
-  skull.scale.set(0.118, 0.14, 0.13);
+  skull.scale.set(fine ? 0.108 : 0.118, fine ? 0.15 : 0.14, fine ? 0.116 : 0.13);
   head.add(skull);
   const jaw = part(geo.sphere, faceM);
   jaw.scale.set(0.09, 0.07, 0.095);
@@ -273,14 +316,30 @@ export function buildHuman(
     }
   }
   if (fine) {
-    const mouth = part(
-      new THREE.CapsuleGeometry(0.006, 0.03, 3, 6),
-      mat(mask ? "#262626" : "#7f3b32", 0.6),
-      false,
-    );
+    const mouth = part(new THREE.CapsuleGeometry(0.006, 0.03, 3, 6), mat(mask ? "#262626" : "#7f3b32", 0.55, 0, "skin"), false);
     mouth.rotation.z = Math.PI / 2;
-    mouth.position.set(0, -0.06, 0.112);
+    mouth.position.set(0, -0.058, 0.112);
     head.add(mouth);
+    if (!mask) {
+      const browRidge = part(new THREE.CapsuleGeometry(0.011, 0.09, 4, 8), faceM, false);
+      browRidge.rotation.z = Math.PI / 2;
+      browRidge.position.set(0, 0.058, 0.102);
+      head.add(browRidge);
+      const lip = part(new THREE.TorusGeometry(0.026, 0.007, 6, 14, Math.PI), mat("#8a4038", 0.5, 0, "skin"), false);
+      lip.rotation.set(Math.PI / 2.2, 0, Math.PI);
+      lip.position.set(0, -0.052, 0.108);
+      head.add(lip);
+      for (const sx of [-1, 1]) {
+        const lid = part(new THREE.CapsuleGeometry(0.005, 0.03, 3, 6), faceM, false);
+        lid.rotation.z = Math.PI / 2;
+        lid.position.set(sx * 0.045, 0.044, 0.116);
+        head.add(lid);
+        const cheek = part(geo.lowSphere, faceM, false);
+        cheek.scale.set(0.03, 0.02, 0.018);
+        cheek.position.set(sx * 0.055, -0.018, 0.092);
+        head.add(cheek);
+      }
+    }
   }
 
   if (!mask) {
@@ -407,14 +466,16 @@ export function buildHuman(
     palm.scale.set(0.034, 0.055, 0.022);
     hand.add(palm);
     if (fine) {
-      const thumb = part(
-        new THREE.CapsuleGeometry(0.01, 0.03, 3, 6),
-        skin,
-        false,
-      );
+      const thumb = part(new THREE.CapsuleGeometry(0.01, 0.03, 3, 6), skin, false);
       thumb.position.set(-side * 0.025, 0.005, 0.015);
       thumb.rotation.z = side * 0.6;
       hand.add(thumb);
+      for (let i = 0; i < 3; i++) {
+        const finger = part(new THREE.CapsuleGeometry(0.007, 0.026, 3, 5), skin, false);
+        finger.position.set(side * (0.016 - i * 0.014), -0.018, 0.01);
+        finger.rotation.x = 0.35;
+        hand.add(finger);
+      }
     }
     return { shoulder, elbow };
   };
@@ -454,21 +515,23 @@ export function buildHuman(
     const shin = part(geo.shin, pants);
     shin.scale.set(big, 1, big);
     knee.add(shin);
-    const shoe = part(geo.shoe, shoes);
-    shoe.rotation.x = Math.PI / 2;
-    shoe.scale.set(1.1, 1, 0.75);
-    shoe.position.set(0, -0.455, 0.045);
-    knee.add(shoe);
     if (fine) {
-      const sole = part(
-        new THREE.CapsuleGeometry(0.054, 0.15, 4, 10),
-        mat("#e7e5e4", 0.9),
-        false,
-      );
-      sole.rotation.x = Math.PI / 2;
-      sole.scale.set(1.12, 1, 0.25);
-      sole.position.set(0, -0.487, 0.045);
+      const upper = part(new RoundedBoxGeometry(0.1, 0.05, 0.16, 3, 0.016), shoes);
+      upper.position.set(0, -0.445, 0.03);
+      knee.add(upper);
+      const toe = part(new THREE.SphereGeometry(0.046, 14, 10), shoes, false);
+      toe.scale.set(1.05, 0.62, 1.2);
+      toe.position.set(0, -0.442, 0.115);
+      knee.add(toe);
+      const sole = part(new RoundedBoxGeometry(0.11, 0.016, 0.23, 2, 0.004), mat("#f4f4f5", 0.8), false);
+      sole.position.set(0, -0.478, 0.04);
       knee.add(sole);
+    } else {
+      const shoe = part(geo.shoe, shoes);
+      shoe.rotation.x = Math.PI / 2;
+      shoe.scale.set(1.1, 1, 0.75);
+      shoe.position.set(0, -0.455, 0.045);
+      knee.add(shoe);
     }
     return { hip, knee };
   };

@@ -342,7 +342,14 @@ function extrudeSide(points: [number, number][], width: number, bevel: number) {
 /** Curved sedan/hatch body built from an extruded side profile; faces +Z, length ~4.3 m. */
 export function buildCar(color: string, kind: "sedan" | "hatch" | "van" = "sedan") {
   const g = new THREE.Group();
-  const paint = std({ color, roughness: 0.28, metalness: 0.55 });
+  const paint = new THREE.MeshPhysicalMaterial({
+    color,
+    roughness: 0.32,
+    metalness: 0.62,
+    clearcoat: 0.85,
+    clearcoatRoughness: 0.12,
+    envMapIntensity: 1,
+  });
   const L = kind === "hatch" ? 3.8 : kind === "van" ? 4.8 : 4.4;
   const h = L / 2;
   const roofH = kind === "van" ? 2.1 : 1.45;
@@ -654,7 +661,16 @@ function buildShip(hullColor: string) {
 function buildBike(style: RideId = "entrega") {
   const g = new THREE.Group();
   const paintColor = style === "esportiva" ? "#22d3ee" : style === "noturna" ? "#6d28d9" : "#b91c1c";
-  const paint = std({ color: paintColor, metalness: style === "noturna" ? 0.75 : 0.55, roughness: 0.32, emissive: style === "noturna" ? "#4c1d95" : "#000000", emissiveIntensity: style === "noturna" ? 0.35 : 0 });
+  const paint = new THREE.MeshPhysicalMaterial({
+    color: paintColor,
+    metalness: style === "noturna" ? 0.72 : 0.55,
+    roughness: 0.28,
+    clearcoat: 0.7,
+    clearcoatRoughness: 0.18,
+    emissive: style === "noturna" ? "#4c1d95" : "#000000",
+    emissiveIntensity: style === "noturna" ? 0.35 : 0,
+    envMapIntensity: 0.9,
+  });
   const dark = std({ color: "#111827", metalness: 0.45, roughness: 0.4 });
   const rubber = std({ color: "#141414", roughness: 0.92 });
   const chrome = std({ color: "#e5e7eb", metalness: 0.92, roughness: 0.18 });
@@ -685,12 +701,37 @@ function buildBike(style: RideId = "entrega") {
   };
   const front = wheel(0.86);
   const rear = wheel(-0.78);
-  box(0.08, 0.08, 1.15, dark, 0, 0.48, 0.05, g, true);
-  box(0.42, 0.32, 0.38, std({ color: "#1f2937", metalness: 0.7, roughness: 0.35 }), 0, 0.46, 0.02, g, true, 0.04);
-  box(0.55, 0.28, 0.85, paint, 0, 0.78, 0.22, g, true, 0.08);
-  box(0.42, 0.1, 0.48, dark, 0, 0.86, -0.22, g, true, 0.03);
-  box(0.12, 0.16, 0.7, dark, 0.16, 0.4, -0.35, g, true);
-  mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.7, 8), chrome, 0.22, 0.32, -0.55, g, true).rotation.x = Math.PI / 2;
+  const frameCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0.36, -0.68),
+    new THREE.Vector3(0, 0.5, -0.12),
+    new THREE.Vector3(0, 0.74, 0.32),
+    new THREE.Vector3(0, 0.5, 0.58),
+    new THREE.Vector3(0, 0.34, 0.12),
+    new THREE.Vector3(0, 0.4, -0.42),
+  ]);
+  const frame = new THREE.Mesh(new THREE.TubeGeometry(frameCurve, 40, 0.026, 8, false), dark);
+  frame.castShadow = true;
+  g.add(frame);
+  const tank = new THREE.Mesh(new THREE.SphereGeometry(0.2, 22, 16), paint);
+  tank.scale.set(0.82, 0.62, 1.45);
+  tank.position.set(0, 0.76, 0.26);
+  tank.castShadow = true;
+  g.add(tank);
+  const seat = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.07, 0.4, 3, 0.02), dark);
+  seat.position.set(0, 0.84, -0.1);
+  seat.rotation.x = -0.18;
+  seat.castShadow = true;
+  g.add(seat);
+  const engine = new THREE.Mesh(new RoundedBoxGeometry(0.28, 0.22, 0.34, 2, 0.04), std({ color: "#1f2937", metalness: 0.65, roughness: 0.38 }));
+  engine.position.set(0, 0.46, 0.02);
+  engine.castShadow = true;
+  g.add(engine);
+  const fender = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.028, 8, 18, Math.PI * 0.65), paint);
+  fender.rotation.y = Math.PI / 2;
+  fender.position.set(0, 0.46, -0.7);
+  fender.rotation.x = 0.35;
+  g.add(fender);
+  mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.55, 10), chrome, 0.2, 0.34, -0.48, g, true).rotation.x = 0.4;
   box(0.5, 0.08, 0.7, dark, 0, 0.5, 0.72, g, true, 0.02);
   box(0.06, 0.42, 0.06, chrome, 0.1, 0.78, 0.5, g, true);
   box(0.06, 0.42, 0.06, chrome, -0.1, 0.78, 0.5, g, true);
@@ -716,8 +757,14 @@ function buildBike(style: RideId = "entrega") {
 
 function buildJet() {
   const g = new THREE.Group();
-  box(1.7, 0.28, 0.55, std({ color: "#f97316", roughness: 0.45, metalness: 0.2 }), 0, 0.35, 0, g, true, 0.08);
-  box(0.45, 0.35, 0.4, std({ color: "#111827" }), -0.35, 0.6, 0, g, true, 0.05);
+  const hullMat = new THREE.MeshPhysicalMaterial({ color: "#f97316", roughness: 0.38, metalness: 0.28, clearcoat: 0.45, clearcoatRoughness: 0.2 });
+  const hull = new THREE.Mesh(new THREE.SphereGeometry(0.4, 20, 14), hullMat);
+  hull.scale.set(0.72, 0.34, 2.15);
+  hull.position.set(0, 0.38, 0.05);
+  hull.castShadow = true;
+  g.add(hull);
+  box(0.42, 0.28, 0.36, std({ color: "#111827", roughness: 0.5 }), -0.15, 0.58, -0.05, g, true, 0.06);
+  mesh(new THREE.BoxGeometry(0.04, 0.16, 0.22), std({ color: "#1f2937" }), 0, 0.32, 0.95, g, false);
   return g;
 }
 
@@ -990,9 +1037,10 @@ function coastTex(span: number, origin: number, mode: "sand" | "grass" | "depth"
       } else {
         const land = past < 0.4;
         const wet = past > -2.4;
-        px[i] = wet ? 176 : 230;
-        px[i + 1] = wet ? 156 : 208;
-        px[i + 2] = wet ? 112 : 158;
+        const grit = Math.sin(wx * 3.7 + wz * 2.1) * 14 + Math.sin(wx * 11.3) * Math.cos(wz * 9.1) * 8;
+        px[i] = Math.max(0, Math.min(255, (wet ? 168 : 214) + grit));
+        px[i + 1] = Math.max(0, Math.min(255, (wet ? 148 : 190) + grit * 0.85));
+        px[i + 2] = Math.max(0, Math.min(255, (wet ? 104 : 142) + grit * 0.55));
         px[i + 3] = land ? 255 : 0;
       }
     }
@@ -1043,6 +1091,9 @@ function seaMaterial() {
         col = mix(col, deep, smoothstep(0.32, 0.9, depth));
         float spark = sin(vWorld.x * 0.75 + uTime * 1.8) * sin(vWorld.z * 0.62 - uTime * 1.4);
         col += vec3(0.18, 0.24, 0.26) * smoothstep(0.78, 1.0, spark) * (1.0 - depth * 0.65);
+        vec3 viewDir = normalize(cameraPosition - vWorld);
+        float fres = pow(1.0 - max(dot(viewDir, vec3(0.0, 1.0, 0.0)), 0.0), 3.0);
+        col = mix(col, vec3(0.62, 0.78, 0.84), fres * 0.5);
         fragColor = vec4(col, 0.94);
       }
     `,
@@ -1178,7 +1229,15 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       const b1 = bump.clone();
       b1.repeat.set(rx, ry);
       b1.needsUpdate = true;
-      const m = std({ map: m1, bumpMap: b1, bumpScale: 2.2, roughness: district.kind === "towers" || district.kind === "corporate" ? 0.45 : 0.9, metalness: district.kind === "containers" ? 0.35 : 0 });
+      const glassWall = district.kind === "towers" || district.kind === "corporate";
+      const m = std({
+        map: m1,
+        bumpMap: b1,
+        bumpScale: glassWall ? 0.6 : 1.4,
+        roughness: glassWall ? 0.18 : district.kind === "containers" ? 0.55 : 0.86,
+        metalness: glassWall ? 0.48 : district.kind === "containers" ? 0.35 : 0.02,
+        envMapIntensity: glassWall ? 1.15 : 0.35,
+      });
       if (f.emissive) {
         const e1 = f.emissive.clone();
         e1.repeat.set(rx, ry);

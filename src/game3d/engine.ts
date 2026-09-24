@@ -261,8 +261,9 @@ export class Game3D {
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
-    sc.left = sc.bottom = -45;
-    sc.right = sc.top = 45;
+    sc.left = sc.bottom = -28;
+    sc.right = sc.top = 28;
+    this.sun.shadow.radius = 1.5;
     sc.near = 1;
     sc.far = 200;
     this.sun.shadow.bias = -0.0005;
