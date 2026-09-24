@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  BERTHS,
   BIKE_PARK,
   canMount,
   COAST,
@@ -9,6 +10,7 @@ import {
   doorOpen,
   endingFor,
   hitWanted,
+  HIDEOUT,
   HOME,
   HOME_STUDY,
   indoors,
@@ -54,6 +56,8 @@ test("home and shops sit off the roadway", () => {
   assert.equal(overlapsStreet(SHOP_A), false);
   assert.equal(overlapsStreet(SHOP_B), false);
   assert.equal(overlapsStreet(CENTRAL), false);
+  assert.equal(Math.abs(HIDEOUT.x - 82) < 4 && Math.abs(HIDEOUT.z - 82) < 8, true);
+  assert.ok(BERTHS.every((b) => b.z < -COAST));
   assert.equal(indoors(HOME_STUDY.x, HOME_STUDY.z), true);
   assert.equal(indoors(BIKE_PARK.x, BIKE_PARK.z), false);
   const out = roomExit(HOME_STUDY.x, HOME_STUDY.z);

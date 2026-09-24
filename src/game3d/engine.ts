@@ -6,7 +6,7 @@ import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
-import { canMount, CENTRAL_PHONE, decayWanted, doorOpen, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, ROOF, roomExit, separateCircles, SHOPS, shirtFor } from "@/game3d/rules";
+import { BERTHS, canMount, CENTRAL_PHONE, decayWanted, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, ROOF, roomExit, separateCircles, SHOPS, shirtFor, TOWER } from "@/game3d/rules";
 import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
@@ -177,6 +177,8 @@ export class Game3D {
   private weapon: WeaponId = "choque";
   private ride: RideId = "entrega";
   private dani: Rig | null = null;
+  private lift: { t: number; up: boolean; start: THREE.Vector3 } | null = null;
+  private liftFloor: "ground" | "roof" = "ground";
   private jetting = false;
   private cops: { mesh: THREE.Group; pos: THREE.Vector3; yaw: number; speed: number }[] = [];
   private owned = false;
@@ -238,7 +240,7 @@ export class Game3D {
 
     this.dani = buildHuman(people.dani.look);
     this.dani.armed = false;
-    this.dani.root.position.set(HIDEOUT.x + 1.6, ROOF, HIDEOUT.z + 0.4);
+    this.dani.root.position.set(HIDEOUT.x - 2.1, ROOF, HIDEOUT.z + 0.4);
     this.dani.root.rotation.y = -0.8;
     this.scene.add(this.dani.root);
 
@@ -545,10 +547,12 @@ export class Game3D {
     if (!out) return;
     this.player.pos.x = out.x;
     this.player.pos.z = out.z;
+    if (this.player.pos.y > 5) this.player.pos.y = 0.2;
   }
 
   startPlay() {
     this.talking = null;
+    this.lift = null;
     this.free = false;
     this.leaveRooms();
     this.setPhase("play");
@@ -570,7 +574,8 @@ export class Game3D {
     this.stepIdx = this.mission.steps.length;
     if (this.phase === "play") this.ev.onPhase("play");
     else this.setPhase("play");
-    this.ev.onToast("Você está na ilha. A torre com o ponto azul é o esconderijo da Dani. As lojas gastam o dinheiro da missão.", "info");
+    this.lift = null;
+    this.ev.onToast("Você está na ilha. O arranha-céu do centro, o ponto azul, é o esconderijo da Dani. E no elevador sobe.", "info");
   }
 
   beginMission() {
@@ -759,6 +764,7 @@ export class Game3D {
 
   private collide(pos: THREE.Vector3, radius: number, feet: number) {
     for (const c of this.layout.colliders) {
+      if (c.above != null && feet < c.above) continue;
       if (c.top <= feet + 0.35) continue;
       const cx = Math.max(c.minX, Math.min(pos.x, c.maxX));
       const cz = Math.max(c.minZ, Math.min(pos.z, c.maxZ));
@@ -803,7 +809,8 @@ export class Game3D {
   private groundAt(pos: THREE.Vector3, feet: number) {
     let g = 0;
     for (const c of this.layout.colliders) {
-      if (c.top > feet + 0.4 || c.top > 50) continue;
+      if (c.above != null && feet < c.above) continue;
+      if (c.top > feet + 0.4 || c.top > 200) continue;
       if (pos.x + R > c.minX && pos.x - R < c.maxX && pos.z + R > c.minZ && pos.z - R < c.maxZ) g = Math.max(g, c.top);
     }
     return g;
@@ -903,7 +910,7 @@ export class Game3D {
 
     const P = this.player;
     const L = this.layout;
-    const control = this.phase === "play" && P.downT <= 0;
+    const control = this.phase === "play" && P.downT <= 0 && !this.lift;
     P.inv = Math.max(0, P.inv - dt);
     P.shootT = Math.max(0, P.shootT - dt);
     P.cooldown = Math.max(0, P.cooldown - dt);
@@ -936,6 +943,7 @@ export class Game3D {
 
     P.moving = false;
     this.rideSpeed = 0;
+    if (this.lift) this.updateLift(dt);
     if (control) {
       const fx = Math.sin(this.camYaw);
       const fz = Math.cos(this.camYaw);
@@ -984,7 +992,7 @@ export class Game3D {
     }
     this.jumpHeld = input.jump;
 
-    if (this.phase !== "escape" && this.phase !== "done") {
+    if (!this.lift && this.phase !== "escape" && this.phase !== "done") {
       this.collide(P.pos, R, P.pos.y);
       const wasAir = !P.grounded;
       P.vy -= GRAV * dt;
@@ -1070,6 +1078,7 @@ export class Game3D {
       jet.position.set(JET.x, 0.05, JET.z);
       jet.rotation.y = 0;
     }
+    if (!this.lift) this.layout.elevator.position.set(ELEVATOR.x, this.liftFloor === "roof" ? ROOF + 1.5 : 1.7, 66.6);
     if (this.mounted) {
       bike.position.set(P.pos.x, P.pos.y, P.pos.z);
       bike.rotation.y = P.yaw;
@@ -1109,6 +1118,8 @@ export class Game3D {
     this.updateCamera(dt);
     this.updateEngines();
 
+    const fog = this.scene.fog as THREE.Fog;
+    if (fog) fog.far = P.pos.y > 30 ? 520 : L.night ? 150 : 200;
     this.sun.position.set(P.pos.x + 30, 60, P.pos.z + 20);
     this.sun.target.position.copy(P.pos);
   }
@@ -1368,6 +1379,16 @@ export class Game3D {
       this.ev.onToast("Você desceu do jet ski.", "info");
       return true;
     }
+    const atLift = P.pos.distanceTo(new THREE.Vector3(ELEVATOR.x, P.pos.y, ELEVATOR.z)) < 2.5;
+    const atRoofLift = P.pos.y > ROOF - 2 && P.pos.distanceTo(new THREE.Vector3(TOWER.x, P.pos.y, 77.4)) < 2.6;
+    if (!hackNear && atLift && P.pos.y < 4) {
+      this.startLift(true);
+      return true;
+    }
+    if (!hackNear && atRoofLift) {
+      this.startLift(false);
+      return true;
+    }
     if (!hackNear && P.pos.y > ROOF - 1.5 && P.pos.distanceTo(new THREE.Vector3(CENTRAL_PHONE.x, P.pos.y, CENTRAL_PHONE.z)) < 2.6) {
       this.ev.onHelp?.();
       return true;
@@ -1431,11 +1452,58 @@ export class Game3D {
 
   private updateShips() {
     this.layout.ships.forEach((ship, i) => {
+      const berth = BERTHS[i] ?? BERTHS[0];
       const t = this.t * 0.08 + i * 2.4;
       const along = Math.sin(t);
-      ship.position.set(i === 0 ? 56 : 104, 0.35 + Math.sin(t * 1.7) * 0.08, -20 + along * 6);
-      ship.rotation.y = along > 0 ? 0.15 : Math.PI - 0.15;
+      ship.position.set(berth.x + along * 2.2, 0.15 + Math.sin(t * 1.7) * 0.1, berth.z);
+      ship.rotation.z = Math.sin(t * 1.3) * 0.03;
+      ship.rotation.y = i === 0 ? 0.2 : Math.PI - 0.2;
     });
+  }
+
+  private startLift(up: boolean) {
+    if (this.lift) return;
+    this.mounted = false;
+    this.jetting = false;
+    this.lift = { t: 0, up, start: this.player.pos.clone() };
+    sound.sfx("gate");
+    this.ev.onToast(up ? "Elevador. Subindo para a cobertura da Dani." : "Elevador. Descendo para o saguão.", "info");
+  }
+
+  private updateLift(dt: number) {
+    const ride = this.lift;
+    if (!ride) return;
+    const P = this.player;
+    ride.t += dt;
+    const k = Math.min(1, ride.t / 6.4);
+    const cabin = new THREE.Vector3(ELEVATOR.x, ride.up ? 0.2 : ROOF, 66.8);
+    const deck = new THREE.Vector3(TOWER.x, ride.up ? ROOF : 0.2, ride.up ? TOWER.z - 1.4 : ELEVATOR.z);
+    let pos: THREE.Vector3;
+    if (k < 0.14) {
+      pos = ride.start.clone().lerp(cabin, k / 0.14);
+      pos.y = ride.up ? 0.2 : ROOF;
+    } else if (k < 0.86) {
+      const u = (k - 0.14) / 0.72;
+      const e = u * u * (3 - 2 * u);
+      pos = cabin.clone();
+      pos.y = (ride.up ? 0.2 : ROOF) + (ride.up ? ROOF - 0.2 : 0.2 - ROOF) * e;
+    } else {
+      const u = (k - 0.86) / 0.14;
+      pos = cabin.clone().lerp(deck, u);
+      pos.y = ride.up ? ROOF : 0.2;
+    }
+    P.pos.copy(pos);
+    P.vy = 0;
+    P.grounded = true;
+    P.yaw = Math.PI;
+    this.layout.elevator.position.set(ELEVATOR.x, Math.max(1.6, P.pos.y + 1.4), 66.6);
+    if (k >= 1) {
+      P.pos.copy(deck);
+      this.liftFloor = ride.up ? "roof" : "ground";
+      this.lift = null;
+      sound.sfx("gate");
+      if (ride.up) this.ev.onToast("Cobertura. O computador da Dani está do outro lado.", "good");
+    }
   }
 
   private resolveVehicles() {
@@ -1843,6 +1911,11 @@ export class Game3D {
       const back = new THREE.Vector3(-Math.sin(car.rotation.y), 0, -Math.cos(car.rotation.y));
       pos = car.position.clone().addScaledVector(back, 9).add(new THREE.Vector3(0, 4, 0));
       look = car.position.clone().add(new THREE.Vector3(0, 1, 0));
+    } else if (this.lift) {
+      const y = P.pos.y;
+      pos = new THREE.Vector3(TOWER.x + 18, y + 7, 48);
+      look = new THREE.Vector3(ELEVATOR.x, y + 1.4, 66.6);
+      snap = true;
     } else {
       const fx = Math.sin(this.camYaw);
       const fz = Math.cos(this.camYaw);

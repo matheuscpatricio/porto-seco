@@ -80,11 +80,18 @@ export const BIKE_PARK = { x: 21.5, z: 15.4 };
 export const SHOP_A: RoomBox = { minX: 136.6, maxX: 145.4, minZ: 16.6, maxZ: 24.2, gap: "minusZ" };
 /** Corner shop on the northwest lot, door toward the west sidewalk. */
 export const SHOP_B: RoomBox = { minX: 16.6, maxX: 24.2, minZ: 136.6, maxZ: 145.4, gap: "west" };
-/** Dani's tower, east of Léo's house. The hideout is the roof, not a sign on the street. */
-export const CENTRAL: RoomBox = { minX: 36, maxX: 46, minZ: 18, maxZ: 27.2, gap: "minusZ" };
-export const ROOF = 10.28;
-export const HIDEOUT = { x: 41, z: 22.6 };
-export const CENTRAL_PHONE = { x: 42.6, z: 22.2 };
+/** Dani's skyscraper, in the center block. The shaft is the roof you stand on. */
+export const TOWER = { x: 82, z: 82 };
+export const ROOF = 140;
+export const CENTRAL: RoomBox = { minX: 76, maxX: 88, minZ: 66, maxZ: 90, gap: "minusZ" };
+export const ELEVATOR = { x: 82, z: 74.2 };
+export const HIDEOUT = { x: 82, z: 82 };
+export const CENTRAL_PHONE = { x: 84.6, z: 84.2 };
+/** Cargo ships sit in the water, past the beach. */
+export const BERTHS = [
+  { x: 58, z: -42 },
+  { x: 106, z: -46 },
+] as const;
 export const ROOMS: RoomBox[] = [HOME, SHOP_A, SHOP_B, CENTRAL];
 /** Walkable dock over the south beach. The driving lanes stay on the island. */
 export const QUAY = { minX: 58, maxX: 102, minZ: -7, maxZ: 0.2 };

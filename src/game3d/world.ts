@@ -1,10 +1,10 @@
 import type { RideId } from "@/lib/progress-rules";
-import { BIKE_PARK, BLOCK, CENTRAL, COAST, districtAt, GREEN, HIDEOUT, HOME, ISLAND, JET, PIER, QUAY, ROOF, SAND, SHOP_A, SHOP_B, STREET, type RoomGap } from "@/game3d/rules";
+import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, CENTRAL_PHONE, COAST, districtAt, ELEVATOR, GREEN, HIDEOUT, HOME, ISLAND, JET, PIER, QUAY, ROOF, SAND, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 export type DoorPlace = "home" | "shop" | "target" | "central";
-export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean; door?: DoorPlace; shut?: number };
+export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean; door?: DoorPlace; shut?: number; above?: number };
 
 export { BLOCK, COAST, GREEN, STREET };
 export const SIZE = ISLAND;
@@ -62,6 +62,7 @@ export type Layout = {
   bikes: Record<RideId, THREE.Group>;
   jet: THREE.Group;
   ships: THREE.Group[];
+  elevator: THREE.Group;
 };
 
 function rng(seed: number) {
@@ -533,8 +534,8 @@ function buildPort(scene: THREE.Scene, addCol: (minX: number, maxX: number, minZ
   sign.position.set(80, quayTop + 2.55, 0.23);
   scene.add(sign);
   const ships = [buildShip("#1e3a5f"), buildShip("#7f1d1d")];
-  ships[0].position.set(56, 0.35, -20);
-  ships[1].position.set(104, 0.35, -21);
+  ships[0].position.set(BERTHS[0].x, 0.15, BERTHS[0].z);
+  ships[1].position.set(BERTHS[1].x, 0.15, BERTHS[1].z);
   ships.forEach((s) => scene.add(s));
   return ships;
 }
@@ -795,61 +796,58 @@ function furnishHome(scene: THREE.Scene, addCol: (minX: number, maxX: number, mi
   scene.add(rug);
 }
 
-function buildHideout(scene: THREE.Scene, addCol: (minX: number, maxX: number, minZ: number, maxZ: number, top: number) => Collider) {
-  const concrete = std({ color: "#1e293b", roughness: 0.8 });
-  const trim = std({ color: "#334155", metalness: 0.3, roughness: 0.5 });
-  const { minX, maxX, minZ, maxZ } = CENTRAL;
-  const midX = (minX + maxX) / 2;
-  const wallT = 0.35;
-  const wallH = ROOF + 1.2;
-  const wall = (x0: number, x1: number, z0: number, z1: number) => {
-    box(x1 - x0, wallH, z1 - z0, concrete, (x0 + x1) / 2, wallH / 2, (z0 + z1) / 2, scene, true);
-    addCol(x0, x1, z0, z1, wallH);
-  };
-  wall(minX, minX + wallT, minZ, maxZ);
-  wall(maxX - wallT, maxX, minZ, maxZ);
-  wall(minX, maxX, maxZ - wallT, maxZ);
-  wall(minX, midX - 1.1, minZ, minZ + wallT);
-  wall(midX + 1.1, maxX, minZ, minZ + wallT);
-  const door = addCol(midX - 1.1, midX + 1.1, minZ, minZ + wallT, 2.6);
-  door.door = "central";
-  door.shut = 2.6;
-  const step = (x: number, z: number, top: number) => {
-    box(1.35, 0.16, 0.38, trim, x, top - 0.08, z, scene, true);
-    addCol(x - 0.68, x + 0.68, z - 0.2, z + 0.2, top);
-  };
-  for (let i = 0; i < 15; i++) step(37.4, 19.3 + i * 0.42, 0.34 * (i + 1));
-  box(3.4, 0.2, 1.5, trim, 38.6, 5.15, 26.0, scene, true);
-  addCol(36.9, 40.3, 25.2, 26.8, 5.25);
-  for (let i = 0; i < 15; i++) {
-    const top = 5.55 + i * 0.34;
-    const z = 25.8 - i * 0.4;
-    const reach = i >= 12 ? 41.4 : 40.6;
-    box(reach - 38.5, 0.16, 0.4, trim, (38.5 + reach) / 2, top - 0.08, z, scene, true);
-    addCol(38.5, reach, z - 0.22, z + 0.22, top);
+function buildSkyHideout(scene: THREE.Scene, night: boolean, addCol: (minX: number, maxX: number, minZ: number, maxZ: number, top: number) => Collider) {
+  const glass = std({ color: night ? "#7dd3fc" : "#dbeafe", emissive: night ? "#38bdf8" : "#93c5fd", emissiveIntensity: night ? 0.55 : 0.18, roughness: 0.18, metalness: 0.62, transparent: true, opacity: 0.82 });
+  const steel = std({ color: "#1e293b", metalness: 0.55, roughness: 0.4 });
+  const deck = std({ color: "#0f172a", roughness: 0.72 });
+  const lobbyH = 7;
+  const shaftH = ROOF - lobbyH;
+  const tower = mesh(new THREE.CylinderGeometry(12.5, 14.2, shaftH, 8), glass, TOWER.x, lobbyH + shaftH / 2, TOWER.z, scene);
+  tower.castShadow = true;
+  const crown = mesh(new THREE.TorusGeometry(12.8, 0.55, 8, 28), new THREE.MeshStandardMaterial({ color: "#38bdf8", emissive: "#38bdf8", emissiveIntensity: 1.6 }), TOWER.x, ROOF - 6, TOWER.z, scene, false);
+  crown.rotation.x = Math.PI / 2;
+  for (const [x, z] of [
+    [77.2, 67.4],
+    [86.8, 67.4],
+    [77.2, 75.2],
+    [86.8, 75.2],
+  ] as const) {
+    mesh(new THREE.CylinderGeometry(0.45, 0.55, lobbyH, 8), steel, x, lobbyH / 2, z, scene, true);
+    addCol(x - 0.45, x + 0.45, z - 0.45, z + 0.45, lobbyH);
   }
-  box(5.4, 0.22, 7.6, std({ color: "#0f172a", roughness: 0.7 }), 43.2, ROOF - 0.08, 22.8, scene, true);
-  box(2.3, 0.22, 2.1, std({ color: "#0f172a", roughness: 0.7 }), 39.6, ROOF - 0.08, 19.5, scene, true);
-  addCol(40.7, 45.7, 18.5, 26.85, ROOF);
-  addCol(38.5, 40.7, 18.5, 20.55, ROOF);
-  const lip = ROOF + 0.85;
+  box(11.2, ROOF, 13, steel, TOWER.x, ROOF / 2, 82.6, scene, true);
+  addCol(76.4, 87.6, 76.2, 89.2, ROOF);
   const rail = (x0: number, x1: number, z0: number, z1: number) => {
-    box(Math.max(0.12, x1 - x0), 0.7, Math.max(0.12, z1 - z0), trim, (x0 + x1) / 2, ROOF + 0.45, (z0 + z1) / 2, scene, true);
-    addCol(x0, x1, z0, z1, lip);
+    box(Math.max(0.18, x1 - x0), 1.05, Math.max(0.18, z1 - z0), steel, (x0 + x1) / 2, ROOF + 0.52, (z0 + z1) / 2, scene, true);
+    const col = addCol(x0, x1, z0, z1, ROOF + 1.1);
+    col.above = ROOF - 1;
   };
-  rail(38.5, 45.7, 18.5, 18.75);
-  rail(45.5, 45.7, 18.5, 26.8);
-  rail(40.4, 45.7, 26.6, 26.85);
-  const screen = std({ color: "#082f49", emissive: "#22d3ee", emissiveIntensity: 0.85, roughness: 0.2 });
-  box(2.4, 0.12, 1.1, std({ color: "#111827" }), 42.6, ROOF + 0.75, 23.5, scene, true);
-  addCol(41.5, 43.8, 23.0, 24.1, ROOF + 0.9);
-  box(1.5, 1.35, 0.08, screen, 42.15, ROOF + 1.7, 23.95, scene, false);
-  box(1.5, 1.35, 0.08, screen, 43.7, ROOF + 1.7, 23.95, scene, false);
-  box(0.45, 0.9, 0.7, std({ color: "#020617", metalness: 0.4 }), 41.5, ROOF + 0.7, 23.2, scene, true);
-  mesh(new THREE.SphereGeometry(0.08, 10, 8), std({ color: "#22d3ee", emissive: "#22d3ee", emissiveIntensity: 2 }), 41.5, ROOF + 1.05, 23.45, scene, false);
-  const pole = mesh(new THREE.CylinderGeometry(0.06, 0.08, 3.2, 8), trim, HIDEOUT.x, ROOF + 1.8, 19.3, scene, true);
-  pole.castShadow = true;
-  mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshBasicMaterial({ color: "#38bdf8", toneMapped: false }), HIDEOUT.x, ROOF + 3.5, 19.3, scene, false);
+  rail(76.4, 80.1, 76.2, 76.9);
+  rail(83.9, 87.6, 76.2, 76.9);
+  rail(87.0, 87.6, 76.2, 89.2);
+  rail(76.4, 77.0, 76.2, 89.2);
+  rail(76.4, 87.6, 88.6, 89.2);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 10), std({ color: "#111827", roughness: 0.9 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(TOWER.x, 0.21, 71);
+  scene.add(floor);
+  const screen = std({ color: "#082f49", emissive: "#22d3ee", emissiveIntensity: 0.9, roughness: 0.2 });
+  box(2.6, 0.12, 1.15, std({ color: "#111827" }), CENTRAL_PHONE.x, ROOF + 0.75, CENTRAL_PHONE.z + 1.1, scene, true);
+  const desk = addCol(CENTRAL_PHONE.x - 1.4, CENTRAL_PHONE.x + 1.4, CENTRAL_PHONE.z + 0.5, CENTRAL_PHONE.z + 1.8, ROOF + 0.95);
+  desk.above = ROOF - 1;
+  box(1.55, 1.4, 0.08, screen, CENTRAL_PHONE.x - 0.7, ROOF + 1.75, CENTRAL_PHONE.z + 1.55, scene, false);
+  box(1.55, 1.4, 0.08, screen, CENTRAL_PHONE.x + 0.85, ROOF + 1.75, CENTRAL_PHONE.z + 1.55, scene, false);
+  box(0.5, 1.1, 0.7, std({ color: "#020617", metalness: 0.45 }), CENTRAL_PHONE.x - 1.7, ROOF + 0.7, CENTRAL_PHONE.z + 0.7, scene, true);
+  mesh(new THREE.SphereGeometry(0.22, 14, 10), new THREE.MeshBasicMaterial({ color: "#38bdf8", toneMapped: false }), HIDEOUT.x, ROOF + 3.2, HIDEOUT.z - 4, scene, false);
+  const car = new THREE.Group();
+  const cab = std({ color: "#e0f2fe", emissive: "#7dd3fc", emissiveIntensity: 0.35, roughness: 0.08, metalness: 0.2, transparent: true, opacity: 0.45 });
+  box(3.1, 2.7, 2.2, cab, 0, 0, 0, car, false);
+  box(3.2, 0.12, 2.3, steel, 0, -1.35, 0, car, true);
+  box(0.12, 2.5, 2.2, steel, -1.55, 0, 0, car, true);
+  box(0.12, 2.5, 2.2, steel, 1.55, 0, 0, car, true);
+  car.position.set(ELEVATOR.x, 1.7, 66.6);
+  scene.add(car);
+  return car;
 }
 
 export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, target: string): Layout {
@@ -920,6 +918,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       box(BLOCK + 3.4, 0.16, BLOCK + 3.4, curbMat, cx, 0.08, cz, scene, false, 0.08);
       const s = mesh(new THREE.BoxGeometry(BLOCK + 3, 0.2, BLOCK + 3), sidewalk, cx, 0.1, cz, scene, false);
       s.receiveShadow = true;
+      addCol(cx - (BLOCK + 3) / 2, cx + (BLOCK + 3) / 2, cz - (BLOCK + 3) / 2, cz + (BLOCK + 3) / 2, 0.2);
     }
   }
   const decals = (color: string, rects: [number, number, number, number][]) => {
@@ -1098,28 +1097,14 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       const bx = blockStart(i);
       const bz = blockStart(j);
       const lot = THEMES[districtAt(bx + 8, bz + 8)] ?? theme;
-      if (lot.kind === "corporate" && i === 1 && j === 1) {
-        const h = 140;
-        const f = facadeTextures("#3a3f5c", true, "towers", r);
-        f.map.repeat.set(10, 44);
-        f.bump.repeat.set(10, 44);
-        f.emissive!.repeat.set(10, 44);
-        const mat = std({ map: f.map, emissiveMap: f.emissive!, emissive: "#ffffff", emissiveIntensity: 1.2, roughness: 0.25, metalness: 0.6 });
-        const tower = mesh(new THREE.CylinderGeometry(14, 16, h, 8), mat, bx + BLOCK / 2, h / 2, bz + BLOCK / 2, scene);
-        tower.castShadow = true;
-        const logo = mesh(new THREE.TorusGeometry(14.5, 0.8, 8, 32), new THREE.MeshStandardMaterial({ color: themeId === "w6" ? "#e11d48" : "#8b5cf6", emissive: themeId === "w6" ? "#e11d48" : "#8b5cf6", emissiveIntensity: 2 }), bx + BLOCK / 2, h - 8, bz + BLOCK / 2, scene, false);
-        logo.rotation.x = Math.PI / 2;
-        addCol(bx + 4, bx + BLOCK - 4, bz + 4, bz + BLOCK - 4, h);
-        continue;
-      }
+      if (lot.kind === "corporate" && i === 1 && j === 1) continue;
       for (let li = 0; li < 2; li++) {
         for (let lj = 0; lj < 2; lj++) {
           const cx = bx + 9 + li * 18;
           const cz = bz + 9 + lj * 18;
           const homeLot = i === 0 && j === 0 && li === 0 && lj === 0;
-          const centralLot = i === 0 && j === 0 && li === 1 && lj === 0;
           const shopLot = (i === 2 && j === 0 && li === 1 && lj === 0) || (i === 0 && j === 2 && li === 0 && lj === 1);
-          if (homeLot || centralLot || shopLot) continue;
+          if (homeLot || shopLot) continue;
           const roll = r();
           if (roll < 0.2 && !(i === 0 && j === 0)) {
             for (let k = 0; k < 3; k++) {
@@ -1387,7 +1372,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   scene.add(motos);
   box(2.2, 0.9, 0.5, std({ color: "#7f1d1d", roughness: 0.6 }), (SHOP_A.minX + SHOP_A.maxX) / 2, 0.7, (SHOP_A.minZ + SHOP_A.maxZ) / 2 + 1.2, scene, true);
   box(0.5, 0.9, 2.2, std({ color: "#0e7490", roughness: 0.55 }), (SHOP_B.minX + SHOP_B.maxX) / 2 + 1.2, 0.7, (SHOP_B.minZ + SHOP_B.maxZ) / 2, scene, true);
-  buildHideout(scene, addCol);
+  const elevator = buildSkyHideout(scene, night, addCol);
   const yard = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), grassMat);
   yard.rotation.x = -Math.PI / 2;
   yard.position.set(23.2, 0.22, 23.2);
@@ -1450,5 +1435,6 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     bikes,
     jet,
     ships: port,
+    elevator,
   };
 }
