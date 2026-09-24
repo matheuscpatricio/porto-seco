@@ -97,20 +97,13 @@ Sound is generated in the browser with the Web Audio API, including:
 
 Audio can be enabled or disabled in the game UI, and the preference is persisted.
 
-## Running locally
+## Play
 
-```bash
-npm install
-npm run dev
-```
+The game is available online at:
 
-Then open:
+https://porto-seco.netlify.app
 
-```text
-http://localhost:43123
-```
-
-The first run requires an internet connection so the browser can load Pyodide from its CDN.
+Pyodide is loaded in the browser to execute the Python challenges.
 
 ## Why I built it
 
