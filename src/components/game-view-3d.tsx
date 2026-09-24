@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { Level, Who, World } from "@/content/types";
 import { connector } from "@/content/story";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
-import { PIER, QUAY } from "@/game3d/rules";
+import { PIER, POLICE_RANK, policeRank, QUAY } from "@/game3d/rules";
 import { BLOCK, blockStart, COAST, GREEN, SIZE } from "@/game3d/world";
 import { purchaseRide, purchaseWeapon, useProgress } from "@/lib/progress";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
@@ -117,7 +117,10 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
   dot(m.escape.x, m.escape.z, 4, "#f43f5e");
   if (m.runner) dot(m.runner.x, m.runner.z, 4, "#fb923c");
   for (const al of m.allies) dot(al.x, al.z, 3.5, "#38bdf8");
-  for (const e of m.enemies) dot(e.x, e.z, e.boss ? 5 : 3.5, e.police ? "#60a5fa" : e.boss ? "#ff0040" : "#ef4444");
+  for (const e of m.enemies) {
+    const police = e.rank ? POLICE_RANK[e.rank].color : e.police ? "#60a5fa" : "";
+    dot(e.x, e.z, e.boss ? 5 : 3.5, police || (e.boss ? "#ff0040" : "#ef4444"));
+  }
   g.restore();
   let [tx, ty] = toScreen(m.target.x, m.target.z);
   const dist = Math.hypot(tx - half, ty - half);
@@ -165,7 +168,8 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
     const look = useRef({ yaw: 0, pitch: 0 });
     const stick = useRef({ id: -1, ox: 0, oy: 0, x: 0, y: 0 });
     const drag = useRef({ id: -1, x: 0, y: 0 });
-    const heartsRef = useRef<HTMLDivElement>(null);
+    const hpBarRef = useRef<HTMLDivElement>(null);
+    const hpLabelRef = useRef<HTMLSpanElement>(null);
     const arrowRef = useRef<HTMLDivElement>(null);
     const objRef = useRef<HTMLSpanElement>(null);
     const bossRef = useRef<HTMLDivElement>(null);
@@ -283,13 +287,21 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
           lastNear = h.near;
           setNear(h.near);
         }
-        if (heartsRef.current) heartsRef.current.textContent = "❤️".repeat(Math.max(0, h.hp)) + "🖤".repeat(Math.max(0, 3 - h.hp));
+        if (hpBarRef.current && hpLabelRef.current) {
+          const pct = Math.max(0, Math.min(1, h.hp / h.maxHp));
+          hpBarRef.current.style.width = `${pct * 100}%`;
+          hpBarRef.current.style.background = pct > 0.55 ? "#34d399" : pct > 0.28 ? "#fbbf24" : "#ef4444";
+          hpLabelRef.current.textContent = String(Math.max(0, Math.ceil(h.hp)));
+        }
         if (arrowRef.current) arrowRef.current.style.transform = `rotate(${-h.angle}rad)`;
         if (h.hub !== hubRef.current) {
           hubRef.current = h.hub;
           setHub(h.hub);
         }
-        if (objRef.current) objRef.current.textContent = `${h.script}${h.steps ? ` ${h.step}/${h.steps}` : ""} · ${h.objective} · ${h.distance} m${h.wanted > 0 ? " · polícia" : ""}`;
+        if (objRef.current) {
+          const unit = h.heat > 0 ? POLICE_RANK[policeRank(h.heat)].name : "";
+          objRef.current.textContent = `${h.script}${h.steps ? ` ${h.step}/${h.steps}` : ""} · ${h.objective} · ${h.distance} m${unit ? ` · ${unit}` : ""}`;
+        }
         if (bossRef.current) bossRef.current.style.display = h.boss ? "block" : "none";
         if (h.boss && bossBarRef.current && bossNameRef.current) {
           bossBarRef.current.style.width = `${h.boss.pct * 100}%`;
@@ -451,8 +463,16 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
 
         {(phase === "play" || phase === "open") && (
           <>
-            <div ref={heartsRef} className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-sm" />
-            <div className="pointer-events-none absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-xs text-white">
+            <div className="pointer-events-none absolute left-3 top-3 w-36 rounded-lg bg-black/60 px-2 py-1.5 sm:w-44">
+              <div className="mb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-white/80">
+                <span>Vida</span>
+                <span ref={hpLabelRef}>100</span>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-white/15">
+                <div ref={hpBarRef} className="h-full w-full rounded-full bg-emerald-400" />
+              </div>
+            </div>
+            <div className="pointer-events-none absolute right-3 top-3 flex max-w-[calc(100%-10.5rem)] items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-xs text-white sm:left-1/2 sm:right-auto sm:max-w-[52vw] sm:-translate-x-1/2">
               <div ref={arrowRef} className="text-lg leading-none text-amber-300 transition-transform duration-75">
                 ⬆
               </div>

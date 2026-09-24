@@ -169,6 +169,31 @@ export function separateCircles(ax: number, az: number, bx: number, bz: number, 
 }
 
 export const WANTED_SECONDS = 45;
+export const PLAYER_MAX_HP = 100;
+/** Mission guards, drones and bosses still drop Léo in three hits. */
+export const SECURITY_HIT = 34;
+
+export type PoliceRank = "guarda" | "especial" | "federal";
+
+export const POLICE_RANK: Record<PoliceRank, { hp: number; damage: number; speed: number; gap: number; spread: number; name: string; call: string; color: string }> = {
+  guarda: { hp: 5, damage: 14, speed: 2.5, gap: 2.15, spread: 0.85, name: "Guarda", call: "A guarda chegou. Arma fraca e pouca vida.", color: "#60a5fa" },
+  especial: { hp: 10, damage: 28, speed: 3, gap: 1.65, spread: 0.5, name: "Policial especial", call: "Polícia especial. Mais dano e mais vida.", color: "#f59e0b" },
+  federal: { hp: 18, damage: 50, speed: 3.35, gap: 1.2, spread: 0.28, name: "Polícia federal", call: "Polícia federal. Muito dano e muita vida.", color: "#fb7185" },
+};
+
+/** 1 = guards, 2 = special, 3 or more = federal. */
+export function policeRank(strikes: number): PoliceRank {
+  if (strikes >= 3) return "federal";
+  if (strikes >= 2) return "especial";
+  return "guarda";
+}
+
+/** Later chapters send a harder unit on the car chase. */
+export function policeRankForMission(index: number): PoliceRank {
+  if (index >= 20) return "federal";
+  if (index >= 10) return "especial";
+  return "guarda";
+}
 
 export function hitWanted(target: "ped" | "ally" | "enemy", wanted: number): number {
   if (target !== "ped") return wanted;

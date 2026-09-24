@@ -17,6 +17,9 @@ import {
   inSea,
   ISLAND,
   knockdownWanted,
+  POLICE_RANK,
+  policeRank,
+  policeRankForMission,
   BUOY,
   CENTRAL,
   JET,
@@ -130,6 +133,20 @@ test("wanted fades in free movement and holds during the hack", () => {
 
 test("a knockdown clears wanted", () => {
   assert.equal(knockdownWanted(), 0);
+});
+
+test("police ranks escalate in health and damage", () => {
+  assert.equal(policeRank(1), "guarda");
+  assert.equal(policeRank(2), "especial");
+  assert.equal(policeRank(3), "federal");
+  assert.equal(policeRank(4), "federal");
+  assert.ok(POLICE_RANK.guarda.hp < POLICE_RANK.especial.hp);
+  assert.ok(POLICE_RANK.especial.hp < POLICE_RANK.federal.hp);
+  assert.ok(POLICE_RANK.guarda.damage < POLICE_RANK.especial.damage);
+  assert.ok(POLICE_RANK.especial.damage < POLICE_RANK.federal.damage);
+  assert.equal(policeRankForMission(0), "guarda");
+  assert.equal(policeRankForMission(10), "especial");
+  assert.equal(policeRankForMission(24), "federal");
 });
 
 test("the bike is ridden on the street", () => {

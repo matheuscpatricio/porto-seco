@@ -1,12 +1,12 @@
 import type { Level, Who, World } from "@/content/types";
 import { allLevels } from "@/content/worlds";
 import { sound } from "@/game/audio";
-import { guardLook, people, randomLook } from "@/game/characters";
+import { guardLook, people, policeLooks, randomLook } from "@/game/characters";
 import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
-import { BERTHS, canMount, CENTRAL_PHONE, DANI_CHAIR, decayWanted, DECK, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, ROOF, roomExit, separateCircles, SHOPS, shirtFor, TOWER } from "@/game3d/rules";
+import { BERTHS, canMount, CENTRAL_PHONE, DANI_CHAIR, decayWanted, DECK, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, PLAYER_MAX_HP, POLICE_RANK, policeRank, policeRankForMission, ROOF, roomExit, SECURITY_HIT, separateCircles, SHOPS, shirtFor, TOWER, type PoliceRank } from "@/game3d/rules";
 import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
@@ -24,6 +24,8 @@ export type GameEvents = {
 
 export type Hud = {
   hp: number;
+  maxHp: number;
+  heat: number;
   near: boolean;
   objective: string;
   distance: number;
@@ -56,6 +58,10 @@ type Enemy = {
   moving: boolean;
   name?: string;
   police?: boolean;
+  rank?: PoliceRank;
+  detail?: "street" | "chase";
+  damage: number;
+  fireGap: number;
   t: number;
 };
 type Ped = { rig: Rig; pos: THREE.Vector3; yaw: number; loop: number; wp: number; dir: 1 | -1; speed: number; panic: number; t: number; talkT: number; still: boolean; pitch: number; stepD: number };
@@ -69,6 +75,11 @@ const R = 0.35;
 const bulletGeo = new THREE.CapsuleGeometry(0.035, 0.5, 2, 6).rotateX(Math.PI / 2);
 const mineMat = new THREE.MeshBasicMaterial({ color: "#fff2b0", toneMapped: false });
 const enemyMat = new THREE.MeshBasicMaterial({ color: "#ff8a65", toneMapped: false });
+const policeBulletMat: Record<PoliceRank, THREE.MeshBasicMaterial> = {
+  guarda: new THREE.MeshBasicMaterial({ color: "#93c5fd", toneMapped: false }),
+  especial: new THREE.MeshBasicMaterial({ color: "#fbbf24", toneMapped: false }),
+  federal: new THREE.MeshBasicMaterial({ color: "#fb7185", toneMapped: false }),
+};
 const partGeo = new THREE.SphereGeometry(0.06, 6, 4);
 const markerGeo = new THREE.ConeGeometry(0.26, 0.55, 16).rotateX(Math.PI);
 const markerMat = new THREE.MeshBasicMaterial({ color: "#ff1f1f", toneMapped: false, transparent: true, opacity: 0.95 });
@@ -172,6 +183,7 @@ export class Game3D {
   private r: () => number;
   private free = false;
   private wanted = 0;
+  private heat = 0;
   private mounted = false;
   private rideSpeed = 0;
   private weapon: WeaponId = "choque";
@@ -219,7 +231,7 @@ export class Game3D {
     const chapter = Math.max(0, Number(world.id.replace(/\D/g, "")) - 1);
     const rig = buildHuman({ ...people.leo.look, shirt: shirtFor(chapter) });
     this.scene.add(rig.root);
-    this.player = { rig, pos: L.spawn.clone(), vy: 0, yaw: Math.PI / 4, grounded: true, hp: 3, inv: 0, shootT: 0, cooldown: 0, downT: 0, cheerT: 0, moving: false, running: false, stepD: 0 };
+    this.player = { rig, pos: L.spawn.clone(), vy: 0, yaw: Math.PI / 4, grounded: true, hp: PLAYER_MAX_HP, inv: 0, shootT: 0, cooldown: 0, downT: 0, cheerT: 0, moving: false, running: false, stepD: 0 };
     this.checkpoint = L.spawn.clone();
 
     const allyIds = Array.from(new Set(level.brief.map((l) => l.who).filter((w) => w !== "leo" && w !== "rui" && w !== "dani" && people[w].ally)));
@@ -487,23 +499,57 @@ export class Game3D {
     return a.lerp(b, s).add(off);
   }
 
-  private spawn(kind: Enemy["kind"], a: THREE.Vector3, b: THREE.Vector3, zone: 1 | 2) {
-    const hp = kind === "boss" ? 14 + Math.floor(this.index / 2) : kind === "drone" ? 2 : 3;
+  private spawn(kind: Enemy["kind"], a: THREE.Vector3, b: THREE.Vector3, zone: 1 | 2, opts?: { look?: (typeof guardLook); rank?: PoliceRank; detail?: "street" | "chase"; hp?: number; damage?: number }) {
+    const hp = opts?.hp ?? (kind === "boss" ? 14 + Math.floor(this.index / 2) : kind === "drone" ? 2 : 3);
+    const rank = opts?.rank;
+    const stats = rank ? POLICE_RANK[rank] : null;
     let rig: Rig | null = null;
     let mesh: THREE.Object3D;
     if (kind === "drone") mesh = buildDrone();
     else {
-      rig = buildHuman(guardLook, { simple: true });
+      rig = buildHuman(opts?.look ?? guardLook, { simple: true });
       mesh = rig.root;
     }
     const pos = a.clone();
     if (kind === "drone") pos.y = 7;
     mesh.position.copy(pos);
     this.scene.add(mesh);
-    const marker = new THREE.Mesh(markerGeo, markerMat);
+    const marker = new THREE.Mesh(markerGeo, rank ? new THREE.MeshBasicMaterial({ color: stats!.color, toneMapped: false }) : kind === "boss" ? bossMarkerMat : markerMat);
     this.scene.add(marker);
-    const e: Enemy = { kind, rig, mesh, marker, pos, yaw: 0, hp, maxHp: hp, zone, a: a.clone(), b: b.clone(), toB: true, cooldown: 1 + Math.random() * 1.5, shootT: 0, dead: 0, moving: false, t: Math.random() * 10 };
+    const fireGap = stats?.gap ?? (kind === "boss" ? 1.8 : kind === "drone" ? 2.6 : 2);
+    const e: Enemy = {
+      kind,
+      rig,
+      mesh,
+      marker,
+      pos,
+      yaw: 0,
+      hp,
+      maxHp: hp,
+      zone,
+      a: a.clone(),
+      b: b.clone(),
+      toB: true,
+      cooldown: 1 + Math.random() * 1.5,
+      shootT: 0,
+      dead: 0,
+      moving: false,
+      damage: opts?.damage ?? stats?.damage ?? SECURITY_HIT,
+      fireGap,
+      rank,
+      detail: opts?.detail,
+      police: !!rank,
+      name: stats?.name,
+      t: Math.random() * 10,
+    };
     this.enemies.push(e);
+    return e;
+  }
+
+  private spawnPolice(rank: PoliceRank, at: THREE.Vector3, detail: "street" | "chase") {
+    const stats = POLICE_RANK[rank];
+    const e = this.spawn("guard", at, this.player.pos.clone(), 1, { look: policeLooks[rank], rank, detail, hp: stats.hp, damage: stats.damage });
+    e.cooldown = 0.6;
     return e;
   }
 
@@ -566,10 +612,10 @@ export class Game3D {
     for (const c of this.cops) this.scene.remove(c.mesh);
     this.cops = [];
     this.wanted = knockdownWanted();
-    this.clearPolice();
+    this.clearPolice(true);
     this.player.pos.copy(this.layout.spawn);
     this.checkpoint = this.layout.spawn.clone();
-    this.player.hp = 3;
+    this.player.hp = PLAYER_MAX_HP;
     this.player.downT = 0;
     this.stepIdx = this.mission.steps.length;
     if (this.phase === "play") this.ev.onPhase("play");
@@ -583,6 +629,7 @@ export class Game3D {
     this.jetting = false;
     for (const c of this.cops) this.scene.remove(c.mesh);
     this.cops = [];
+    this.clearPolice(true);
     this.leaveRooms();
     this.stepIdx = 0;
     this.setPhase("brief");
@@ -597,8 +644,13 @@ export class Game3D {
     this.ride = ride;
   }
 
-  private clearPolice() {
-    for (const e of this.enemies) if (e.police) e.hp = 0;
+  private clearPolice(all = false) {
+    for (const e of this.enemies) {
+      if (!e.rank) continue;
+      if (!all && e.detail === "chase") continue;
+      e.hp = 0;
+    }
+    this.heat = 0;
   }
 
   private syncDoors() {
@@ -610,17 +662,18 @@ export class Game3D {
   }
 
   private callPolice(at: THREE.Vector3) {
-    const first = this.wanted <= 0;
     this.wanted = hitWanted("ped", this.wanted);
-    if (!first) return;
+    this.heat = Math.min(3, this.heat + 1);
+    const rank = policeRank(this.heat);
+    const alive = this.enemies.some((e) => e.rank === rank && e.detail === "street" && e.hp > 0);
+    if (alive) {
+      this.ev.onToast(`${POLICE_RANK[rank].name} ainda está atrás de você.`, "bad");
+      return;
+    }
     sound.sfx("siren");
     const spots = [new THREE.Vector3(at.x + 14, 0, at.z + 6), new THREE.Vector3(at.x - 12, 0, at.z - 8)];
-    for (const spot of spots) {
-      const cop = this.spawn("guard", spot, this.player.pos.clone(), 1);
-      cop.police = true;
-      cop.name = "Polícia";
-    }
-    this.ev.onToast("Alguém chamou a polícia!", "bad");
+    for (const spot of spots) this.spawnPolice(rank, spot, "street");
+    this.ev.onToast(POLICE_RANK[rank].call, "bad");
   }
 
   beginHack() {
@@ -868,6 +921,8 @@ export class Game3D {
     const bossShown = b && b.hp > 0 && (this.step?.k === "boss" || (b.zone === 1 && b.pos.distanceTo(p) < 30));
     return {
       hp: this.player.hp,
+      maxHp: PLAYER_MAX_HP,
+      heat: this.heat,
       near: this.near && this.phase === "play",
       objective: this.free ? "Casa" : this.stepText(),
       distance: Math.round(Math.hypot(dx, dz)),
@@ -887,7 +942,7 @@ export class Game3D {
     return {
       player: { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw, cam: this.camYaw },
       target: this.targetPos(),
-      enemies: this.enemies.filter(alive).map((e) => ({ x: e.pos.x, z: e.pos.z, boss: e.kind === "boss", police: !!e.police })),
+      enemies: this.enemies.filter(alive).map((e) => ({ x: e.pos.x, z: e.pos.z, boss: e.kind === "boss", police: !!e.rank, rank: e.rank ?? null })),
       allies: this.allies.map((a) => ({ x: a.pos.x, z: a.pos.z })),
       cars: this.traffic.map((c) => ({ x: c.pos.x, z: c.pos.z })),
       cops: this.cops.map((c) => ({ x: c.pos.x, z: c.pos.z })),
@@ -936,7 +991,7 @@ export class Game3D {
         if (this.free) this.checkpoint = this.layout.spawn.clone();
         P.pos.copy(this.checkpoint);
         P.vy = 0;
-        P.hp = 3;
+        P.hp = PLAYER_MAX_HP;
         P.inv = 2;
         this.ev.onToast("Você foi derrubado e voltou para o último ponto seguro.", "info");
       }
@@ -1199,6 +1254,7 @@ export class Game3D {
         break;
       case "cops":
         if (P.pos.distanceTo(new THREE.Vector3(s.to.x, P.pos.y, s.to.z)) < 4.2) {
+          for (const e of this.enemies) if (e.detail === "chase") e.hp = 0;
           this.ev.onToast("No porto a viatura perdeu você.", "good");
           this.checkpoint = P.pos.clone();
           this.nextStep();
@@ -1423,8 +1479,11 @@ export class Game3D {
       this.scene.add(mesh);
       this.cops.push({ mesh, pos, yaw: 0, speed: 7 });
     }
+    const rank = policeRankForMission(this.index);
+    this.spawnPolice(rank, new THREE.Vector3(this.player.pos.x + 11, 0, z - 10), "chase");
+    this.spawnPolice(rank, new THREE.Vector3(this.player.pos.x - 9, 0, z - 14), "chase");
     sound.sfx("siren", { pan: 0, vol: 0.75 });
-    this.ev.onToast("Sirene. A viatura saiu atrás de você.", "bad");
+    this.ev.onToast(`Sirene. ${POLICE_RANK[rank].name} saiu atrás de você.`, "bad");
   }
 
   private updateCops(dt: number) {
@@ -1758,7 +1817,7 @@ export class Game3D {
       e.yaw = Math.atan2(to.x, to.z);
       const keep = e.kind === "boss" ? 7 : 9;
       if (dist > keep) {
-        const step = (e.kind === "boss" ? 3.2 : 2.6) * dt;
+        const step = (e.rank ? POLICE_RANK[e.rank].speed : e.kind === "boss" ? 3.2 : 2.6) * dt;
         e.pos.x += Math.sin(e.yaw) * step;
         e.pos.z += Math.cos(e.yaw) * step;
         e.moving = true;
@@ -1786,7 +1845,7 @@ export class Game3D {
     e.marker.position.set(e.pos.x, e.pos.y + top + Math.sin(this.t * 4 + e.t) * 0.08, e.pos.z);
     e.marker.rotation.y += dt * 2.5;
     const pulse = 1 + (sees ? Math.sin(this.t * 12) * 0.15 : 0);
-    e.marker.scale.setScalar((e.kind === "boss" ? 1.4 : 1) * pulse);
+    e.marker.scale.setScalar((e.kind === "boss" ? 1.4 : e.rank === "federal" ? 1.35 : e.rank === "especial" ? 1.15 : 1) * pulse);
     if (e.rig) {
       e.rig.armed = true;
       animate(e.rig, e.shootT > 0 ? "shoot" : e.moving ? (sees ? "run" : "walk") : "idle", e.t, dt, sees ? 0.8 : 0.7);
@@ -1800,18 +1859,19 @@ export class Game3D {
       this.at(k * 0.18, () => {
         if (e.hp <= 0) return;
         const from = e.pos.clone().add(new THREE.Vector3(0, e.kind === "drone" ? -0.2 : 1.35, 0));
-        const aim = P.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 1.2, (Math.random() - 0.5) * 0.8));
+        const spread = e.rank ? POLICE_RANK[e.rank].spread : 0.8;
+        const aim = P.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * spread, 1.2, (Math.random() - 0.5) * spread));
         const dir = aim.sub(from).normalize();
-        const mesh = new THREE.Mesh(bulletGeo, enemyMat);
+        const mesh = new THREE.Mesh(bulletGeo, e.rank ? policeBulletMat[e.rank] : enemyMat);
         mesh.position.copy(from).addScaledVector(dir, 0.5);
         mesh.lookAt(mesh.position.clone().add(dir));
         this.scene.add(mesh);
-        this.bullets.push({ mesh, vel: dir.multiplyScalar(e.kind === "drone" ? 16 : 20), mine: false, life: 2.2, damage: 1 });
+        this.bullets.push({ mesh, vel: dir.multiplyScalar(e.kind === "drone" ? 16 : e.rank === "federal" ? 26 : 20), mine: false, life: 2.2, damage: e.damage });
         sound.sfx("enemyShoot", this.at3(from, 70));
       });
     }
     e.shootT = 0.4;
-    e.cooldown = e.kind === "boss" ? 1.8 : e.kind === "drone" ? 2.6 : 2.0;
+    e.cooldown = e.fireGap;
     if (this.t - this.lastShot > 1.5) this.panicAll(e.pos);
     this.lastShot = this.t;
   }
@@ -1876,7 +1936,7 @@ export class Game3D {
         const c = P.pos.clone().add(new THREE.Vector3(0, 1.1, 0));
         if (pos.distanceTo(c) < 0.55) {
           b.life = 0;
-          P.hp -= 1;
+          P.hp -= b.damage;
           P.inv = 1.1;
           this.shake = 0.3;
           sound.sfx("hurt");

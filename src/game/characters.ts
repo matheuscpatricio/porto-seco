@@ -16,6 +16,45 @@ export type Look = {
   accent?: string;
 };
 
+export const policeLooks: Record<"guarda" | "especial" | "federal", Look> = {
+  guarda: {
+    skin: "#c89a74",
+    hair: "#1f2937",
+    hairStyle: "buzz",
+    shirt: "#1d4ed8",
+    jacket: "#1e3a8a",
+    pants: "#1e3a8a",
+    shoes: "#0b0f19",
+    extras: ["cap", "vest"],
+    build: "normal",
+    accent: "#1e3a8a",
+  },
+  especial: {
+    skin: "#a97856",
+    hair: "#111827",
+    hairStyle: "buzz",
+    shirt: "#0f172a",
+    jacket: "#111827",
+    pants: "#0f172a",
+    shoes: "#0b0f19",
+    extras: ["mask", "vest"],
+    build: "big",
+    accent: "#f59e0b",
+  },
+  federal: {
+    skin: "#e0b18a",
+    hair: "#111827",
+    hairStyle: "slick",
+    shirt: "#18181b",
+    jacket: "#0a0a0a",
+    pants: "#18181b",
+    shoes: "#0a0a0a",
+    extras: ["vest", "jacket"],
+    build: "big",
+    accent: "#eab308",
+  },
+};
+
 export const guardLook: Look = {
   skin: "#c89a74",
   hair: "#1f2937",
