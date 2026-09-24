@@ -821,16 +821,23 @@ function buildHideout(scene: THREE.Scene, addCol: (minX: number, maxX: number, m
   for (let i = 0; i < 15; i++) step(37.4, 19.3 + i * 0.42, 0.34 * (i + 1));
   box(3.4, 0.2, 1.5, trim, 38.6, 5.15, 26.0, scene, true);
   addCol(36.9, 40.3, 25.2, 26.8, 5.25);
-  for (let i = 0; i < 15; i++) step(39.4, 25.8 - i * 0.4, 5.55 + i * 0.34);
-  box(6.2, 0.22, 8.2, std({ color: "#0f172a", roughness: 0.7 }), 43.0, ROOF - 0.08, 22.6, scene, true);
-  addCol(40.35, 45.7, 18.5, 26.85, ROOF);
-  addCol(39.7, 40.5, 19.9, 21.1, ROOF);
+  for (let i = 0; i < 15; i++) {
+    const top = 5.55 + i * 0.34;
+    const z = 25.8 - i * 0.4;
+    const reach = i >= 12 ? 41.4 : 40.6;
+    box(reach - 38.5, 0.16, 0.4, trim, (38.5 + reach) / 2, top - 0.08, z, scene, true);
+    addCol(38.5, reach, z - 0.22, z + 0.22, top);
+  }
+  box(5.4, 0.22, 7.6, std({ color: "#0f172a", roughness: 0.7 }), 43.2, ROOF - 0.08, 22.8, scene, true);
+  box(2.3, 0.22, 2.1, std({ color: "#0f172a", roughness: 0.7 }), 39.6, ROOF - 0.08, 19.5, scene, true);
+  addCol(40.7, 45.7, 18.5, 26.85, ROOF);
+  addCol(38.5, 40.7, 18.5, 20.55, ROOF);
   const lip = ROOF + 0.85;
   const rail = (x0: number, x1: number, z0: number, z1: number) => {
     box(Math.max(0.12, x1 - x0), 0.7, Math.max(0.12, z1 - z0), trim, (x0 + x1) / 2, ROOF + 0.45, (z0 + z1) / 2, scene, true);
     addCol(x0, x1, z0, z1, lip);
   };
-  rail(40.4, 45.7, 18.5, 18.7);
+  rail(38.5, 45.7, 18.5, 18.75);
   rail(45.5, 45.7, 18.5, 26.8);
   rail(40.4, 45.7, 26.6, 26.85);
   const screen = std({ color: "#082f49", emissive: "#22d3ee", emissiveIntensity: 0.85, roughness: 0.2 });
