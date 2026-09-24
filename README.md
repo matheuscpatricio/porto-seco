@@ -9,7 +9,9 @@ Léo é motoboy em Porto Seco, está devendo para o agiota Caveira e nunca progr
 - chega ao terminal e, ao apertar E, vê o Léo digitando e mergulhando dentro do computador, num ciberespaço onde as travas do sistema são cadeados 3D;
 - hackeia escrevendo Python de verdade, que roda no navegador com [Pyodide](https://pyodide.org): cada trava abre ou quebra conforme o resultado do código;
 - volta para a rua: com o código certo, a missão avança; com o código errado, o alarme dispara, os pedestres correm e chegam reforços;
-- termina fugindo no carro do Tio Rui.
+- termina a missão no próprio objetivo. A fuga de carro com o Tio Rui fica para a perseguição e para o confronto com o chefe.
+
+A cidade é uma ilha só. Continuar a história deixa o Léo em casa, no mesmo mapa, com o dinheiro da missão. Em casa ele estuda o Python da próxima lição. Na oficina, com 500, compra a moto e pilota a rua entre uma missão e outra. Atirar num pedestre chama a polícia. O mar devolve o Léo para o último ponto seguro.
 
 Os carros param para pedestres e buzinam se o Léo ficar na frente. Tiros assustam quem está por perto.
 

@@ -72,7 +72,7 @@ export default function Home() {
               Python a cada missão.
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <LinkButton size="lg" href={`/level/${nextLevel.id}`} className="bg-orange-500 text-black hover:bg-orange-400">
+              <LinkButton size="lg" href={done ? `/level/${nextLevel.id}?hub=1` : `/level/${nextLevel.id}`} className="bg-orange-500 text-black hover:bg-orange-400">
                 {done ? "Continuar a história" : "Começar a história"} ▶
               </LinkButton>
               <button className="text-sm text-white/70 underline hover:text-white" onClick={() => setReplay(true)}>
@@ -80,7 +80,7 @@ export default function Home() {
               </button>
             </div>
             <p className="mt-3 text-xs text-white/60">
-              {done} de {allLevels.length} missões concluídas · Teclado: ← → andar, ↑ pular, F atirar, E hackear · No celular há botões na tela
+              {done} de {allLevels.length} missões concluídas · R$ {p.money}{p.bike ? " · moto na porta de casa" : ""} · Teclado: ← → andar, ↑ pular, F atirar, E hackear · No celular há botões na tela
             </p>
           </div>
           <div className="pointer-events-none absolute bottom-0 right-4 hidden items-end gap-3 md:flex">

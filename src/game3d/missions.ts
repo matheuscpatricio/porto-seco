@@ -1,4 +1,5 @@
 import type { Level } from "@/content/types";
+import { endingFor, liveScript } from "@/game3d/rules";
 import { BLOCK, blockStart, Layout, Spot, streetCenter } from "@/game3d/world";
 import * as THREE from "three";
 
@@ -35,11 +36,9 @@ export const SCRIPT_LABEL: Record<ScriptKind, string> = {
   confronto: "Confronto",
 };
 
-const CYCLE: ScriptKind[] = ["invasao", "entrega", "perseguicao", "escolta", "fuga"];
-
 export function scriptFor(level: Level, index: number, bossOrder: number): ScriptKind {
   if (level.boss) return bossOrder % 2 === 0 ? "invasao" : "confronto";
-  return CYCLE[index % CYCLE.length];
+  return liveScript(index);
 }
 
 function rng(seed: number) {
@@ -74,7 +73,6 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       m.gate = true;
       m.steps = [{ k: "hack" }];
       if (level.boss) m.steps.push({ k: "boss", text: `Entre no pátio e derrube ${bossName}` });
-      m.steps.push(car);
       break;
     case "entrega": {
       const a = far(L.spots, L.spawn, 30, r);
@@ -84,7 +82,7 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       m.steps = [
         { k: "contact", to: a.pos.clone().add(new THREE.Vector3(-1.4, 0, 0)), text: `Encontre o contato da Dani na ${a.area}`, arrive: `Contato: "Toma o pendrive. O terminal fica na ${b.area}. Some daqui!"` },
         { k: "hack" },
-        car,
+        { k: "go", to: a.pos.clone(), text: "Devolva o resultado ao contato", arrive: 'Contato: "Recebido. Pode ir para casa."' },
       ];
       break;
     }
@@ -110,7 +108,7 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
         path.push(new THREE.Vector3(streetCenter(i), 0, streetCenter(j)));
       }
       m.chasePath = path;
-      m.steps = [{ k: "chase", text: "Alcance o carro do mensageiro (atire nos pneus!)" }, { k: "hack" }, car];
+      m.steps = [{ k: "chase", text: "Alcance o carro do mensageiro (atire nos pneus!)" }, { k: "hack" }];
       break;
     }
     case "escolta": {
@@ -120,7 +118,7 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       const path = [new THREE.Vector3(9, 0, 9), new THREE.Vector3(gx, 0, 9), new THREE.Vector3(gx, 0, s.pos.z), new THREE.Vector3(s.pos.x - 1.8, 0, s.pos.z + 1.2)];
       m.escortWave = [path[1].clone().lerp(path[2], 0.25), path[1].clone().lerp(path[2], 0.6), path[2].clone().add(new THREE.Vector3(3, 0, -6))];
       m.pickup = pickupNear(s);
-      m.steps = [{ k: "escort", path, text: `Fique perto da Dani e leve ela até a ${s.area}` }, { k: "hack" }, car];
+      m.steps = [{ k: "escort", path, text: `Fique perto da Dani e leve ela até a ${s.area}` }, { k: "hack" }];
       break;
     }
     case "fuga": {
@@ -128,7 +126,7 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       m.terminal = s.pos.clone();
       m.alarmAfterHack = true;
       m.pickup = pickupNear(far(L.spots, s.pos, 60, r));
-      m.steps = [{ k: "hack" }, { k: "car", text: "Alarme! Corra até o Tio Rui do outro lado do bairro" }];
+      m.steps = [{ k: "hack" }, { k: "go", to: L.spawn.clone(), text: "Alarme! Volte para casa a pé", arrive: "Você chegou em casa." }];
       break;
     }
     case "confronto": {
@@ -141,11 +139,11 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
         { k: "go", to: m.bossAt.clone().add(new THREE.Vector3(0, 0, -14)), text: `${bossName} está esperando na ${plaza.area}`, arrive: `${bossName}: "Você de novo, moleque? Hoje acaba."`, spawnBoss: true },
         { k: "boss", text: `Derrube ${bossName}` },
         { k: "hack" },
-        car,
       ];
       break;
     }
   }
+  if (endingFor(kind) === "car") m.steps.push(car);
   if (!m.gate && !m.pickup) m.pickup = pickupNear(far(L.spots, L.spawn, 30, r));
   return m;
 }

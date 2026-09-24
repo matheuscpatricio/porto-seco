@@ -16,7 +16,7 @@ import confetti from "canvas-confetti";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type Win = { stars: number; xp: number; ach: string[] };
+type Win = { stars: number; xp: number; pay: number; ach: string[] };
 
 export default function LevelPage() {
   const { id } = useParams<{ id: string }>();
@@ -79,7 +79,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
       setPhase(p);
       if (p === "done") {
         const done = completeLevel(id, potentialRef.current);
-        setWin({ stars: done.stars, xp: done.gainedXp, ach: done.newAch });
+        setWin({ stars: done.stars, xp: done.gainedXp, pay: done.pay, ach: done.newAch });
         confetti({ particleCount: level.boss ? 260 : 150, spread: 90, origin: { y: 0.55 } });
         sound.sfx("fanfare");
       }
@@ -235,8 +235,10 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
                 </>
               ) : phase === "dive" || phase === "surface" || phase === "result" ? (
                 "Léo está dentro do sistema..."
-              ) : phase === "done" || phase === "escape" ? (
+              ) : phase === "escape" ? (
                 "Fuga com o Tio Rui!"
+              ) : phase === "done" ? (
+                "Missão encerrada."
               ) : (
                 "Acesso liberado! Siga o próximo objetivo no topo da tela."
               )}
@@ -251,7 +253,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
               <p className="text-xs font-black uppercase tracking-widest text-emerald-300">{level.boss ? `${people[level.boss].name} derrotado` : "Missão cumprida"}</p>
               <Stars n={win.stars} size="text-5xl" />
               <p className="text-sm text-muted-foreground">
-                +{win.xp} XP de reputação{solved ? " · resolvido pela Dani" : ""}
+                +{win.xp} XP de reputação{win.pay ? ` · +R$ ${win.pay}` : ""}{solved ? " · resolvido pela Dani" : ""}
               </p>
             </div>
             <Dialogue
@@ -267,13 +269,21 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
               </p>
             ))}
             <div className="flex flex-wrap justify-center gap-2 pt-1">
+              <Button
+                onClick={() => {
+                  setWin(null);
+                  game.current?.enterHub();
+                }}
+              >
+                Ficar na ilha
+              </Button>
               <Button variant="ghost" onClick={replay}>
                 Jogar de novo
               </Button>
               <LinkButton href="/" variant="secondary">
                 Mapa
               </LinkButton>
-              {next && <LinkButton href={`/level/${next.id}`}>Próxima missão →</LinkButton>}
+              {next && <LinkButton href={`/level/${next.id}?hub=1`}>Próxima missão →</LinkButton>}
             </div>
           </div>
         </div>

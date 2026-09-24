@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { allLevels } from "@/content/worlds";
+import { buyBike, EMPTY_LIFE, firstClearPay, mergeRecord } from "@/lib/progress-rules";
 
 export type Progress = {
   xp: number;
@@ -10,11 +11,21 @@ export type Progress = {
   achievements: string[];
   lastDay: string | null;
   streak: number;
+  money: number;
+  bike: boolean;
   introSeen?: boolean;
 };
 
 const KEY = "porto-seco-progress-v1";
-const empty: Progress = { xp: 0, stars: {}, code: {}, achievements: [], lastDay: null, streak: 0 };
+const empty: Progress = {
+  xp: 0,
+  stars: {},
+  code: {},
+  achievements: [],
+  lastDay: null,
+  streak: 0,
+  ...EMPTY_LIFE,
+};
 
 let cache: Progress | null = null;
 const subs = new Set<() => void>();
@@ -22,7 +33,7 @@ const subs = new Set<() => void>();
 function load(): Progress {
   if (cache) return cache;
   try {
-    cache = { ...empty, ...JSON.parse(localStorage.getItem(KEY) || "{}") };
+    cache = mergeRecord(empty, JSON.parse(localStorage.getItem(KEY) || "{}"));
   } catch {
     cache = { ...empty };
   }
@@ -79,7 +90,15 @@ export function completeLevel(id: string, stars: number) {
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
   const streak = p.lastDay === today ? p.streak : p.lastDay === yesterday ? p.streak + 1 : 1;
-  const next: Progress = { ...p, xp: p.xp + gainedXp, stars: { ...p.stars, [id]: Math.max(prev, stars) }, lastDay: today, streak };
+  const pay = firstClearPay(prev, level.xp);
+  const next: Progress = {
+    ...p,
+    xp: p.xp + gainedXp,
+    money: p.money + pay,
+    stars: { ...p.stars, [id]: Math.max(prev, stars) },
+    lastDay: today,
+    streak,
+  };
 
   const newAch: string[] = [];
   const add = (a: string) => !next.achievements.includes(a) && newAch.push(a);
@@ -91,7 +110,14 @@ export function completeLevel(id: string, stars: number) {
   if (allLevels.every((l) => next.stars[l.id])) add("master");
   next.achievements = [...next.achievements, ...newAch];
   save(next);
-  return { gainedXp, newAch, stars: next.stars[id] };
+  return { gainedXp, pay, newAch, stars: next.stars[id] };
+}
+
+export function purchaseBike() {
+  const p = load();
+  const deal = buyBike(p.money, p.bike);
+  if (deal.bought) save({ ...p, money: deal.money, bike: true });
+  return deal;
 }
 
 export function markIntroSeen() {

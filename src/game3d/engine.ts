@@ -5,6 +5,7 @@ import { guardLook, people, randomLook } from "@/game/characters";
 import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
+import { BIKE_PARK, canMount, decayWanted, doorOpen, hitWanted, HOME_STUDY, indoors, inSea, knockdownWanted, SHOPS, shirtFor } from "@/game3d/rules";
 import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
@@ -15,6 +16,8 @@ export type Input3 = { mx: number; mz: number; jump: boolean; shoot: boolean; us
 export type GameEvents = {
   onPhase: (p: Phase) => void;
   onToast: (text: string, tone?: "info" | "bad" | "good") => void;
+  onStudy?: () => void;
+  onShop?: () => void;
 };
 
 export type Hud = {
@@ -28,6 +31,8 @@ export type Hud = {
   script: string;
   step: number;
   steps: number;
+  hub: boolean;
+  wanted: number;
 };
 
 type Enemy = {
@@ -48,6 +53,7 @@ type Enemy = {
   dead: number;
   moving: boolean;
   name?: string;
+  police?: boolean;
   t: number;
 };
 type Ped = { rig: Rig; pos: THREE.Vector3; yaw: number; loop: number; wp: number; dir: 1 | -1; speed: number; panic: number; t: number; talkT: number; still: boolean; pitch: number; stepD: number };
@@ -162,6 +168,11 @@ export class Game3D {
   private lastShot = -99;
   private warnT = 0;
   private r: () => number;
+  private free = false;
+  private wanted = 0;
+  private mounted = false;
+  private owned = false;
+  private targetDoor: Collider | null = null;
 
   constructor(
     public level: Level,
@@ -170,9 +181,9 @@ export class Game3D {
     private ev: GameEvents,
   ) {
     const bossOrder = allLevels.slice(0, index).filter((l) => l.boss).length;
-    const theme = THEMES[world.id] ?? THEMES.w1;
-    this.r = rand(index + 3);
-    this.layout = buildWorld(this.scene, world.id, index * 7 + 3, level.target);
+    const theme = THEMES.w1;
+    this.r = rand(11);
+    this.layout = buildWorld(this.scene, "w1", 11, level.target);
     const L = this.layout;
     const bossName = level.boss ? people[level.boss].name : null;
     this.mission = buildMission(scriptFor(level, index, bossOrder), level, L, index, bossName);
@@ -195,7 +206,8 @@ export class Game3D {
     if (M.terminal) this.moveTerminal(M.terminal);
     if (M.pickup) this.moveCar(this.openCurb(M.pickup.pos, M.pickup.yaw), M.pickup.yaw);
 
-    const rig = buildHuman(people.leo.look);
+    const chapter = Math.max(0, Number(world.id.replace(/\D/g, "")) - 1);
+    const rig = buildHuman({ ...people.leo.look, shirt: shirtFor(chapter) });
     this.scene.add(rig.root);
     this.player = { rig, pos: L.spawn.clone(), vy: 0, yaw: Math.PI / 4, grounded: true, hp: 3, inv: 0, shootT: 0, cooldown: 0, downT: 0, cheerT: 0, moving: false, running: false, stepD: 0 };
     this.checkpoint = L.spawn.clone();
@@ -282,7 +294,19 @@ export class Game3D {
     }
 
     this.player.yaw = this.camYaw + Math.PI;
+    this.placeTargetDoor();
     this.updateCamera(1, true);
+  }
+
+  private placeTargetDoor() {
+    const t = this.layout.terminal;
+    const door: Collider = { minX: t.x - 2.5, maxX: t.x - 1.7, minZ: t.z - 1.15, maxZ: t.z + 1.15, top: 2.6, door: "target", shut: 2.6 };
+    if (this.targetDoor) {
+      Object.assign(this.targetDoor, door);
+      return;
+    }
+    this.layout.colliders.push(door);
+    this.targetDoor = door;
   }
 
   private moveTerminal(p: THREE.Vector3) {
@@ -291,6 +315,7 @@ export class Game3D {
     L.terminal.copy(spot);
     L.kiosk.position.copy(spot);
     Object.assign(L.kioskCollider, { minX: spot.x - 0.35, maxX: spot.x + 0.35, minZ: spot.z - 0.5, maxZ: spot.z + 0.5 });
+    if (this.targetDoor) this.placeTargetDoor();
   }
 
   /** Puts the kiosk on open sidewalk, screen facing the street, with room to stand in front of it. */
@@ -481,7 +506,10 @@ export class Game3D {
   private nextStep() {
     this.stepIdx++;
     const s = this.step;
-    if (!s) return;
+    if (!s) {
+      this.setPhase("done");
+      return;
+    }
     this.ev.onToast(`Próximo objetivo: ${this.stepText(s)}`, "info");
     this.updateAmbience();
   }
@@ -502,8 +530,65 @@ export class Game3D {
 
   startPlay() {
     this.talking = null;
+    this.free = false;
+    if (this.mounted) {
+      this.mounted = false;
+      this.ev.onToast("A moto ficou em casa.", "info");
+    }
     this.setPhase("play");
     this.ev.onToast(`${this.mission.title}: ${this.stepText()}`, "info");
+  }
+
+  enterHub() {
+    this.free = true;
+    this.mounted = false;
+    this.wanted = knockdownWanted();
+    this.clearPolice();
+    this.player.pos.copy(this.layout.spawn);
+    this.checkpoint = this.layout.spawn.clone();
+    this.player.hp = 3;
+    this.player.downT = 0;
+    this.stepIdx = this.mission.steps.length;
+    if (this.phase === "play") this.ev.onPhase("play");
+    else this.setPhase("play");
+    this.ev.onToast("Você está na ilha. E em casa estuda. E na moto sobe. E na oficina compra.", "info");
+  }
+
+  beginMission() {
+    this.free = false;
+    this.mounted = false;
+    this.stepIdx = 0;
+    this.setPhase("brief");
+  }
+
+  setOwned(owned: boolean) {
+    this.owned = owned;
+  }
+
+  private clearPolice() {
+    for (const e of this.enemies) if (e.police) e.hp = 0;
+  }
+
+  private syncDoors() {
+    const step = this.free || !this.step ? "none" : this.step.k === "hack" ? "hack" : "other";
+    for (const c of this.layout.colliders) {
+      if (!c.door) continue;
+      c.top = doorOpen(c.door, step) ? -1 : (c.shut ?? 2.6);
+    }
+  }
+
+  private callPolice(at: THREE.Vector3) {
+    const first = this.wanted <= 0;
+    this.wanted = hitWanted("ped", this.wanted);
+    if (!first) return;
+    sound.sfx("siren");
+    const spots = [new THREE.Vector3(at.x + 14, 0, at.z + 6), new THREE.Vector3(at.x - 12, 0, at.z - 8)];
+    for (const spot of spots) {
+      const cop = this.spawn("guard", spot, this.player.pos.clone(), 1);
+      cop.police = true;
+      cop.name = "Polícia";
+    }
+    this.ev.onToast("Alguém chamou a polícia!", "bad");
   }
 
   beginHack() {
@@ -707,6 +792,7 @@ export class Game3D {
   }
 
   private targetPos(): THREE.Vector3 {
+    if (this.free || !this.step) return new THREE.Vector3(HOME_STUDY.x, 0, HOME_STUDY.z);
     const s = this.step;
     const L = this.layout;
     if (!s) return L.car.position;
@@ -744,14 +830,16 @@ export class Game3D {
     return {
       hp: this.player.hp,
       near: this.near && this.phase === "play",
-      objective: this.stepText(),
+      objective: this.free ? "Casa" : this.stepText(),
       distance: Math.round(Math.hypot(dx, dz)),
       angle,
       boss: bossShown ? { name: b.name ?? "Chefe", pct: b.hp / b.maxHp } : null,
       alarm: this.alarmT > 0,
-      script: this.mission.title,
-      step: Math.min(this.stepIdx + 1, this.mission.steps.length),
-      steps: this.mission.steps.length,
+      script: this.free ? "Na ilha" : this.mission.title,
+      step: this.free ? 0 : Math.min(this.stepIdx + 1, this.mission.steps.length),
+      steps: this.free ? 0 : this.mission.steps.length,
+      hub: this.free,
+      wanted: this.wanted,
     };
   }
 
@@ -760,7 +848,7 @@ export class Game3D {
     return {
       player: { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw, cam: this.camYaw },
       target: this.targetPos(),
-      enemies: this.enemies.filter(alive).map((e) => ({ x: e.pos.x, z: e.pos.z, boss: e.kind === "boss" })),
+      enemies: this.enemies.filter(alive).map((e) => ({ x: e.pos.x, z: e.pos.z, boss: e.kind === "boss", police: !!e.police })),
       allies: this.allies.map((a) => ({ x: a.pos.x, z: a.pos.z })),
       cars: this.traffic.map((c) => ({ x: c.pos.x, z: c.pos.z })),
       escape: { x: this.layout.car.position.x, z: this.layout.car.position.z },
@@ -793,9 +881,18 @@ export class Game3D {
       this.camPitch = Math.max(-0.15, Math.min(1.0, this.camPitch + input.pitch));
     }
 
+    this.syncDoors();
+    const seen = this.enemies.some((e) => e.police && e.hp > 0 && e.pos.distanceTo(P.pos) < 18);
+    const street = this.phase === "play" || this.phase === "open" ? "free" : "busy";
+    this.wanted = decayWanted(this.wanted, dt, street, seen);
+    if (this.wanted <= 0) this.clearPolice();
+
     if (P.downT > 0) {
       P.downT -= dt;
       if (P.downT <= 0) {
+        this.wanted = knockdownWanted();
+        this.clearPolice();
+        if (this.free) this.checkpoint = this.layout.spawn.clone();
         P.pos.copy(this.checkpoint);
         P.vy = 0;
         P.hp = 3;
@@ -815,7 +912,7 @@ export class Game3D {
         vx /= Math.max(1, len);
         vz /= Math.max(1, len);
         P.running = input.run || len > 0.95;
-        const speed = P.running ? 7.5 : 4.2;
+        const speed = (P.running ? 7.5 : 4.2) * (this.mounted ? 1.65 : 1);
         P.pos.x += vx * speed * dt;
         P.pos.z += vz * speed * dt;
         P.moving = true;
@@ -831,6 +928,15 @@ export class Game3D {
             sound.step((Math.random() - 0.5) * 0.2, P.running ? 0.16 : 0.1, P.running);
           }
         }
+      }
+      if (inSea(P.pos.x, P.pos.z) && P.downT <= 0) {
+        P.downT = 1.6;
+        this.mounted = false;
+        this.ev.onToast("Você caiu no mar.", "bad");
+      }
+      if (this.mounted && (indoors(P.pos.x, P.pos.z) || !canMount("street", this.owned && this.free))) {
+        this.mounted = false;
+        this.ev.onToast("A moto ficou em casa.", "info");
       }
       if (input.jump && !this.jumpHeld && P.grounded) {
         P.vy = 8.2;
@@ -949,6 +1055,27 @@ export class Game3D {
     const L = this.layout;
     const s = this.step;
     this.near = false;
+    if (this.free && this.phase === "play") {
+      if (control && input.use && !this.useHeld) {
+        const study = new THREE.Vector3(HOME_STUDY.x, P.pos.y, HOME_STUDY.z);
+        const bike = new THREE.Vector3(BIKE_PARK.x, P.pos.y, BIKE_PARK.z);
+        const shop = SHOPS.some((p) => P.pos.distanceTo(new THREE.Vector3(p.x, P.pos.y, p.z)) < 2.4);
+        if (P.pos.distanceTo(study) < 2.3) this.ev.onStudy?.();
+        else if (P.pos.distanceTo(bike) < 2.2) {
+          const place = indoors(P.pos.x, P.pos.z) ? "indoor" : inSea(P.pos.x, P.pos.z) ? "sea" : "street";
+          if (!this.mounted && !canMount(place, this.owned)) this.ev.onShop?.();
+          else if (this.mounted) {
+            this.mounted = false;
+            this.ev.onToast("Você desceu da moto.", "info");
+          } else {
+            this.mounted = true;
+            this.ev.onToast("Você subiu na moto.", "good");
+          }
+        } else if (shop) this.ev.onShop?.();
+      }
+      this.useHeld = input.use;
+      return;
+    }
     if (!s || this.phase !== "play") {
       this.useHeld = input.use;
       return;
@@ -1449,6 +1576,16 @@ export class Game3D {
               if (e.kind === "boss") this.ev.onToast(`${e.name} foi derrubado!`, "good");
             }
             break;
+          }
+        }
+        if (b.life > 0) {
+          for (const ped of this.peds) {
+            if (Math.abs(pos.x - ped.pos.x) < 0.55 && Math.abs(pos.z - ped.pos.z) < 0.55 && pos.y < 1.8) {
+              b.life = 0;
+              ped.panic = 4;
+              this.callPolice(ped.pos);
+              break;
+            }
           }
         }
       } else if (P.inv <= 0 && P.downT <= 0) {

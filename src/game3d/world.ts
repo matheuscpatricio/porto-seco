@@ -1,7 +1,12 @@
+import { BIKE_PARK, BLOCK, districtAt, HOME, ISLAND, SHOPS, STREET } from "@/game3d/rules";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
-export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean };
+export type DoorPlace = "home" | "shop" | "target";
+export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean; door?: DoorPlace; shut?: number };
+
+export { BLOCK, STREET };
+export const SIZE = ISLAND;
 
 export type Theme = {
   sky: [string, string];
@@ -26,9 +31,6 @@ export const THEMES: Record<string, Theme> = {
   w6: { sky: ["#0a0306", "#3b1018"], fog: "#2a0c12", sun: "#fdb4be", sunIntensity: 0.8, hemi: ["#fb7185", "#14060a", 0.4], kind: "corporate", palette: ["#3a3432", "#3b3b40", "#5a2a2a", "#2e2e33"], heights: [24, 64], night: true, peds: 12, traffic: 9 },
 };
 
-export const BLOCK = 36;
-export const STREET = 14;
-export const SIZE = 3 * BLOCK + 4 * STREET;
 export const LANE = 2.2;
 export const streetCenter = (i: number) => STREET / 2 + i * (BLOCK + STREET);
 export const blockStart = (i: number) => STREET + i * (BLOCK + STREET);
@@ -471,9 +473,16 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   scene.background = skyTexture(theme.sky[0], theme.sky[1], theme.sun, night);
   scene.fog = new THREE.Fog(theme.fog, 45, night ? 140 : 190);
 
+  const water = new THREE.Mesh(
+    new THREE.PlaneGeometry(SIZE + 240, SIZE + 240),
+    std({ color: "#1a4a68", roughness: 0.28, metalness: 0.2 }),
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.position.set(SIZE / 2, -0.12, SIZE / 2);
+  scene.add(water);
   const asphalt = asphaltTextures();
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(SIZE + 200, SIZE + 200),
+    new THREE.PlaneGeometry(SIZE, SIZE),
     std({ map: asphalt.map, bumpMap: asphalt.bump, bumpScale: 1.2, roughness: 0.92, color: night ? "#9aa0b0" : "#ffffff" }),
   );
   ground.rotation.x = -Math.PI / 2;
@@ -527,7 +536,15 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   decals("#e0b43a", yellowR);
   decals("#e8e4d8", whiteR);
 
-  const facades = theme.palette.map((c) => facadeTextures(c, night, theme.kind, r));
+  const facadeCache = new Map<string, ReturnType<typeof facadeTextures>[]>();
+  const facadesFor = (id: string) => {
+    const hit = facadeCache.get(id);
+    if (hit) return hit;
+    const th = THEMES[id] ?? theme;
+    const list = th.palette.map((c) => facadeTextures(c, th.night, th.kind, r));
+    facadeCache.set(id, list);
+    return list;
+  };
   const roofMat = std({ color: night ? "#1b1b20" : "#6a645e", roughness: 0.95 });
   const trimMat = std({ color: night ? "#6b6b72" : "#efe9df", roughness: 0.7 });
   const tiles = roofTiles();
@@ -540,9 +557,11 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   const compound = { minX: blockStart(2), maxX: blockStart(2) + BLOCK, minZ: blockStart(2), maxZ: blockStart(2) + BLOCK };
 
   const building = (cx: number, cz: number, w: number, d: number, h: number) => {
+    const district = THEMES[districtAt(cx, cz)] ?? theme;
+    const facades = facadesFor(districtAt(cx, cz));
     const f = facades[Math.floor(r() * facades.length)];
-    const unitW = theme.kind === "houses" ? 4 : theme.kind === "containers" ? 6 : 3.2;
-    const unitH = theme.kind === "containers" ? h : 3.2;
+    const unitW = district.kind === "houses" ? 4 : district.kind === "containers" ? 6 : 3.2;
+    const unitH = district.kind === "containers" ? h : 3.2;
     const map = f.map.clone();
     const bump = f.bump.clone();
     const reps = (face: number) => [Math.max(1, Math.round(face / unitW)), Math.max(1, Math.round(h / unitH))] as const;
@@ -554,7 +573,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       const b1 = bump.clone();
       b1.repeat.set(rx, ry);
       b1.needsUpdate = true;
-      const m = std({ map: m1, bumpMap: b1, bumpScale: 2.2, roughness: theme.kind === "towers" || theme.kind === "corporate" ? 0.45 : 0.9, metalness: theme.kind === "containers" ? 0.35 : 0 });
+      const m = std({ map: m1, bumpMap: b1, bumpScale: 2.2, roughness: district.kind === "towers" || district.kind === "corporate" ? 0.45 : 0.9, metalness: district.kind === "containers" ? 0.35 : 0 });
       if (f.emissive) {
         const e1 = f.emissive.clone();
         e1.repeat.set(rx, ry);
@@ -567,16 +586,16 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     };
     const mw = sideMat(w);
     const md = sideMat(d);
-    const round = theme.kind === "containers" ? 0.05 : 0.25;
+    const round = district.kind === "containers" ? 0.05 : 0.25;
     const body = mesh(new RoundedBoxGeometry(w, h, d, 2, round), [md, md, roofMat, roofMat, mw, mw], cx, h / 2, cz, scene);
     body.receiveShadow = true;
     addCol(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, h);
 
-    if (theme.kind === "containers") {
+    if (district.kind === "containers") {
       for (let y = 2.6; y < h; y += 2.6) box(w + 0.05, 0.08, d + 0.05, std({ color: "#1f1f1f" }), cx, y, cz, scene, false);
       return;
     }
-    if (theme.kind === "houses") {
+    if (district.kind === "houses") {
       const shape = new THREE.Shape();
       shape.moveTo(-w / 2 - 0.5, 0);
       shape.lineTo(0, 2.4);
@@ -594,7 +613,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       }
       for (let k = 0; k < 2; k++) box(1, 0.7, 0.8, acMat, cx + (r() - 0.5) * (w - 2), h + 0.6, cz + (r() - 0.5) * (d - 2), scene, true, 0.08);
     }
-    if (theme.kind === "sheds") {
+    if (district.kind === "sheds") {
       const door = std({ color: "#5b5550", roughness: 0.6, metalness: 0.5 });
       box(0.1, 4, 5, door, cx - w / 2 - 0.05, 2, cz, scene, false);
       return;
@@ -660,7 +679,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       if (i === 2 && j === 2) continue;
       const bx = blockStart(i);
       const bz = blockStart(j);
-      if (theme.kind === "corporate" && i === 1 && j === 1) {
+      const lot = THEMES[districtAt(bx + 8, bz + 8)] ?? theme;
+      if (lot.kind === "corporate" && i === 1 && j === 1) {
         const h = 140;
         const f = facadeTextures("#3a3f5c", true, "towers", r);
         f.map.repeat.set(10, 44);
@@ -692,11 +712,11 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
             addCol(cx + 3.8, cx + 4.2, cz - 4.2, cz - 3.8, 3);
             continue;
           }
-          const [hmin, hmax] = theme.heights;
+          const [hmin, hmax] = lot.heights;
           let h = hmin + r() * (hmax - hmin);
-          if (theme.kind === "containers") h = 2.6 * (1 + Math.floor(r() * 4));
-          const w = theme.kind === "containers" ? 6 : 12 + r() * 3;
-          const d = theme.kind === "containers" ? 14 : 12 + r() * 3;
+          if (lot.kind === "containers") h = 2.6 * (1 + Math.floor(r() * 4));
+          const w = lot.kind === "containers" ? 6 : 12 + r() * 3;
+          const d = lot.kind === "containers" ? 14 : 12 + r() * 3;
           building(cx, cz, w, d, h);
         }
       }
@@ -708,7 +728,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   for (let i = 0; i < 3; i++) {
     for (let j = 0; j < 3; j++) {
       if (i === 2 && j === 2) continue;
-      if (theme.kind === "corporate" && i === 1 && j === 1) continue;
+      if ((THEMES[districtAt(blockStart(i) + 8, blockStart(j) + 8)] ?? theme).kind === "corporate" && i === 1 && j === 1) continue;
       spots.push({ pos: new THREE.Vector3(blockStart(i) + 0.7, 0, blockStart(j) + BLOCK / 2 + (r() - 0.5) * 8), area: areaName(i, j) });
     }
   }
@@ -865,12 +885,6 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   beacon.position.set(terminal.x, 30, terminal.z);
   scene.add(beacon);
 
-  const e = 400;
-  addCol(-e, 0, -e, SIZE + e, 999);
-  addCol(SIZE, SIZE + e, -e, SIZE + e, 999);
-  addCol(-e, SIZE + e, -e, 0, 999);
-  addCol(-e, SIZE + e, SIZE, SIZE + e, 999);
-
   const patrols1: [THREE.Vector3, THREE.Vector3][] = [];
   for (let n = 0; n < 40 && patrols1.length < 12; n++) {
     const alongX = r() > 0.5;
@@ -887,7 +901,50 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   const droneSpots: THREE.Vector3[] = [];
   for (let n = 0; n < 6; n++) droneSpots.push(new THREE.Vector3(streetCenter(1 + (n % 3)), 7, 30 + r() * (SIZE - 60)));
 
-  const spawn = new THREE.Vector3(7, 0, 7);
+  const roomWall = std({ color: "#e7d3b0", roughness: 0.85 });
+  const shopMat = std({ color: "#d6d3d1", roughness: 0.8 });
+  const placeRoom = (minX: number, maxX: number, minZ: number, maxZ: number, door: "home" | "shop", gap: "east" | "plusZ" | "minusZ") => {
+    const mat = door === "home" ? roomWall : shopMat;
+    const midX = (minX + maxX) / 2;
+    const midZ = (minZ + maxZ) / 2;
+    box(maxX - minX, 0.08, maxZ - minZ, mat, midX, 0.04, midZ, scene, false);
+    const t = 0.28;
+    const h = 2.8;
+    const slab = (x0: number, x1: number, z0: number, z1: number, tagged = false) => {
+      if (x1 - x0 < 0.2 || z1 - z0 < 0.2) return;
+      if (!tagged) box(x1 - x0, h, z1 - z0, mat, (x0 + x1) / 2, h / 2, (z0 + z1) / 2, scene, true, 0.04);
+      const col = addCol(x0, x1, z0, z1, h);
+      if (tagged) {
+        col.door = door;
+        col.shut = h;
+      }
+    };
+    slab(minX, minX + t, minZ, maxZ);
+    if (gap !== "east") slab(maxX - t, maxX, minZ, maxZ);
+    if (gap !== "minusZ") slab(minX, maxX, minZ, minZ + t);
+    if (gap !== "plusZ") slab(minX, maxX, maxZ - t, maxZ);
+    if (gap === "east") {
+      slab(maxX - t, maxX, minZ, midZ - 1.1);
+      slab(maxX - t, maxX, midZ + 1.1, maxZ);
+      slab(maxX - t, maxX, midZ - 1.1, midZ + 1.1, true);
+    } else if (gap === "plusZ") {
+      slab(minX, midX - 1.1, maxZ - t, maxZ);
+      slab(midX + 1.1, maxX, maxZ - t, maxZ);
+      slab(midX - 1.1, midX + 1.1, maxZ - t, maxZ, true);
+    } else {
+      slab(minX, midX - 1.1, minZ, minZ + t);
+      slab(midX + 1.1, maxX, minZ, minZ + t);
+      slab(midX - 1.1, midX + 1.1, minZ, minZ + t, true);
+    }
+  };
+  placeRoom(HOME.minX, HOME.maxX, HOME.minZ, HOME.maxZ, "home", "east");
+  placeRoom(SHOPS[0].x - 3, SHOPS[0].x + 3, SHOPS[0].z - 2.2, SHOPS[0].z + 2.2, "shop", "plusZ");
+  placeRoom(SHOPS[1].x - 3, SHOPS[1].x + 3, SHOPS[1].z - 2.2, SHOPS[1].z + 2.2, "shop", "minusZ");
+  const bike = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 0.5), std({ color: "#111827", metalness: 0.4, roughness: 0.45 }));
+  bike.position.set(BIKE_PARK.x, 0.5, BIKE_PARK.z);
+  scene.add(bike);
+
+  const spawn = new THREE.Vector3(BIKE_PARK.x + 1.4, 0, BIKE_PARK.z);
   const allySpots = [new THREE.Vector3(9.5, 0, 10), new THREE.Vector3(5, 0, 11), new THREE.Vector3(11, 0, 6.5)];
 
   return {

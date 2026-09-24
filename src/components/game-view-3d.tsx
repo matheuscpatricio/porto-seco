@@ -1,14 +1,17 @@
 "use client";
 
 import { Dialogue } from "@/components/dialogue";
+import { Button } from "@/components/ui/button";
 import type { Level, Who, World } from "@/content/types";
+import { connector } from "@/content/story";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
-import { BLOCK, blockStart } from "@/game3d/world";
+import { BLOCK, blockStart, SIZE } from "@/game3d/world";
+import { purchaseBike, useProgress } from "@/lib/progress";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-export type GameHandle = { applyHack: (o: HackOutcome) => void; closeHack: () => void; replayBrief: () => void };
+export type GameHandle = { applyHack: (o: HackOutcome) => void; closeHack: () => void; replayBrief: () => void; enterHub: () => void; beginMission: () => void };
 
 type Toast = { id: number; text: string; tone: "info" | "bad" | "good" };
 type Keys = { f: boolean; b: boolean; l: boolean; r: boolean; tl: boolean; tr: boolean; jump: boolean; shoot: boolean; use: boolean; run: boolean };
@@ -72,13 +75,15 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
   g.beginPath();
   g.arc(half, half, half - 2, 0, Math.PI * 2);
   g.clip();
-  g.fillStyle = "#2b2f36";
+  g.fillStyle = "#1a4a68";
   g.fillRect(0, 0, W, W);
   const a = -cos * s;
   const b = -sin * s;
   const cc = sin * s;
   const d = -cos * s;
   g.setTransform(a, b, cc, d, half - (a * m.player.x + cc * m.player.z), half - (b * m.player.x + d * m.player.z));
+  g.fillStyle = "#3f4550";
+  g.fillRect(0, 0, SIZE, SIZE);
   for (let i = 0; i < 3; i++)
     for (let j = 0; j < 3; j++) {
       const inCompound = blockStart(i) === m.compound.minX && blockStart(j) === m.compound.minZ;
@@ -99,7 +104,7 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
   dot(m.escape.x, m.escape.z, 4, "#f43f5e");
   if (m.runner) dot(m.runner.x, m.runner.z, 4, "#fb923c");
   for (const al of m.allies) dot(al.x, al.z, 3.5, "#38bdf8");
-  for (const e of m.enemies) dot(e.x, e.z, e.boss ? 5 : 3.5, e.boss ? "#ff0040" : "#ef4444");
+  for (const e of m.enemies) dot(e.x, e.z, e.boss ? 5 : 3.5, e.police ? "#60a5fa" : e.boss ? "#ff0040" : "#ef4444");
   g.restore();
   let [tx, ty] = toScreen(m.target.x, m.target.z);
   const dist = Math.hypot(tx - half, ty - half);
@@ -162,6 +167,13 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
     const [loading, setLoading] = useState(true);
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [briefKey, setBriefKey] = useState(0);
+    const [pass, setPass] = useState<"link" | "lesson">("link");
+    const [hub, setHub] = useState(false);
+    const hubRef = useRef(false);
+    const [notes, setNotes] = useState(false);
+    const [shop, setShop] = useState(false);
+    const progress = useProgress();
+    const link = connector(level.id);
     const toastId = useRef(0);
     const onPhaseRef = useRef(onPhase);
     useEffect(() => {
@@ -193,12 +205,16 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
           if (p !== "play" && document.pointerLockElement) document.exitPointerLock();
         },
         onToast: toast,
+        onStudy: () => setNotes(true),
+        onShop: () => setShop(true),
       });
       gameRef.current = game;
       game.scene.environment = envMap;
       if (process.env.NODE_ENV !== "production") (window as unknown as { __game: Game3D }).__game = game;
       game.scene.environmentIntensity = world.id === "w2" || world.id === "w5" || world.id === "w6" ? 0.25 : 0.55;
-      if (skipBrief) game.startPlay();
+      const openHub = new URLSearchParams(window.location.search).get("hub") === "1";
+      if (openHub) game.enterHub();
+      else if (skipBrief) game.startPlay();
       const resize = () => {
         const w = wrap.clientWidth;
         const h = wrap.clientHeight;
@@ -249,7 +265,11 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
         }
         if (heartsRef.current) heartsRef.current.textContent = "❤️".repeat(Math.max(0, h.hp)) + "🖤".repeat(Math.max(0, 3 - h.hp));
         if (arrowRef.current) arrowRef.current.style.transform = `rotate(${-h.angle}rad)`;
-        if (objRef.current) objRef.current.textContent = `${h.script} ${h.step}/${h.steps} · ${h.objective} · ${h.distance} m`;
+        if (h.hub !== hubRef.current) {
+          hubRef.current = h.hub;
+          setHub(h.hub);
+        }
+        if (objRef.current) objRef.current.textContent = `${h.script}${h.steps ? ` ${h.step}/${h.steps}` : ""} · ${h.objective} · ${h.distance} m${h.wanted > 0 ? " · polícia" : ""}`;
         if (bossRef.current) bossRef.current.style.display = h.boss ? "block" : "none";
         if (h.boss && bossBarRef.current && bossNameRef.current) {
           bossBarRef.current.style.width = `${h.boss.pct * 100}%`;
@@ -269,6 +289,10 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
         renderer.dispose();
       };
     }, [level, world, index, skipBrief, toast]);
+
+    useEffect(() => {
+      gameRef.current?.setOwned(progress.bike);
+    }, [progress.bike]);
 
     useEffect(() => {
       const typing = (e: KeyboardEvent) => {
@@ -321,6 +345,18 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
     useImperativeHandle(ref, () => ({
       applyHack: (o) => gameRef.current?.applyHack(o),
       closeHack: () => gameRef.current?.closeHack(),
+      enterHub: () => {
+        gameRef.current?.enterHub();
+        setHub(true);
+        hubRef.current = true;
+      },
+      beginMission: () => {
+        setPass("link");
+        setBriefKey((k) => k + 1);
+        gameRef.current?.beginMission();
+        setHub(false);
+        hubRef.current = false;
+      },
       replayBrief: () => {
         const g = gameRef.current;
         if (!g || g.phase !== "play") return;
@@ -461,15 +497,73 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
         {phase === "brief" && !loading && (
           <div className="absolute inset-x-0 bottom-0 p-2 sm:p-4">
             <Dialogue
-              key={briefKey}
-              lines={level.brief}
+              key={`${briefKey}-${pass}`}
+              lines={link.length > 0 && pass === "link" ? link : level.brief}
               onSpeaker={setSpeaker}
-              doneLabel="Começar missão ▶"
+              doneLabel={link.length > 0 && pass === "link" ? "Continuar" : "Começar missão ▶"}
               onDone={() => {
+                if (link.length > 0 && pass === "link") {
+                  setPass("lesson");
+                  return;
+                }
                 onStart();
                 gameRef.current?.startPlay();
               }}
             />
+          </div>
+        )}
+
+        {hub && phase === "play" && (
+          <div className="absolute left-1/2 top-16 z-10 flex -translate-x-1/2 flex-wrap justify-center gap-2">
+            <Button
+              onClick={() => {
+                setPass("link");
+                setBriefKey((k) => k + 1);
+                setHub(false);
+                hubRef.current = false;
+                gameRef.current?.beginMission();
+              }}
+            >
+              Começar missão
+            </Button>
+            <p className="w-full text-center text-xs text-white/80">R$ {progress.money}{progress.bike ? " · moto" : ""}</p>
+          </div>
+        )}
+
+        {notes && (
+          <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/60 p-3 sm:items-center">
+            <div className="max-h-[80vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-2xl bg-card p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-emerald-300">Caderno de casa</p>
+              <p className="text-sm leading-relaxed">{level.theory}</p>
+              <pre className="overflow-x-auto rounded-lg bg-black/70 p-3 font-mono text-xs text-emerald-200">{level.example}</pre>
+              <Button onClick={() => setNotes(false)}>Fechar</Button>
+            </div>
+          </div>
+        )}
+
+        {shop && (
+          <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/60 p-3 sm:items-center">
+            <div className="w-full max-w-sm space-y-3 rounded-2xl bg-card p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-amber-200">Oficina</p>
+              <p className="text-sm">A moto custa 500. Você tem R$ {progress.money}.</p>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    const deal = purchaseBike();
+                    if (deal.bought) {
+                      gameRef.current?.setOwned(true);
+                      toast("A moto é sua. Ela está na porta de casa.", "good");
+                    } else toast(progress.bike ? "Você já tem a moto." : "Ainda falta dinheiro.", "bad");
+                    setShop(false);
+                  }}
+                >
+                  Comprar
+                </Button>
+                <Button variant="ghost" onClick={() => setShop(false)}>
+                  Sair
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
