@@ -1,57 +1,130 @@
 # Porto Seco
 
-Um jogo de ação no navegador para aprender Python do zero ao avançado.
+**A browser-based 3D action game that teaches Python through gameplay.**
 
-Léo é motoboy em Porto Seco, está devendo para o agiota Caveira e nunca programou. A hacker Dani recruta o Léo para derrubar a Vértice Segurança, a empresa de Augusto Vidal que controla a cidade. Ao longo de 30 missões em 6 capítulos, o jogador:
+Porto Seco was built as a learning project to combine programming fundamentals with a more immersive way of practicing Python. Instead of completing isolated exercises, the player moves through a story-driven 3D world and uses real Python code to progress through missions.
 
-- controla o Léo em 3D, em terceira pessoa, num bairro aberto com prédios, sacadas, toldos, árvores, postes, calçada de pedra portuguesa, pedestres andando e carros circulando: anda, corre, pula, atira com a pistola de choque e derruba seguranças, drones e chefes (todos com uma seta vermelha em cima da cabeça);
-- joga missões com roteiros diferentes: invasão do complexo, entrega com um contato na rua, perseguição de carro (atirando nos pneus), escolta da Dani, fuga a pé com alarme e confronto com o chefe na praça;
-- chega ao terminal e, ao apertar E, vê o Léo digitando e mergulhando dentro do computador, num ciberespaço onde as travas do sistema são cadeados 3D;
-- hackeia escrevendo Python de verdade, que roda no navegador com [Pyodide](https://pyodide.org): cada trava abre ou quebra conforme o resultado do código;
-- volta para a rua: com o código certo, a missão avança; com o código errado, o alarme dispara, os pedestres correm e chegam reforços;
-- termina fugindo no carro do Tio Rui.
+The game follows **Léo**, a delivery rider in Porto Seco who gets pulled into a conflict involving hacker **Dani** and the security company **Vértice Segurança**. Across 30 missions and 6 chapters, the player alternates between action sequences and Python challenges that run directly in the browser.
 
-Os carros param para pedestres e buzinam se o Léo ficar na frente. Tiros assustam quem está por perto.
+## What the player does
 
-## Capítulos
+- explores a 3D neighborhood in third person;
+- runs, jumps, shoots, avoids enemies and completes mission objectives;
+- enters terminals and transitions into a cyberspace environment;
+- writes real Python code to unlock systems;
+- receives immediate in-game consequences when code succeeds or fails;
+- progresses from beginner syntax to more advanced Python concepts.
 
-1. Quebrada: `print`, variáveis, contas, `input` e `int`
-2. Centro: `if`, `elif`, `else`, `and`, `or` e `not`
-3. Porto: `for`, `while` e listas
-4. Desmanche: funções, dicionários, tuplas, conjuntos e recursão
-5. Torre Vértice: classes, herança, métodos especiais e exceções
-6. O Golpe: compreensões, `lambda`, geradores, decorators e dataclasses
+Python runs in the browser with [Pyodide](https://pyodide.org), so exercises are executed and validated locally without requiring a separate Python backend.
 
-## Som
+## Python curriculum
 
-Não há música. Todo o som é gerado no navegador com a Web Audio API (`src/game/audio.ts`), sem arquivos de áudio: ronco da cidade, motores dos carros que passam (com volume e lado de acordo com a distância), buzinas, sirenes ao longe, passarinhos de dia, cachorro à noite, passos, tiros com eco, vozes sintetizadas de pedestres conversando e dos personagens nos diálogos. O botão Som, na barra do topo, liga e desliga tudo, e a escolha fica salva.
+The game is structured into six chapters:
 
-## Controles
+1. **Quebrada** — `print`, variables, arithmetic, `input`, `int`
+2. **Centro** — `if`, `elif`, `else`, `and`, `or`, `not`
+3. **Porto** — `for`, `while`, lists
+4. **Desmanche** — functions, dictionaries, tuples, sets, recursion
+5. **Torre Vértice** — classes, inheritance, special methods, exceptions
+6. **O Golpe** — comprehensions, `lambda`, generators, decorators, dataclasses
 
-- Teclado e mouse: clique no jogo para prender o mouse na câmera. W A S D (ou ↑ ↓) andam, ← → giram a câmera, Shift corre, espaço pula, clique ou F atira (com mira assistida), E hackeia e Esc solta o mouse.
-- Celular: joystick virtual no lado esquerdo, arraste no lado direito para girar a câmera, e botões de pular, atirar e hackear.
+The goal is to make each new concept part of the mission flow instead of presenting it as a disconnected exercise.
 
-## Como rodar
+## Tech stack
+
+- **Next.js 16**
+- **React 19**
+- **TypeScript**
+- **Three.js**
+- **Pyodide**
+- **CodeMirror**
+- **Tailwind CSS**
+- **Web Audio API**
+
+## Architecture
+
+The project separates game logic, world generation, lesson content and Python execution:
+
+- `src/content/chapters-a.ts` and `src/content/chapters-b.ts` — missions, dialogue, exercises, tests and solutions
+- `src/content/worlds.ts` — prologue and chapter composition
+- `src/game3d/engine.ts` — main 3D engine, camera, movement, physics, enemies, traffic, objectives and mission state
+- `src/game3d/missions.ts` — mission scripting and objective setup
+- `src/game3d/world.ts` — procedural world generation and chapter visuals
+- `src/game3d/human.ts` — articulated 3D characters and animation
+- `src/game3d/cyber.ts` — cyberspace environment
+- `src/game/characters.ts` — character appearance
+- `src/game/draw.ts` — dialogue portraits
+- `src/components/game-view-3d.tsx` — 3D viewport, controls, compass and dialogue UI
+- `src/components/hack-panel.tsx` — embedded Python coding terminal
+- `public/pyodide-worker.js` — executes and validates player-written Python
+
+## Python challenge system
+
+Each hacking challenge evaluates real Python written by the player.
+
+A mission can define validation code through `check`, while `display.events` represents the locks that must be opened. Each `expr` is evaluated and compared against its expected result. Expected values beginning with `!` represent expected Python exceptions.
+
+This allows the game to test not only printed output, but also values, behavior and error handling.
+
+## World and interaction
+
+The game includes:
+
+- third-person movement;
+- open neighborhood environments;
+- pedestrians and traffic;
+- enemy guards, drones and bosses;
+- mission-specific sequences such as chases, escorts and escapes;
+- contextual reactions to gunfire and player behavior;
+- keyboard, mouse and mobile controls.
+
+Vehicles react to pedestrians, pedestrians react to danger, and failed hacking attempts can trigger alarms and reinforcements.
+
+## Audio
+
+The project does not use pre-recorded music.
+
+Sound is generated in the browser with the Web Audio API, including:
+
+- ambient city noise;
+- vehicle engines;
+- horns;
+- distant sirens;
+- birds and dogs;
+- footsteps;
+- weapon sounds and echoes;
+- synthesized pedestrian and character voices.
+
+Audio can be enabled or disabled in the game UI, and the preference is persisted.
+
+## Running locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Depois abra http://localhost:43123. Na primeira execução, o navegador baixa o Pyodide pela CDN, então é preciso internet.
+Then open:
 
-## Estrutura
+```text
+http://localhost:43123
+```
 
-- `src/content/chapters-a.ts` e `src/content/chapters-b.ts`: roteiro, diálogos, exercícios, testes e soluções de cada missão
-- `src/content/worlds.ts`: prólogo e junção dos capítulos
-- `src/game3d/engine.ts`: motor 3D com Three.js (câmera em terceira pessoa, física, inimigos, pedestres, trânsito, objetivos da missão, mergulho no terminal, alarme e fuga)
-- `src/game3d/missions.ts`: escolhe o roteiro de cada missão e monta a lista de objetivos
-- `src/game3d/world.ts`: gerador do bairro de cada missão, com texturas geradas no navegador e o visual de cada capítulo
-- `src/game3d/human.ts`: personagens 3D articulados e suas animações
-- `src/game3d/cyber.ts`: o ciberespaço, a cena dentro do computador
-- `src/game/characters.ts`: aparência de cada personagem; `src/game/draw.ts` desenha os retratos dos diálogos
-- `src/components/game-view-3d.tsx`: tela 3D, controles, bússola e diálogos sobre o jogo
-- `src/components/hack-panel.tsx`: terminal compacto onde o jogador escreve o código
-- `public/pyodide-worker.js`: executa o código do jogador e testa cada trava
+The first run requires an internet connection so the browser can load Pyodide from its CDN.
 
-Numa missão, `check` é código Python executado depois do código do jogador (a variável `__out` guarda o que foi impresso). Em `display.events`, cada item é uma trava do portão: `expr` é avaliado e comparado com `expect`. Um `expect` que começa com `!` espera um erro com esse nome.
+## Why I built it
+
+I built Porto Seco as a practical way to learn and reinforce Python while working on a project with real product and engineering constraints.
+
+The project gave me a reason to work with:
+
+- state management;
+- game loops and interaction logic;
+- 3D rendering;
+- browser-based Python execution;
+- validation systems;
+- modular architecture;
+- real-time user feedback;
+- progressively harder programming concepts.
+
+The main idea was simple: **make learning Python feel less like solving worksheets and more like progressing through a game.**
