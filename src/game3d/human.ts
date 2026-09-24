@@ -1,4 +1,5 @@
 import type { Look } from "@/game/characters";
+import { driveSkinned, trySkinned } from "@/game3d/cast";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
@@ -37,6 +38,25 @@ export type Rig = {
   materials: THREE.MeshStandardMaterial[];
   flash: number;
   armed: boolean;
+  /** Set when the body is a Mixamo mesh instead of the procedural volumes. */
+  skinned?: {
+    mixer: THREE.AnimationMixer;
+    actions: Map<string, THREE.AnimationAction>;
+    clip: string;
+    bones: {
+      spine: THREE.Bone | null;
+      head: THREE.Bone | null;
+      armL: THREE.Bone | null;
+      armR: THREE.Bone | null;
+      foreL: THREE.Bone | null;
+      foreR: THREE.Bone | null;
+      upL: THREE.Bone | null;
+      upR: THREE.Bone | null;
+      shinL: THREE.Bone | null;
+      shinR: THREE.Bone | null;
+      handR: THREE.Bone | null;
+    };
+  };
 };
 
 const normals = new Map<string, THREE.Texture>();
@@ -162,6 +182,10 @@ export function buildHuman(
   look: Look,
   opts: { wire?: string; simple?: boolean } = {},
 ): Rig {
+  if (!opts.wire) {
+    const skinned = trySkinned(look);
+    if (skinned) return skinned;
+  }
   const fine = !opts.simple;
   const materials: THREE.MeshStandardMaterial[] = [];
   const mat = (color: string, rough = 0.8, metal = 0, kind: "flat" | "skin" | "cloth" | "leather" = "flat") => {
@@ -583,6 +607,10 @@ type Target = {
 
 /** Poses the rig. `t` is time in seconds; `speed` scales the gait cycle. Rotations use negative X for swinging a limb forward. */
 export function animate(r: Rig, pose: Pose3, t: number, dt: number, speed = 1) {
+  if (r.skinned) {
+    driveSkinned(r, pose, t, dt);
+    return;
+  }
   const c = t * (pose === "run" ? 10.5 : 6.4) * speed;
   const T: Target = {
     sL: [0.05, 0, 0.1],

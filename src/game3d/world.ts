@@ -1,5 +1,7 @@
 import type { RideId } from "@/lib/progress-rules";
+import { photoMaterial } from "@/game3d/pbr";
 import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, COAST, coastReach, DANI_CHAIR, DECK, districtAt, ELEVATOR, GREEN, HIDEOUT, HOME, ISLAND, JET, pastShore, PIER, QUAY, ROOF, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
+import { takeCar } from "@/game3d/vehicles";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
@@ -95,68 +97,6 @@ function tex(c: HTMLCanvasElement, rx = 1, ry = 1, srgb = true) {
   t.anisotropy = 8;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;
-}
-
-function asphaltTextures() {
-  const [c, g] = canvas(512);
-  const [b, gb] = canvas(512);
-  g.fillStyle = "#3a3a3c";
-  g.fillRect(0, 0, 512, 512);
-  gb.fillStyle = "#808080";
-  gb.fillRect(0, 0, 512, 512);
-  speckle(g, 512, 512, 26000, 0.5, 0.18, 2);
-  speckle(gb, 512, 512, 26000, 0.6, 0.6, 2);
-  for (let k = 0; k < 18; k++) {
-    g.fillStyle = `rgba(0,0,0,${0.08 + Math.random() * 0.1})`;
-    g.beginPath();
-    g.ellipse(Math.random() * 512, Math.random() * 512, 20 + Math.random() * 60, 10 + Math.random() * 30, Math.random() * 3, 0, Math.PI * 2);
-    g.fill();
-  }
-  for (let k = 0; k < 7; k++) {
-    let x = Math.random() * 512;
-    let y = Math.random() * 512;
-    g.strokeStyle = "rgba(15,15,15,0.7)";
-    gb.strokeStyle = "#202020";
-    g.lineWidth = gb.lineWidth = 1.5;
-    g.beginPath();
-    gb.beginPath();
-    g.moveTo(x, y);
-    gb.moveTo(x, y);
-    for (let s = 0; s < 12; s++) {
-      x += (Math.random() - 0.5) * 30;
-      y += (Math.random() - 0.5) * 30;
-      g.lineTo(x, y);
-      gb.lineTo(x, y);
-    }
-    g.stroke();
-    gb.stroke();
-  }
-  return { map: tex(c, 18, 18), bump: tex(b, 18, 18, false) };
-}
-
-function pavementTextures(base: string, night: boolean) {
-  const [c, g] = canvas(256);
-  const [b, gb] = canvas(256);
-  g.fillStyle = base;
-  g.fillRect(0, 0, 256, 256);
-  gb.fillStyle = "#303030";
-  gb.fillRect(0, 0, 256, 256);
-  for (let y = 0; y < 256; y += 16) {
-    for (let x = (y / 16) % 2 ? -8 : 0; x < 256; x += 16) {
-      const wave = Math.sin((x + y) / 40) > 0.3;
-      const l = night ? 40 + Math.random() * 15 : wave ? 30 + Math.random() * 10 : 78 + Math.random() * 12;
-      g.fillStyle = `hsl(35,8%,${l}%)`;
-      g.beginPath();
-      g.roundRect(x + 1.5, y + 1.5, 13, 13, 4);
-      g.fill();
-      gb.fillStyle = `hsl(0,0%,${70 + Math.random() * 20}%)`;
-      gb.beginPath();
-      gb.roundRect(x + 1.5, y + 1.5, 13, 13, 4);
-      gb.fill();
-    }
-  }
-  speckle(g, 256, 256, 3000, 0.3, 0.1, 1.5);
-  return { map: tex(c), bump: tex(b, 1, 1, false) };
 }
 
 function facadeTextures(base: string, night: boolean, kind: Theme["kind"], r: () => number) {
@@ -259,24 +199,6 @@ function facadeTextures(base: string, night: boolean, kind: Theme["kind"], r: ()
   return { map: tex(c), bump: tex(b, 1, 1, false), emissive: night ? tex(e) : null };
 }
 
-function roofTiles() {
-  const [c, g] = canvas(128);
-  g.fillStyle = "#9a4a2e";
-  g.fillRect(0, 0, 128, 128);
-  for (let y = 0; y < 128; y += 16) {
-    for (let x = (y / 16) % 2 ? -8 : 0; x < 128; x += 16) {
-      const grd = g.createLinearGradient(0, y, 0, y + 16);
-      grd.addColorStop(0, `hsl(15,${45 + Math.random() * 15}%,${36 + Math.random() * 8}%)`);
-      grd.addColorStop(1, "hsl(15,45%,22%)");
-      g.fillStyle = grd;
-      g.beginPath();
-      g.ellipse(x + 8, y + 8, 7.5, 9, 0, 0, Math.PI * 2);
-      g.fill();
-    }
-  }
-  return tex(c);
-}
-
 function skyTexture(top: string, bottom: string, sun: string, night: boolean) {
   const [c, g] = canvas(16, 512);
   const grd = g.createLinearGradient(0, 0, 0, 512);
@@ -325,7 +247,7 @@ const carShared = {
   rimGeo: new THREE.CylinderGeometry(0.22, 0.22, 0.22, 18),
 };
 
-function extrudeSide(points: [number, number][], width: number, bevel: number) {
+function extrudeSide(points: [number, number][], width: number, bevel: number, segs = 12) {
   const s = new THREE.Shape();
   s.moveTo(points[0][0], points[0][1]);
   for (let i = 1; i < points.length; i++) {
@@ -333,7 +255,7 @@ function extrudeSide(points: [number, number][], width: number, bevel: number) {
     s.lineTo(x, y);
   }
   s.closePath();
-  const g = new THREE.ExtrudeGeometry(s, { depth: width - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 4, curveSegments: 12 });
+  const g = new THREE.ExtrudeGeometry(s, { depth: width - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 5, curveSegments: segs });
   g.translate(0, 0, -(width - bevel * 2) / 2);
   g.rotateY(-Math.PI / 2);
   return g;
@@ -341,6 +263,8 @@ function extrudeSide(points: [number, number][], width: number, bevel: number) {
 
 /** Curved sedan/hatch body built from an extruded side profile; faces +Z, length ~4.3 m. */
 export function buildCar(color: string, kind: "sedan" | "hatch" | "van" = "sedan") {
+  const scanned = takeCar(color, kind);
+  if (scanned) return scanned;
   const g = new THREE.Group();
   const paint = new THREE.MeshPhysicalMaterial({
     color,
@@ -676,11 +600,11 @@ function buildBike(style: RideId = "entrega") {
   const chrome = std({ color: "#e5e7eb", metalness: 0.92, roughness: 0.18 });
   const wheel = (z: number) => {
     const w = new THREE.Group();
-    const tire = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.075, 12, 28), rubber);
+    const tire = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.075, 28, 72), rubber);
     tire.rotation.y = Math.PI / 2;
     tire.castShadow = true;
     w.add(tire);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 18), chrome);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 48), chrome);
     rim.rotation.z = Math.PI / 2;
     w.add(rim);
     for (let i = 0; i < 5; i++) {
@@ -709,15 +633,30 @@ function buildBike(style: RideId = "entrega") {
     new THREE.Vector3(0, 0.34, 0.12),
     new THREE.Vector3(0, 0.4, -0.42),
   ]);
-  const frame = new THREE.Mesh(new THREE.TubeGeometry(frameCurve, 40, 0.026, 8, false), dark);
+  const frame = new THREE.Mesh(new THREE.TubeGeometry(frameCurve, 80, 0.026, 16, false), dark);
   frame.castShadow = true;
   g.add(frame);
-  const tank = new THREE.Mesh(new THREE.SphereGeometry(0.2, 22, 16), paint);
+  const tank = new THREE.Mesh(new THREE.SphereGeometry(0.2, 48, 32), paint);
   tank.scale.set(0.82, 0.62, 1.45);
   tank.position.set(0, 0.76, 0.26);
   tank.castShadow = true;
   g.add(tank);
-  const seat = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.07, 0.4, 3, 0.02), dark);
+  const fairingPts: [number, number][] = [
+    [-1.02, 0.34],
+    [-0.72, 0.48],
+    [-0.28, 0.7],
+    [0.12, 0.9],
+    [0.48, 0.96],
+    [0.78, 0.72],
+    [1.02, 0.46],
+    [0.7, 0.32],
+    [0.05, 0.28],
+    [-0.55, 0.3],
+  ];
+  const fairing = new THREE.Mesh(extrudeSide(fairingPts, style === "esportiva" ? 0.62 : 0.5, 0.06, 28), paint);
+  fairing.castShadow = true;
+  g.add(fairing);
+  const seat = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.07, 0.4, 4, 0.02), dark);
   seat.position.set(0, 0.84, -0.1);
   seat.rotation.x = -0.18;
   seat.castShadow = true;
@@ -871,9 +810,9 @@ function buildSkyHideout(scene: THREE.Scene, night: boolean, addCol: (minX: numb
   const lobbyH = 7;
   const glassTop = ROOF - 1.4;
   const glassH = glassTop - lobbyH;
-  const tower = mesh(new THREE.CylinderGeometry(12.5, 14.2, glassH, 8, 1, true), glass, TOWER.x, lobbyH + glassH / 2, TOWER.z, scene);
+  const tower = mesh(new THREE.CylinderGeometry(12.5, 14.2, glassH, 96, 48, true), glass, TOWER.x, lobbyH + glassH / 2, TOWER.z, scene);
   tower.castShadow = true;
-  const crown = mesh(new THREE.TorusGeometry(12.8, 0.55, 8, 28), new THREE.MeshStandardMaterial({ color: "#38bdf8", emissive: "#38bdf8", emissiveIntensity: 1.6 }), TOWER.x, ROOF - 6, TOWER.z, scene, false);
+  const crown = mesh(new THREE.TorusGeometry(12.8, 0.55, 16, 80), new THREE.MeshStandardMaterial({ color: "#38bdf8", emissive: "#38bdf8", emissiveIntensity: 1.6 }), TOWER.x, ROOF - 6, TOWER.z, scene, false);
   crown.rotation.x = Math.PI / 2;
   for (const [x, z] of [
     [77.2, 67.4],
@@ -1052,6 +991,33 @@ function coastTex(span: number, origin: number, mode: "sand" | "grass" | "depth"
   return tex;
 }
 
+/** Grayscale land mask. Three reads alphaMap from the green channel. */
+function coastMask(span: number, origin: number, mode: "sand" | "grass") {
+  const S = 512;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d")!;
+  const img = g.createImageData(S, S);
+  const px = img.data;
+  for (let py = 0; py < S; py++) {
+    for (let x = 0; x < S; x++) {
+      const wx = origin + (x / (S - 1)) * span;
+      const wz = origin + (py / (S - 1)) * span;
+      const past = pastShore(wx, wz);
+      const land = mode === "grass" ? past < -1.15 : past < 0.4;
+      const v = land ? 255 : 0;
+      const i = (py * S + x) * 4;
+      px[i] = px[i + 1] = px[i + 2] = v;
+      px[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 const SEA_SPAN = SIZE + 240;
 const SEA_ORIGIN = SIZE / 2 - SEA_SPAN / 2;
 
@@ -1120,35 +1086,33 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   water.position.set(SIZE / 2, -0.1, SIZE / 2);
   scene.add(water);
   const sandSpan = SIZE + COAST * 2;
-  const sandMat = std({ map: coastTex(sandSpan, -COAST, "sand"), roughness: 1, color: "#ffffff" });
+  const sandMat = photoMaterial("coast_sand_01", 32, 32, { disp: 0.045, rough: 0.96 });
+  sandMat.alphaMap = coastMask(sandSpan, -COAST, "sand");
   sandMat.alphaTest = 0.45;
-  const sand = new THREE.Mesh(new THREE.PlaneGeometry(sandSpan, sandSpan), sandMat);
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(sandSpan, sandSpan, 160, 160), sandMat);
   sand.rotation.x = -Math.PI / 2;
-  sand.position.set(SIZE / 2, -0.06, SIZE / 2);
+  sand.position.set(SIZE / 2, -0.08, SIZE / 2);
   sand.receiveShadow = true;
   scene.add(sand);
   const grassSpan = SIZE + GREEN * 2;
-  const grassMat = std({ map: coastTex(grassSpan, -GREEN, "grass"), roughness: 1, color: "#ffffff" });
+  const grassMat = photoMaterial("grass_ground", 26, 26, { disp: 0.02, rough: 0.95 });
+  grassMat.alphaMap = coastMask(grassSpan, -GREEN, "grass");
   grassMat.alphaTest = 0.45;
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(grassSpan, grassSpan), grassMat);
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(grassSpan, grassSpan, 140, 140), grassMat);
   grass.rotation.x = -Math.PI / 2;
-  grass.position.set(SIZE / 2, -0.03, SIZE / 2);
+  grass.position.set(SIZE / 2, -0.045, SIZE / 2);
   grass.receiveShadow = true;
   scene.add(grass);
-  const asphalt = asphaltTextures();
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(SIZE, SIZE),
-    std({ map: asphalt.map, bumpMap: asphalt.bump, bumpScale: 1.2, roughness: 0.92, color: night ? "#9aa0b0" : "#ffffff" }),
+    new THREE.PlaneGeometry(SIZE, SIZE, 200, 200),
+    photoMaterial("asphalt_02", 46, 46, { disp: 0.028, color: night ? "#c5ccd8" : "#ffffff", rough: 0.94 }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(SIZE / 2, 0, SIZE / 2);
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const pave = pavementTextures(themeId === "w1" ? "#d9cfc0" : "#9d9a95", night);
-  pave.map.repeat.set(10, 10);
-  pave.bump.repeat.set(10, 10);
-  const sidewalk = std({ map: pave.map, bumpMap: pave.bump, bumpScale: 1.5, roughness: 0.9 });
+  const sidewalk = photoMaterial("concrete_floor_02", 8, 8, { rough: 0.88, color: themeId === "w1" ? "#f3efe8" : "#d4d0cb" });
   const curbMat = std({ color: "#b7b2aa", roughness: 0.8 });
   for (let i = 0; i < 3; i++) {
     for (let j = 0; j < 3; j++) {
@@ -1192,19 +1156,14 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   decals("#e0b43a", yellowR);
   decals("#e8e4d8", whiteR);
 
-  const facadeCache = new Map<string, ReturnType<typeof facadeTextures>[]>();
-  const facadesFor = (id: string) => {
-    const hit = facadeCache.get(id);
-    if (hit) return hit;
-    const th = THEMES[id] ?? theme;
-    const list = th.palette.map((c) => facadeTextures(c, th.night, th.kind, r));
-    facadeCache.set(id, list);
-    return list;
-  };
-  const roofMat = std({ color: night ? "#1b1b20" : "#6a645e", roughness: 0.95 });
+  const roofMat = photoMaterial("concrete_floor_02", 4, 4, { color: night ? "#8a8a90" : "#e7e2da", rough: 0.9 });
   const trimMat = std({ color: night ? "#6b6b72" : "#efe9df", roughness: 0.7 });
-  const tiles = roofTiles();
-  const tileMat = std({ map: tiles, roughness: 0.8, color: night ? "#777" : "#fff" });
+  const tileMat = photoMaterial("clay_roof_tiles", 3, 2, { color: night ? "#9a8078" : "#ffffff", rough: 0.82 });
+  const darkWins: THREE.Matrix4[] = [];
+  const litWins: THREE.Matrix4[] = [];
+  const winQ = new THREE.Quaternion();
+  const winUp = new THREE.Vector3(0, 0, 1);
+  const outward = new THREE.Vector3();
   const awningColors = ["#b91c1c", "#15803d", "#1d4ed8", "#ca8a04", "#7c2d12"];
   const railMat = std({ color: "#2b2f35", roughness: 0.4, metalness: 0.8 });
   const tankMat = std({ color: "#3a6ea5", roughness: 0.5 });
@@ -1214,44 +1173,20 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
 
   const building = (cx: number, cz: number, w: number, d: number, h: number) => {
     const district = THEMES[districtAt(cx, cz)] ?? theme;
-    const facades = facadesFor(districtAt(cx, cz));
-    const f = facades[Math.floor(r() * facades.length)];
-    const unitW = district.kind === "houses" ? 4 : district.kind === "containers" ? 6 : 3.2;
-    const unitH = district.kind === "containers" ? h : 3.2;
-    const map = f.map.clone();
-    const bump = f.bump.clone();
-    const reps = (face: number) => [Math.max(1, Math.round(face / unitW)), Math.max(1, Math.round(h / unitH))] as const;
-    const sideMat = (face: number) => {
-      const [rx, ry] = reps(face);
-      const m1 = map.clone();
-      m1.repeat.set(rx, ry);
-      m1.needsUpdate = true;
-      const b1 = bump.clone();
-      b1.repeat.set(rx, ry);
-      b1.needsUpdate = true;
-      const glassWall = district.kind === "towers" || district.kind === "corporate";
-      const m = std({
-        map: m1,
-        bumpMap: b1,
-        bumpScale: glassWall ? 0.6 : 1.4,
-        roughness: glassWall ? 0.18 : district.kind === "containers" ? 0.55 : 0.86,
-        metalness: glassWall ? 0.48 : district.kind === "containers" ? 0.35 : 0.02,
-        envMapIntensity: glassWall ? 1.15 : 0.35,
+    const tint = district.palette[Math.floor(r() * district.palette.length)];
+    const glassWall = district.kind === "towers" || district.kind === "corporate";
+    const sideMat = (face: number) =>
+      photoMaterial("painted_plaster_wall", Math.max(1, face / 2.2), Math.max(1, h / 2.4), {
+        color: tint,
+        disp: h > 18 ? 0.02 : 0.045,
+        rough: glassWall ? 0.32 : district.kind === "containers" ? 0.55 : 0.9,
+        metal: glassWall ? 0.46 : district.kind === "containers" ? 0.38 : 0.02,
       });
-      if (f.emissive) {
-        const e1 = f.emissive.clone();
-        e1.repeat.set(rx, ry);
-        e1.needsUpdate = true;
-        m.emissiveMap = e1;
-        m.emissive = new THREE.Color("#ffffff");
-        m.emissiveIntensity = 0.55;
-      }
-      return m;
-    };
     const mw = sideMat(w);
     const md = sideMat(d);
-    const round = district.kind === "containers" ? 0.05 : 0.25;
-    const body = mesh(new RoundedBoxGeometry(w, h, d, 2, round), [md, md, roofMat, roofMat, mw, mw], cx, h / 2, cz, scene);
+    const round = district.kind === "containers" ? 0.05 : 0.18;
+    const seg = h > 20 ? 4 : 7;
+    const body = mesh(new RoundedBoxGeometry(w, h, d, seg, round), [md, md, roofMat, roofMat, mw, mw], cx, h / 2, cz, scene);
     body.receiveShadow = true;
     addCol(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, h);
 
@@ -1303,6 +1238,23 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
         if (nx !== 0) box(0.06, 2.1, along * 0.5, shop, fx + nx * 0.04, 1.35, fz, scene, false);
         else box(along * 0.5, 2.1, 0.06, shop, fx, 1.35, fz + nz * 0.04, scene, false);
       }
+      if (along > 3) {
+        const cols = Math.max(1, Math.floor((along - 1.4) / 2.35));
+        const rows = Math.max(1, Math.floor((h - 3.4) / 2.7));
+        outward.set(nx, 0, nz);
+        winQ.setFromUnitVectors(winUp, outward);
+        for (let row = 0; row < rows; row++) {
+          const y = 3.5 + row * 2.7;
+          if (y > h - 0.9) break;
+          for (let col = 0; col < cols; col++) {
+            const offset = (col - (cols - 1) / 2) * 2.35;
+            const px = nx !== 0 ? fx + nx * 0.16 : fx + offset;
+            const pz = nz !== 0 ? fz + nz * 0.16 : fz + offset;
+            const bucket = night && r() < 0.38 ? litWins : darkWins;
+            bucket.push(new THREE.Matrix4().compose(new THREE.Vector3(px, y, pz), winQ, new THREE.Vector3(1.15, 1.55, 1)));
+          }
+        }
+      }
       if (h > 7 && r() < 0.5) {
         for (let y = 6.4; y < h - 1; y += 3.2) {
           const bw = Math.min(3, along * 0.3);
@@ -1319,6 +1271,16 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       }
     }
   };
+
+  const placeWins = (list: THREE.Matrix4[], mat: THREE.Material) => {
+    if (!list.length) return;
+    const win = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, list.length);
+    list.forEach((m, i) => win.setMatrixAt(i, m));
+    win.instanceMatrix.needsUpdate = true;
+    scene.add(win);
+  };
+  placeWins(darkWins, new THREE.MeshPhysicalMaterial({ color: "#163044", roughness: 0.06, metalness: 0.55, envMapIntensity: 1.3, transparent: true, opacity: 0.72 }));
+  placeWins(litWins, new THREE.MeshStandardMaterial({ color: "#ffd7a1", emissive: "#ffb15a", emissiveIntensity: 1.5, roughness: 0.4 }));
 
   const crateMat = std({ color: "#8a5a2b", roughness: 0.95 });
   const binMat = std({ color: "#2f5d3a", roughness: 0.6 });
@@ -1414,6 +1376,10 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     if (x > compound.minX - 16 && z > compound.minZ - 16) continue;
     if ([0, 1, 2, 3].some((j) => Math.abs((alongX ? x : z) - streetCenter(j)) < 9)) continue;
     const car = buildCar(carColors[n % carColors.length], kinds[n % kinds.length]);
+    car.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) mesh.castShadow = false;
+    });
     car.position.set(x, 0, z);
     car.rotation.y = alongX ? Math.PI / 2 : 0;
     scene.add(car);
@@ -1620,7 +1586,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   box(2.2, 0.9, 0.5, std({ color: "#7f1d1d", roughness: 0.6 }), (SHOP_A.minX + SHOP_A.maxX) / 2, 0.7, (SHOP_A.minZ + SHOP_A.maxZ) / 2 + 1.2, scene, true);
   box(0.5, 0.9, 2.2, std({ color: "#0e7490", roughness: 0.55 }), (SHOP_B.minX + SHOP_B.maxX) / 2 + 1.2, 0.7, (SHOP_B.minZ + SHOP_B.maxZ) / 2, scene, true);
   const elevator = buildSkyHideout(scene, night, addCol);
-  const yard = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), grassMat);
+  const yard = new THREE.Mesh(new THREE.PlaneGeometry(18, 18, 24, 24), photoMaterial("grass_ground", 4, 4, { disp: 0.015, rough: 0.95 }));
   yard.rotation.x = -Math.PI / 2;
   yard.position.set(23.2, 0.22, 23.2);
   yard.receiveShadow = true;

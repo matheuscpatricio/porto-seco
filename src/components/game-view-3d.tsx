@@ -5,6 +5,7 @@ import { ComputerLesson } from "@/components/lesson-screen";
 import { Button } from "@/components/ui/button";
 import type { Level, Who, World } from "@/content/types";
 import { connector } from "@/content/story";
+import { preloadScene } from "@/game3d/assets";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
 import { coastReach, PIER, POLICE_RANK, policeRank, QUAY } from "@/game3d/rules";
 import { BLOCK, blockStart, SIZE } from "@/game3d/world";
@@ -231,6 +232,8 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
     useEffect(() => {
       const canvas = canvasRef.current!;
       const wrap = wrapRef.current!;
+      let cancel = false;
+      let stop = () => {};
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
       renderer.shadowMap.enabled = true;
@@ -238,6 +241,16 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.05;
+      const boot = async () => {
+      try {
+        await preloadScene();
+      } catch (err) {
+        console.warn(err);
+      }
+      if (cancel) {
+        renderer.dispose();
+        return;
+      }
       const pmrem = new THREE.PMREMGenerator(renderer);
       const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
       const game = new Game3D(level, world, index, {
@@ -334,13 +347,19 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
         raf = requestAnimationFrame(loop);
       };
       raf = requestAnimationFrame(loop);
-      return () => {
+      stop = () => {
         cancelAnimationFrame(raf);
         ro.disconnect();
         game.dispose();
         envMap.dispose();
         pmrem.dispose();
         renderer.dispose();
+      };
+      };
+      void boot();
+      return () => {
+        cancel = true;
+        stop();
       };
     }, [level, world, index, skipBrief, toast]);
 
