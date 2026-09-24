@@ -168,6 +168,11 @@
   .anim-walk-in, .anim-cast, .anim-defeat, .anim-glow, .anim-puff, .anim-sign-on, .anim-big-in { animation: none; }
 }
 
+@keyframes monitor-in { from { opacity: 0; transform: scale(0.16) } to { opacity: 1; transform: none } }
+.anim-monitor { animation: monitor-in 0.55s cubic-bezier(0.16, 0.84, 0.3, 1) both; transform-origin: 70% 42%; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-monitor { animation: none; }
+}
 @keyframes dive { 0%, 55% { opacity: 0; transform: scale(0.2) } 85% { opacity: 1; transform: scale(1) } 100% { opacity: 1; transform: scale(1.4) } }
 @keyframes dive-in { from { opacity: 1 } to { opacity: 0 } }
 .anim-dive { background: radial-gradient(circle, #ecfccb 0%, #4ade80 25%, #052e16 70%); animation: dive 1.8s ease-in forwards; }

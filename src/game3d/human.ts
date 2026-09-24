@@ -16,7 +16,8 @@ export type Pose3 =
   | "sit"
   | "ride"
   | "phone"
-  | "cower";
+  | "cower"
+  | "desk";
 
 export type Rig = {
   root: THREE.Group;
@@ -597,6 +598,17 @@ export function animate(r: Rig, pose: Pose3, t: number, dt: number, speed = 1) {
       T.sL = [-1.0, 0, 0.1];
       T.sR = [-1.0, 0, -0.1];
       T.eL = T.eR = -0.5;
+      break;
+    case "desk":
+      T.hL = T.hR = -1.48;
+      T.kL = T.kR = 1.55;
+      T.hipsY = 0.5;
+      T.sL = [-1.05, 0, 0.28];
+      T.sR = [-1.05, 0, -0.28];
+      T.eL = -1.25 + Math.sin(t * 18) * 0.12;
+      T.eR = -1.25 + Math.cos(t * 16) * 0.12;
+      T.chest = 0.32;
+      T.head = 0.42;
       break;
     case "ride":
       T.hipsY = 0.74;

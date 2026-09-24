@@ -6,7 +6,7 @@ import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
-import { BERTHS, canMount, CENTRAL_PHONE, decayWanted, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, ROOF, roomExit, separateCircles, SHOPS, shirtFor, TOWER } from "@/game3d/rules";
+import { BERTHS, canMount, CENTRAL_PHONE, DANI_CHAIR, decayWanted, DECK, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, ROOF, roomExit, separateCircles, SHOPS, shirtFor, TOWER } from "@/game3d/rules";
 import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
@@ -80,7 +80,7 @@ function segBox(a: THREE.Vector3, b: THREE.Vector3, c: Collider) {
   let t1 = 1;
   const d = [b.x - a.x, b.y - a.y, b.z - a.z];
   const o = [a.x, a.y, a.z];
-  const mn = [c.minX, 0, c.minZ];
+  const mn = [c.minX, c.bottom ?? 0, c.minZ];
   const mx = [c.maxX, c.top, c.maxZ];
   for (let i = 0; i < 3; i++) {
     if (Math.abs(d[i]) < 1e-9) {
@@ -240,8 +240,8 @@ export class Game3D {
 
     this.dani = buildHuman(people.dani.look);
     this.dani.armed = false;
-    this.dani.root.position.set(HIDEOUT.x - 2.1, ROOF, HIDEOUT.z + 0.4);
-    this.dani.root.rotation.y = -0.8;
+    this.dani.root.position.set(DANI_CHAIR.x, DECK, DANI_CHAIR.z);
+    this.dani.root.rotation.y = 0;
     this.scene.add(this.dani.root);
 
     const n = level.display.kind === "locks" ? level.display.events.length : 1;
@@ -765,6 +765,7 @@ export class Game3D {
   private collide(pos: THREE.Vector3, radius: number, feet: number) {
     for (const c of this.layout.colliders) {
       if (c.above != null && feet < c.above) continue;
+      if (c.bottom != null && feet < c.bottom) continue;
       if (c.top <= feet + 0.35) continue;
       const cx = Math.max(c.minX, Math.min(pos.x, c.maxX));
       const cz = Math.max(c.minZ, Math.min(pos.z, c.maxZ));
@@ -1093,7 +1094,7 @@ export class Game3D {
     rig.root.rotation.y = P.yaw;
     animate(rig, pose, this.t, dt);
 
-    if (this.dani) animate(this.dani, "type", this.t, dt);
+    if (this.dani) animate(this.dani, "desk", this.t, dt);
     this.updateAllies(dt);
     const car = L.car;
     this.driver.root.position.set(car.position.x, car.position.y + 0.25, car.position.z);
@@ -1476,21 +1477,23 @@ export class Game3D {
     const P = this.player;
     ride.t += dt;
     const k = Math.min(1, ride.t / 6.4);
-    const cabin = new THREE.Vector3(ELEVATOR.x, ride.up ? 0.2 : ROOF, 66.8);
-    const deck = new THREE.Vector3(TOWER.x, ride.up ? ROOF : 0.2, ride.up ? TOWER.z - 1.4 : ELEVATOR.z);
+    const high = DECK;
+    const low = 0.2;
+    const cabin = new THREE.Vector3(ELEVATOR.x, ride.up ? low : high, 66.8);
+    const deck = new THREE.Vector3(TOWER.x, ride.up ? high : low, ride.up ? 83.2 : ELEVATOR.z);
     let pos: THREE.Vector3;
     if (k < 0.14) {
       pos = ride.start.clone().lerp(cabin, k / 0.14);
-      pos.y = ride.up ? 0.2 : ROOF;
+      pos.y = ride.up ? low : high;
     } else if (k < 0.86) {
       const u = (k - 0.14) / 0.72;
       const e = u * u * (3 - 2 * u);
       pos = cabin.clone();
-      pos.y = (ride.up ? 0.2 : ROOF) + (ride.up ? ROOF - 0.2 : 0.2 - ROOF) * e;
+      pos.y = (ride.up ? low : high) + (ride.up ? high - low : low - high) * e;
     } else {
       const u = (k - 0.86) / 0.14;
       pos = cabin.clone().lerp(deck, u);
-      pos.y = ride.up ? ROOF : 0.2;
+      pos.y = ride.up ? high : low;
     }
     P.pos.copy(pos);
     P.vy = 0;
@@ -1499,10 +1502,12 @@ export class Game3D {
     this.layout.elevator.position.set(ELEVATOR.x, Math.max(1.6, P.pos.y + 1.4), 66.6);
     if (k >= 1) {
       P.pos.copy(deck);
+      P.yaw = ride.up ? 0 : Math.PI;
+      if (ride.up) this.camYaw = 0;
       this.liftFloor = ride.up ? "roof" : "ground";
       this.lift = null;
       sound.sfx("gate");
-      if (ride.up) this.ev.onToast("Cobertura. O computador da Dani está do outro lado.", "good");
+      if (ride.up) this.ev.onToast("Sala da Dani. Aperte E para entrar no computador.", "good");
     }
   }
 

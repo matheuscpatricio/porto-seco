@@ -83,10 +83,15 @@ export const SHOP_B: RoomBox = { minX: 16.6, maxX: 24.2, minZ: 136.6, maxZ: 145.
 /** Dani's skyscraper, in the center block. The shaft is the roof you stand on. */
 export const TOWER = { x: 82, z: 82 };
 export const ROOF = 140;
+/** Hideout floor, raised off the shaft cap so the two surfaces do not share a plane. */
+export const DECK = ROOF + 0.16;
 export const CENTRAL: RoomBox = { minX: 76, maxX: 88, minZ: 66, maxZ: 90, gap: "minusZ" };
 export const ELEVATOR = { x: 82, z: 74.2 };
 export const HIDEOUT = { x: 82, z: 82 };
-export const CENTRAL_PHONE = { x: 84.6, z: 84.2 };
+/** Dani's chair, facing +Z into the monitors. */
+export const DANI_CHAIR = { x: 82, z: 85.85 };
+/** Where Léo stands to enter the computer. South of the chair, inside the room. */
+export const CENTRAL_PHONE = { x: 82, z: 83.4 };
 /** Cargo ships sit in the water, past the beach. */
 export const BERTHS = [
   { x: 58, z: -42 },

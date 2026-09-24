@@ -1,14 +1,14 @@
 "use client";
 
 import { Dialogue } from "@/components/dialogue";
+import { ComputerLesson } from "@/components/lesson-screen";
 import { Button } from "@/components/ui/button";
 import type { Level, Who, World } from "@/content/types";
-import { MODULES } from "@/content/modules";
 import { connector } from "@/content/story";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
 import { PIER, QUAY } from "@/game3d/rules";
 import { BLOCK, blockStart, COAST, GREEN, SIZE } from "@/game3d/world";
-import { markHelped, purchaseRide, purchaseWeapon, useProgress } from "@/lib/progress";
+import { purchaseRide, purchaseWeapon, useProgress } from "@/lib/progress";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -563,48 +563,14 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
         )}
 
         {help && (
-          <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/70 p-3 sm:items-center">
-            <div className="max-h-[80vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-2xl bg-card p-4">
-              <p className="text-xs font-black uppercase tracking-widest text-sky-300">Computador da Dani</p>
-              {help === "lista" ? (
-                <>
-                  <p className="text-sm">Escolha o módulo. Se pedir a ajuda, a Dani explica e essa missão não paga.</p>
-                  <div className="space-y-2">
-                    {["Começo", "Decisão", "Repetição", "Dados", "Funções", "Objetos", "Avançado"].map((band) => (
-                      <div key={band}>
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-white/50">{band}</p>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {MODULES.filter((m) => m.band === band).map((m) => (
-                            <Button key={m.id} size="sm" variant="secondary" onClick={() => setHelp(m.id)}>
-                              {m.title}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Button variant="ghost" onClick={() => setHelp(null)}>
-                    Sair sem pedir
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Dialogue
-                    lines={[
-                      { who: "dani", text: "Se eu te explicar isso agora, o pagamento dessa missão some. O aprendizado fica." },
-                      ...(MODULES.find((m) => m.id === help)?.lines ?? []).map((text) => ({ who: "dani" as const, text })),
-                    ]}
-                    doneLabel="Entendi"
-                    onDone={() => {
-                      markHelped();
-                      toast("A Dani ajudou. Essa missão não paga.", "info");
-                      setHelp(null);
-                    }}
-                  />
-                </>
-              )}
-            </div>
-          </div>
+          <ComputerLesson
+            moduleId={help === "lista" ? null : help}
+            onPick={(id) => setHelp(id || "lista")}
+            onClose={() => {
+              toast("Você saiu do computador. O pagamento da missão continua.", "good");
+              setHelp(null);
+            }}
+          />
         )}
 
         {shop && (

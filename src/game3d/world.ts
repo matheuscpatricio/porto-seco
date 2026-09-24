@@ -1,10 +1,10 @@
 import type { RideId } from "@/lib/progress-rules";
-import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, CENTRAL_PHONE, COAST, districtAt, ELEVATOR, GREEN, HIDEOUT, HOME, ISLAND, JET, PIER, QUAY, ROOF, SAND, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
+import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, COAST, DANI_CHAIR, DECK, districtAt, ELEVATOR, GREEN, HIDEOUT, HOME, ISLAND, JET, PIER, QUAY, ROOF, SAND, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 export type DoorPlace = "home" | "shop" | "target" | "central";
-export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean; door?: DoorPlace; shut?: number; above?: number };
+export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean; door?: DoorPlace; shut?: number; above?: number; bottom?: number };
 
 export { BLOCK, COAST, GREEN, STREET };
 export const SIZE = ISLAND;
@@ -796,13 +796,34 @@ function furnishHome(scene: THREE.Scene, addCol: (minX: number, maxX: number, mi
   scene.add(rug);
 }
 
+function monitorFace(title: string, lines: string[], color: string) {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 320;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#02110c";
+  g.fillRect(0, 0, 512, 320);
+  g.fillStyle = color;
+  g.fillRect(0, 0, 512, 6);
+  g.font = "bold 26px monospace";
+  g.fillText(title, 22, 42);
+  g.font = "22px monospace";
+  g.fillStyle = "#d1fae5";
+  lines.forEach((line, i) => g.fillText(line.slice(0, 28), 22, 88 + i * 34));
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+}
+
 function buildSkyHideout(scene: THREE.Scene, night: boolean, addCol: (minX: number, maxX: number, minZ: number, maxZ: number, top: number) => Collider) {
   const glass = std({ color: night ? "#7dd3fc" : "#dbeafe", emissive: night ? "#38bdf8" : "#93c5fd", emissiveIntensity: night ? 0.55 : 0.18, roughness: 0.18, metalness: 0.62, transparent: true, opacity: 0.82 });
   const steel = std({ color: "#1e293b", metalness: 0.55, roughness: 0.4 });
-  const deck = std({ color: "#0f172a", roughness: 0.72 });
+  const wall = std({ color: "#0b0e14", roughness: 0.92, metalness: 0.04 });
+  const dark = std({ color: "#07090d", roughness: 0.88 });
   const lobbyH = 7;
-  const shaftH = ROOF - lobbyH;
-  const tower = mesh(new THREE.CylinderGeometry(12.5, 14.2, shaftH, 8), glass, TOWER.x, lobbyH + shaftH / 2, TOWER.z, scene);
+  const glassTop = ROOF - 1.4;
+  const glassH = glassTop - lobbyH;
+  const tower = mesh(new THREE.CylinderGeometry(12.5, 14.2, glassH, 8, 1, true), glass, TOWER.x, lobbyH + glassH / 2, TOWER.z, scene);
   tower.castShadow = true;
   const crown = mesh(new THREE.TorusGeometry(12.8, 0.55, 8, 28), new THREE.MeshStandardMaterial({ color: "#38bdf8", emissive: "#38bdf8", emissiveIntensity: 1.6 }), TOWER.x, ROOF - 6, TOWER.z, scene, false);
   crown.rotation.x = Math.PI / 2;
@@ -815,11 +836,19 @@ function buildSkyHideout(scene: THREE.Scene, night: boolean, addCol: (minX: numb
     mesh(new THREE.CylinderGeometry(0.45, 0.55, lobbyH, 8), steel, x, lobbyH / 2, z, scene, true);
     addCol(x - 0.45, x + 0.45, z - 0.45, z + 0.45, lobbyH);
   }
-  box(11.2, ROOF, 13, steel, TOWER.x, ROOF / 2, 82.6, scene, true);
+  const shaftTop = ROOF - 0.5;
+  box(11.2, shaftTop, 13, steel, TOWER.x, shaftTop / 2, 82.6, scene, true);
   addCol(76.4, 87.6, 76.2, 89.2, ROOF);
+  const slabMat = std({ color: "#161b24", roughness: 0.84, metalness: 0.08 });
+  slabMat.polygonOffset = true;
+  slabMat.polygonOffsetFactor = -2;
+  slabMat.polygonOffsetUnits = -2;
+  box(11.8, 0.78, 13.6, slabMat, TOWER.x, DECK - 0.39, 82.6, scene, true);
+  const deckCol = addCol(76.3, 87.7, 76.1, 89.3, DECK);
+  deckCol.above = ROOF - 1;
   const rail = (x0: number, x1: number, z0: number, z1: number) => {
-    box(Math.max(0.18, x1 - x0), 1.05, Math.max(0.18, z1 - z0), steel, (x0 + x1) / 2, ROOF + 0.52, (z0 + z1) / 2, scene, true);
-    const col = addCol(x0, x1, z0, z1, ROOF + 1.1);
+    box(Math.max(0.18, x1 - x0), 1.05, Math.max(0.18, z1 - z0), steel, (x0 + x1) / 2, DECK + 0.52, (z0 + z1) / 2, scene, true);
+    const col = addCol(x0, x1, z0, z1, DECK + 1.1);
     col.above = ROOF - 1;
   };
   rail(76.4, 80.1, 76.2, 76.9);
@@ -827,18 +856,101 @@ function buildSkyHideout(scene: THREE.Scene, night: boolean, addCol: (minX: numb
   rail(87.0, 87.6, 76.2, 89.2);
   rail(76.4, 77.0, 76.2, 89.2);
   rail(76.4, 87.6, 88.6, 89.2);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 10), std({ color: "#111827", roughness: 0.9 }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set(TOWER.x, 0.21, 71);
-  scene.add(floor);
-  const screen = std({ color: "#082f49", emissive: "#22d3ee", emissiveIntensity: 0.9, roughness: 0.2 });
-  box(2.6, 0.12, 1.15, std({ color: "#111827" }), CENTRAL_PHONE.x, ROOF + 0.75, CENTRAL_PHONE.z + 1.1, scene, true);
-  const desk = addCol(CENTRAL_PHONE.x - 1.4, CENTRAL_PHONE.x + 1.4, CENTRAL_PHONE.z + 0.5, CENTRAL_PHONE.z + 1.8, ROOF + 0.95);
+  const lobby = new THREE.Mesh(new THREE.PlaneGeometry(12, 10), std({ color: "#111827", roughness: 0.9 }));
+  lobby.rotation.x = -Math.PI / 2;
+  lobby.position.set(TOWER.x, 0.21, 71);
+  scene.add(lobby);
+
+  const roomH = 3.2;
+  const ceilY = DECK + roomH;
+  const wallCol = (x0: number, x1: number, z0: number, z1: number) => {
+    box(x1 - x0, roomH + 0.08, z1 - z0, wall, (x0 + x1) / 2, DECK + roomH / 2 - 0.02, (z0 + z1) / 2, scene, true);
+    const col = addCol(x0, x1, z0, z1, ceilY);
+    col.above = ROOF - 1;
+  };
+  wallCol(77.25, 77.62, 77.35, 88.2);
+  wallCol(86.55, 86.92, 77.35, 88.2);
+  wallCol(77.25, 86.92, 87.85, 88.22);
+  wallCol(77.25, 81.1, 77.35, 77.72);
+  wallCol(82.9, 86.92, 77.35, 77.72);
+  box(1.8, 0.85, 0.37, wall, 82, DECK + roomH - 0.42, 77.53, scene, true);
+  const ceiling = box(9.8, 0.22, 11.05, dark, 82.08, ceilY + 0.04, 82.75, scene, true);
+  ceiling.receiveShadow = true;
+  const lid = addCol(77.25, 86.92, 77.35, 88.22, ceilY + 0.2);
+  lid.bottom = ceilY;
+  lid.above = ROOF - 1;
+
+  const tileMat = std({ color: "#10141c", roughness: 0.78 });
+  tileMat.polygonOffset = true;
+  tileMat.polygonOffsetFactor = -4;
+  tileMat.polygonOffsetUnits = -4;
+  const tile = new THREE.Mesh(new THREE.PlaneGeometry(8.7, 10.2), tileMat);
+  tile.rotation.x = -Math.PI / 2;
+  tile.position.set(82.05, DECK + 0.015, 82.8);
+  tile.receiveShadow = true;
+  scene.add(tile);
+
+  const rack = std({ color: "#111827", metalness: 0.35, roughness: 0.45 });
+  box(0.7, 1.85, 0.85, rack, 78.15, DECK + 0.95, 84.2, scene, true);
+  const rackCol = addCol(77.75, 78.55, 83.7, 84.7, DECK + 1.9);
+  rackCol.above = ROOF - 1;
+  const led = new THREE.MeshBasicMaterial({ color: "#22c55e", toneMapped: false });
+  for (let i = 0; i < 6; i++) box(0.08, 0.08, 0.04, i % 2 ? led : new THREE.MeshBasicMaterial({ color: "#38bdf8", toneMapped: false }), 78.52, DECK + 0.4 + i * 0.24, 84.55, scene, false);
+
+  const deskMat = std({ color: "#1c1917", roughness: 0.55, metalness: 0.15 });
+  box(5.4, 0.08, 1.25, deskMat, 82.15, DECK + 0.78, 86.85, scene, true);
+  box(0.08, 0.74, 1.15, deskMat, 79.5, DECK + 0.4, 86.85, scene, true);
+  box(0.08, 0.74, 1.15, deskMat, 84.8, DECK + 0.4, 86.85, scene, true);
+  const desk = addCol(79.4, 84.95, 86.2, 87.5, DECK + 0.86);
   desk.above = ROOF - 1;
-  box(1.55, 1.4, 0.08, screen, CENTRAL_PHONE.x - 0.7, ROOF + 1.75, CENTRAL_PHONE.z + 1.55, scene, false);
-  box(1.55, 1.4, 0.08, screen, CENTRAL_PHONE.x + 0.85, ROOF + 1.75, CENTRAL_PHONE.z + 1.55, scene, false);
-  box(0.5, 1.1, 0.7, std({ color: "#020617", metalness: 0.45 }), CENTRAL_PHONE.x - 1.7, ROOF + 0.7, CENTRAL_PHONE.z + 0.7, scene, true);
-  mesh(new THREE.SphereGeometry(0.22, 14, 10), new THREE.MeshBasicMaterial({ color: "#38bdf8", toneMapped: false }), HIDEOUT.x, ROOF + 3.2, HIDEOUT.z - 4, scene, false);
+  box(0.46, 0.62, 0.7, std({ color: "#020617", metalness: 0.4 }), 79.85, DECK + 0.36, 86.55, scene, true);
+  box(0.55, 0.04, 0.22, std({ color: "#0f172a" }), 81.7, DECK + 0.84, 86.35, scene, false);
+  box(0.12, 0.03, 0.18, std({ color: "#334155" }), 82.35, DECK + 0.83, 86.4, scene, false);
+  mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.1, 12), std({ color: "#44403c" }), 84.15, DECK + 0.88, 86.55, scene, false);
+
+  const cloth = std({ color: "#1e293b", roughness: 0.8 });
+  box(0.52, 0.08, 0.5, cloth, DANI_CHAIR.x, DECK + 0.46, DANI_CHAIR.z, scene, true);
+  box(0.52, 0.62, 0.08, cloth, DANI_CHAIR.x, DECK + 0.78, DANI_CHAIR.z - 0.24, scene, true);
+  for (const [sx, sz] of [[-0.2, -0.18], [0.2, -0.18], [-0.2, 0.18], [0.2, 0.18]] as const) {
+    mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.44, 8), steel, DANI_CHAIR.x + sx, DECK + 0.22, DANI_CHAIR.z + sz, scene, true);
+  }
+  const chair = addCol(DANI_CHAIR.x - 0.4, DANI_CHAIR.x + 0.4, DANI_CHAIR.z - 0.4, DANI_CHAIR.z + 0.35, DECK + 0.7);
+  chair.above = ROOF - 1;
+
+  const bezel = std({ color: "#020617", metalness: 0.5, roughness: 0.35 });
+  const screens: [number, number, number, number, string, string, string[]][] = [
+    [80.15, 1.55, 1.35, 0.95, "variavel.py", "#34d399", ["nome = \"Leo\"", "idade = 23", "print(nome)"]],
+    [81.85, 1.72, 1.55, 1.15, "if porta", "#22d3ee", ["if aberta:", "    entrar()", "else:", "    esperar()"]],
+    [83.55, 1.55, 1.35, 0.95, "for item", "#a3e635", ["for item in lista:", "    print(item)"]],
+    [82.0, 2.5, 2.2, 0.48, "DANI // AULA", "#67e8f9", ["escolha um modulo"]],
+    [84.85, 1.7, 0.72, 1.2, "log", "#fbbf24", ["> ok", "> passo 1", "> passo 2"]],
+  ];
+  for (const [x, h, w, ht, title, color, lines] of screens) {
+    box(w + 0.08, ht + 0.08, 0.08, bezel, x, DECK + h, 87.48, scene, false);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(w, ht), monitorFace(title, lines, color));
+    face.position.set(x, DECK + h, 87.42);
+    face.rotation.y = Math.PI;
+    scene.add(face);
+  }
+  box(0.08, 0.35, 0.08, bezel, 81.85, DECK + 1.05, 87.4, scene, false);
+  box(0.08, 0.35, 0.08, bezel, 83.55, DECK + 1.05, 87.4, scene, false);
+
+  for (let i = 0; i < 3; i++) {
+    box(0.55, 0.06, 0.28, new THREE.MeshBasicMaterial({ color: i === 1 ? "#67e8f9" : "#1e293b", toneMapped: false }), 80.4 + i * 1.7, ceilY - 0.08, 83.2, scene, false);
+  }
+  box(0.06, 0.04, 2.4, std({ color: "#27272a" }), 80.4, DECK + 0.04, 85.4, scene, false);
+  box(2.2, 0.04, 0.06, std({ color: "#27272a" }), 81.2, DECK + 0.05, 86.2, scene, false);
+
+  const screenLight = new THREE.PointLight("#67e8f9", 18, 8, 2);
+  screenLight.position.set(82, DECK + 1.9, 86.2);
+  scene.add(screenLight);
+  const lamp = new THREE.PointLight("#fdba74", 4, 3.2, 2);
+  lamp.position.set(84.3, DECK + 1.2, 86.3);
+  scene.add(lamp);
+
+  mesh(new THREE.SphereGeometry(0.22, 14, 10), new THREE.MeshBasicMaterial({ color: "#38bdf8", toneMapped: false }), HIDEOUT.x, DECK + 4.4, 76.6, scene, false);
+  mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.1, 8), steel, HIDEOUT.x, DECK + 3.7, 76.6, scene, true);
+
   const car = new THREE.Group();
   const cab = std({ color: "#e0f2fe", emissive: "#7dd3fc", emissiveIntensity: 0.35, roughness: 0.08, metalness: 0.2, transparent: true, opacity: 0.45 });
   box(3.1, 2.7, 2.2, cab, 0, 0, 0, car, false);
