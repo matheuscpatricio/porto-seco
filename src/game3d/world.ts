@@ -1,11 +1,11 @@
-import { BIKE_PARK, BLOCK, districtAt, HOME, ISLAND, SHOPS, STREET } from "@/game3d/rules";
+import { BIKE_PARK, BLOCK, COAST, districtAt, GREEN, HOME, ISLAND, SAND, SHOP_A, SHOP_B, STREET, type RoomGap } from "@/game3d/rules";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 export type DoorPlace = "home" | "shop" | "target";
 export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean; door?: DoorPlace; shut?: number };
 
-export { BLOCK, STREET };
+export { BLOCK, COAST, GREEN, STREET };
 export const SIZE = ISLAND;
 
 export type Theme = {
@@ -411,6 +411,77 @@ function buildTree(r: () => number, night: boolean) {
   return g;
 }
 
+function addCoast(scene: THREE.Scene, night: boolean) {
+  const cols: { minX: number; maxX: number; minZ: number; maxZ: number }[] = [];
+  const c = rng(19);
+  type Spot = { x: number; z: number; kind: "bush" | "palm" | "rock"; s: number };
+  const spots: Spot[] = [];
+  const side = (axis: "x" | "z", sign: -1 | 1) => {
+    for (let t = 8; t < ISLAND - 8; t += 8) {
+      const along = t + (c() - 0.5) * 2.4;
+      const bush = 2.4 + c() * 4;
+      const palm = 6.5 + c() * 5.5;
+      const rock = GREEN + 3 + c() * (SAND - 5);
+      const at = (dist: number) => (sign < 0 ? -dist : ISLAND + dist);
+      const put = (dist: number, kind: Spot["kind"], s: number) => {
+        if (axis === "z") spots.push({ x: along, z: at(dist), kind, s });
+        else spots.push({ x: at(dist), z: along, kind, s });
+      };
+      put(bush, "bush", 0.55 + c() * 0.55);
+      if (c() > 0.35) put(bush + 2.2, "bush", 0.4 + c() * 0.4);
+      put(palm, "palm", 0.85 + c() * 0.35);
+      if (c() > 0.55) put(rock, "rock", 0.35 + c() * 0.45);
+    }
+  };
+  side("z", -1);
+  side("z", 1);
+  side("x", -1);
+  side("x", 1);
+
+  const bushes = spots.filter((s) => s.kind === "bush");
+  const palms = spots.filter((s) => s.kind === "palm");
+  const rocks = spots.filter((s) => s.kind === "rock");
+  const bushGeo = new THREE.IcosahedronGeometry(1, 0);
+  const bushMat = std({ color: night ? "#1d3324" : "#2f6b38", roughness: 1 });
+  const bushMesh = new THREE.InstancedMesh(bushGeo, bushMat, bushes.length);
+  const m4 = new THREE.Matrix4();
+  bushes.forEach((s, i) => {
+    bushMesh.setMatrixAt(i, m4.makeScale(s.s, s.s * 0.7, s.s).setPosition(s.x, 0.35 * s.s, s.z));
+  });
+  bushMesh.castShadow = true;
+  scene.add(bushMesh);
+
+  const trunkGeo = new THREE.CylinderGeometry(0.16, 0.28, 4.4, 6);
+  const trunkMat = std({ color: "#6a4a32", roughness: 1 });
+  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, palms.length);
+  palms.forEach((s, i) => trunks.setMatrixAt(i, m4.makeScale(s.s, s.s, s.s).setPosition(s.x, 2.2 * s.s, s.z)));
+  trunks.castShadow = true;
+  scene.add(trunks);
+  const frondGeo = new THREE.ConeGeometry(0.28, 2.2, 4);
+  const frondMat = std({ color: night ? "#214428" : "#2f8a3e", roughness: 0.9 });
+  const fronds = new THREE.InstancedMesh(frondGeo, frondMat, palms.length * 6);
+  const q = new THREE.Quaternion();
+  const v = new THREE.Vector3();
+  palms.forEach((s, i) => {
+    for (let k = 0; k < 6; k++) {
+      q.setFromEuler(new THREE.Euler(Math.PI / 2.5, (k / 6) * Math.PI * 2, 0));
+      v.set(s.x, 4.15 * s.s, s.z);
+      fronds.setMatrixAt(i * 6 + k, m4.compose(v, q, new THREE.Vector3(s.s, s.s, s.s)));
+    }
+    cols.push({ minX: s.x - 0.2, maxX: s.x + 0.2, minZ: s.z - 0.2, maxZ: s.z + 0.2 });
+  });
+  fronds.castShadow = true;
+  scene.add(fronds);
+
+  const rockGeo = new THREE.DodecahedronGeometry(0.7, 0);
+  const rockMat = std({ color: "#b7aa96", roughness: 0.95 });
+  const rockMesh = new THREE.InstancedMesh(rockGeo, rockMat, Math.max(1, rocks.length));
+  rocks.forEach((s, i) => rockMesh.setMatrixAt(i, m4.makeScale(s.s, s.s * 0.55, s.s).setPosition(s.x, 0.2, s.z)));
+  rockMesh.count = rocks.length;
+  scene.add(rockMesh);
+  return cols;
+}
+
 function buildLamp(night: boolean) {
   const g = new THREE.Group();
   const metal = std({ color: "#3b4148", roughness: 0.5, metalness: 0.7 });
@@ -480,6 +551,31 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   water.rotation.x = -Math.PI / 2;
   water.position.set(SIZE / 2, -0.12, SIZE / 2);
   scene.add(water);
+  const sandMat = std({ color: "#e6d2a4", roughness: 1 });
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(SIZE + COAST * 2, SIZE + COAST * 2), sandMat);
+  sand.rotation.x = -Math.PI / 2;
+  sand.position.set(SIZE / 2, -0.06, SIZE / 2);
+  sand.receiveShadow = true;
+  scene.add(sand);
+  const grassMat = std({ color: "#3c7a46", roughness: 1 });
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(SIZE + GREEN * 2, SIZE + GREEN * 2), grassMat);
+  grass.rotation.x = -Math.PI / 2;
+  grass.position.set(SIZE / 2, -0.03, SIZE / 2);
+  grass.receiveShadow = true;
+  scene.add(grass);
+  const wetMat = std({ color: "#c9b48a", roughness: 0.72 });
+  const wet = (w: number, d: number, x: number, z: number) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), wetMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, -0.045, z);
+    m.receiveShadow = true;
+    scene.add(m);
+  };
+  const lip = 4.5;
+  wet(SIZE + COAST * 2, lip, SIZE / 2, -COAST + lip / 2);
+  wet(SIZE + COAST * 2, lip, SIZE / 2, SIZE + COAST - lip / 2);
+  wet(lip, SIZE, -COAST + lip / 2, SIZE / 2);
+  wet(lip, SIZE, SIZE + COAST - lip / 2, SIZE / 2);
   const asphalt = asphaltTextures();
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(SIZE, SIZE),
@@ -698,6 +794,9 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
         for (let lj = 0; lj < 2; lj++) {
           const cx = bx + 9 + li * 18;
           const cz = bz + 9 + lj * 18;
+          const homeLot = i === 0 && j === 0 && li === 0 && lj === 0;
+          const shopLot = (i === 2 && j === 0 && li === 1 && lj === 0) || (i === 0 && j === 2 && li === 0 && lj === 1);
+          if (homeLot || shopLot) continue;
           const roll = r();
           if (roll < 0.2 && !(i === 0 && j === 0)) {
             for (let k = 0; k < 3; k++) {
@@ -903,11 +1002,11 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
 
   const roomWall = std({ color: "#e7d3b0", roughness: 0.85 });
   const shopMat = std({ color: "#d6d3d1", roughness: 0.8 });
-  const placeRoom = (minX: number, maxX: number, minZ: number, maxZ: number, door: "home" | "shop", gap: "east" | "plusZ" | "minusZ") => {
+  const placeRoom = (minX: number, maxX: number, minZ: number, maxZ: number, door: "home" | "shop", gap: RoomGap) => {
     const mat = door === "home" ? roomWall : shopMat;
     const midX = (minX + maxX) / 2;
     const midZ = (minZ + maxZ) / 2;
-    box(maxX - minX, 0.08, maxZ - minZ, mat, midX, 0.04, midZ, scene, false);
+    box(maxX - minX, 0.1, maxZ - minZ, mat, midX, 0.26, midZ, scene, false);
     const t = 0.28;
     const h = 2.8;
     const slab = (x0: number, x1: number, z0: number, z1: number, tagged = false) => {
@@ -919,7 +1018,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
         col.shut = h;
       }
     };
-    slab(minX, minX + t, minZ, maxZ);
+    if (gap !== "west") slab(minX, minX + t, minZ, maxZ);
     if (gap !== "east") slab(maxX - t, maxX, minZ, maxZ);
     if (gap !== "minusZ") slab(minX, maxX, minZ, minZ + t);
     if (gap !== "plusZ") slab(minX, maxX, maxZ - t, maxZ);
@@ -927,6 +1026,10 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       slab(maxX - t, maxX, minZ, midZ - 1.1);
       slab(maxX - t, maxX, midZ + 1.1, maxZ);
       slab(maxX - t, maxX, midZ - 1.1, midZ + 1.1, true);
+    } else if (gap === "west") {
+      slab(minX, minX + t, minZ, midZ - 1.1);
+      slab(minX, minX + t, midZ + 1.1, maxZ);
+      slab(minX, minX + t, midZ - 1.1, midZ + 1.1, true);
     } else if (gap === "plusZ") {
       slab(minX, midX - 1.1, maxZ - t, maxZ);
       slab(midX + 1.1, maxX, maxZ - t, maxZ);
@@ -936,16 +1039,47 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       slab(midX + 1.1, maxX, minZ, minZ + t);
       slab(midX - 1.1, midX + 1.1, minZ, minZ + t, true);
     }
+    if (door === "home") {
+      const shape = new THREE.Shape();
+      shape.moveTo(-((maxX - minX) / 2 + 0.4), 0);
+      shape.lineTo(0, 1.8);
+      shape.lineTo((maxX - minX) / 2 + 0.4, 0);
+      shape.closePath();
+      const roof = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: maxZ - minZ + 0.6, bevelEnabled: false }), tileMat);
+      roof.position.set(midX, h, minZ - 0.3);
+      roof.castShadow = true;
+      scene.add(roof);
+    }
   };
-  placeRoom(HOME.minX, HOME.maxX, HOME.minZ, HOME.maxZ, "home", "east");
-  placeRoom(SHOPS[0].x - 3, SHOPS[0].x + 3, SHOPS[0].z - 2.2, SHOPS[0].z + 2.2, "shop", "plusZ");
-  placeRoom(SHOPS[1].x - 3, SHOPS[1].x + 3, SHOPS[1].z - 2.2, SHOPS[1].z + 2.2, "shop", "minusZ");
+  placeRoom(HOME.minX, HOME.maxX, HOME.minZ, HOME.maxZ, "home", HOME.gap);
+  placeRoom(SHOP_A.minX, SHOP_A.maxX, SHOP_A.minZ, SHOP_A.maxZ, "shop", SHOP_A.gap);
+  placeRoom(SHOP_B.minX, SHOP_B.maxX, SHOP_B.minZ, SHOP_B.maxZ, "shop", SHOP_B.gap);
+  const yard = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), grassMat);
+  yard.rotation.x = -Math.PI / 2;
+  yard.position.set(23.2, 0.22, 23.2);
+  yard.receiveShadow = true;
+  scene.add(yard);
+  const yardRng = rng(41);
+  for (const [tx, tz] of [
+    [29.2, 20.4],
+    [19.2, 29.4],
+  ] as const) {
+    const tree = buildTree(yardRng, night);
+    tree.position.set(tx, 0.2, tz);
+    scene.add(tree);
+    addCol(tx - 0.25, tx + 0.25, tz - 0.25, tz + 0.25, 3);
+  }
   const bike = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 0.5), std({ color: "#111827", metalness: 0.4, roughness: 0.45 }));
-  bike.position.set(BIKE_PARK.x, 0.5, BIKE_PARK.z);
+  bike.position.set(BIKE_PARK.x, 0.55, BIKE_PARK.z);
   scene.add(bike);
+  for (const c of addCoast(scene, night)) addCol(c.minX, c.maxX, c.minZ, c.maxZ, 3);
 
-  const spawn = new THREE.Vector3(BIKE_PARK.x + 1.4, 0, BIKE_PARK.z);
-  const allySpots = [new THREE.Vector3(9.5, 0, 10), new THREE.Vector3(5, 0, 11), new THREE.Vector3(11, 0, 6.5)];
+  const spawn = new THREE.Vector3(BIKE_PARK.x + 2.2, 0, BIKE_PARK.z);
+  const allySpots = [
+    new THREE.Vector3(BIKE_PARK.x - 2.4, 0, BIKE_PARK.z),
+    new THREE.Vector3(HOME.minX + 1.2, 0, HOME.minZ - 1.5),
+    new THREE.Vector3(HOME.maxX - 1.2, 0, HOME.minZ - 1.5),
+  ];
 
   return {
     colliders,

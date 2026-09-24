@@ -5,7 +5,7 @@ import { guardLook, people, randomLook } from "@/game/characters";
 import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
-import { BIKE_PARK, canMount, decayWanted, doorOpen, hitWanted, HOME_STUDY, indoors, inSea, knockdownWanted, SHOPS, shirtFor } from "@/game3d/rules";
+import { BIKE_PARK, canMount, decayWanted, doorOpen, hitWanted, HOME_STUDY, indoors, inSea, knockdownWanted, roomExit, SHOPS, shirtFor } from "@/game3d/rules";
 import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
@@ -528,9 +528,17 @@ export class Game3D {
     sound.setAmbience(p === "dive" || p === "hack" || p === "result" ? "cyber" : this.layout.night ? "night" : "day");
   }
 
+  private leaveRooms() {
+    const out = roomExit(this.player.pos.x, this.player.pos.z);
+    if (!out) return;
+    this.player.pos.x = out.x;
+    this.player.pos.z = out.z;
+  }
+
   startPlay() {
     this.talking = null;
     this.free = false;
+    this.leaveRooms();
     if (this.mounted) {
       this.mounted = false;
       this.ev.onToast("A moto ficou em casa.", "info");
@@ -557,6 +565,7 @@ export class Game3D {
   beginMission() {
     this.free = false;
     this.mounted = false;
+    this.leaveRooms();
     this.stepIdx = 0;
     this.setPhase("brief");
   }

@@ -11,7 +11,7 @@ Léo é motoboy em Porto Seco, está devendo para o agiota Caveira e nunca progr
 - volta para a rua: com o código certo, a missão avança; com o código errado, o alarme dispara, os pedestres correm e chegam reforços;
 - termina a missão no próprio objetivo. A fuga de carro com o Tio Rui fica para a perseguição e para o confronto com o chefe.
 
-A cidade é uma ilha só. Continuar a história deixa o Léo em casa, no mesmo mapa, com o dinheiro da missão. Em casa ele estuda o Python da próxima lição. Na oficina, com 500, compra a moto e pilota a rua entre uma missão e outra. Atirar num pedestre chama a polícia. O mar devolve o Léo para o último ponto seguro.
+A cidade é uma ilha só. Entre a última rua e o mar tem grama, palmeiras e uma praia. Continuar a história deixa o Léo em casa, no mesmo mapa, com o dinheiro da missão. A casa e as oficinas ficam no lote, fora da pista. Em casa ele estuda o Python da próxima lição. Na oficina, com 500, compra a moto e pilota a rua entre uma missão e outra. Atirar num pedestre chama a polícia. O mar devolve o Léo para o último ponto seguro.
 
 Os carros param para pedestres e buzinam se o Léo ficar na frente. Tiros assustam quem está por perto.
 

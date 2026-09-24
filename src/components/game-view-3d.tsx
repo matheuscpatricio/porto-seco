@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { Level, Who, World } from "@/content/types";
 import { connector } from "@/content/story";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
-import { BLOCK, blockStart, SIZE } from "@/game3d/world";
+import { BLOCK, blockStart, COAST, GREEN, SIZE } from "@/game3d/world";
 import { purchaseBike, useProgress } from "@/lib/progress";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -82,6 +82,10 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
   const cc = sin * s;
   const d = -cos * s;
   g.setTransform(a, b, cc, d, half - (a * m.player.x + cc * m.player.z), half - (b * m.player.x + d * m.player.z));
+  g.fillStyle = "#e4d2a4";
+  g.fillRect(-COAST, -COAST, SIZE + COAST * 2, SIZE + COAST * 2);
+  g.fillStyle = "#3e7a48";
+  g.fillRect(-GREEN, -GREEN, SIZE + GREEN * 2, SIZE + GREEN * 2);
   g.fillStyle = "#3f4550";
   g.fillRect(0, 0, SIZE, SIZE);
   for (let i = 0; i < 3; i++)

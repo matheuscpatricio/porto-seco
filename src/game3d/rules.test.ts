@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   BIKE_PARK,
   canMount,
+  COAST,
   decayWanted,
   districtAt,
   doorOpen,
@@ -15,7 +16,11 @@ import {
   ISLAND,
   knockdownWanted,
   liveScript,
+  overlapsStreet,
+  roomExit,
   shirtFor,
+  SHOP_A,
+  SHOP_B,
   stepKinds,
   WANTED_SECONDS,
 } from "./rules.ts";
@@ -26,17 +31,25 @@ test("two districts keep the same addresses", () => {
   assert.notEqual(districtAt(70, 20), districtAt(20, 20));
 });
 
-test("the sea knocks you down and the street does not", () => {
-  assert.equal(inSea(-1, 10), true);
-  assert.equal(inSea(ISLAND + 2, 10), true);
+test("the beach is walkable and the sea starts past it", () => {
   assert.equal(inSea(20, 8), false);
+  assert.equal(inSea(-2, 20), false);
+  assert.equal(inSea(ISLAND + 4, 20), false);
+  assert.equal(inSea(-COAST - 1, 20), true);
+  assert.equal(inSea(ISLAND + COAST + 1, 20), true);
 });
 
-test("home sits in the first district and outside the block footprints", () => {
+test("home and shops sit off the roadway", () => {
   assert.equal(districtAt(HOME_STUDY.x, HOME_STUDY.z), "w1");
-  assert.equal(HOME.maxX < 14, true);
+  assert.equal(overlapsStreet(HOME), false);
+  assert.equal(overlapsStreet(SHOP_A), false);
+  assert.equal(overlapsStreet(SHOP_B), false);
   assert.equal(indoors(HOME_STUDY.x, HOME_STUDY.z), true);
   assert.equal(indoors(BIKE_PARK.x, BIKE_PARK.z), false);
+  const out = roomExit(HOME_STUDY.x, HOME_STUDY.z);
+  assert.ok(out);
+  assert.equal(indoors(out.x, out.z), false);
+  assert.equal(overlapsStreet({ minX: out.x, maxX: out.x, minZ: out.z, maxZ: out.z }), false);
 });
 
 test("invasao ends on the hack with no car", () => {
