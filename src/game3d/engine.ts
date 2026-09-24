@@ -286,10 +286,56 @@ export class Game3D {
   }
 
   private moveTerminal(p: THREE.Vector3) {
+    const spot = this.openTerminal(p);
     const L = this.layout;
-    L.terminal.copy(p);
-    L.kiosk.position.copy(p);
-    Object.assign(L.kioskCollider, { minX: p.x - 0.35, maxX: p.x + 0.35, minZ: p.z - 0.5, maxZ: p.z + 0.5 });
+    L.terminal.copy(spot);
+    L.kiosk.position.copy(spot);
+    Object.assign(L.kioskCollider, { minX: spot.x - 0.35, maxX: spot.x + 0.35, minZ: spot.z - 0.5, maxZ: spot.z + 0.5 });
+  }
+
+  /** Puts the kiosk on open sidewalk, screen facing the street, with room to stand in front of it. */
+  private openTerminal(want: THREE.Vector3) {
+    const own = this.layout.kioskCollider;
+    const fits = (q: THREE.Vector3) => {
+      if (q.x < 3 || q.z < 3 || q.x > SIZE - 3 || q.z > SIZE - 3) return false;
+      const comp = this.layout.compound;
+      if (q.x > comp.minX - 1 && q.x < comp.maxX + 1 && q.z > comp.minZ - 1 && q.z < comp.maxZ + 1) return false;
+      if (this.solidAt(q.x, q.z, 0.7, own)) return false;
+      return !this.solidAt(q.x - 1.5, q.z, 0.45, own);
+    };
+    if (fits(want)) return want;
+    for (const dx of [-1.4, -2.6, -3.8, 1.4]) {
+      for (const dz of [0, 2.2, -2.2, 4.4, -4.4]) {
+        const q = want.clone().add(new THREE.Vector3(dx, 0, dz));
+        if (fits(q)) return q;
+      }
+    }
+    return want;
+  }
+
+  /** True when a living guard is close and in front of the escort, not merely somewhere on the street. */
+  private guardAhead(a: { pos: THREE.Vector3; path?: THREE.Vector3[]; wp: number }) {
+    const goal = a.path?.[Math.min(a.wp, (a.path?.length ?? 1) - 1)];
+    const fwd = goal ? goal.clone().sub(a.pos) : new THREE.Vector3(0, 0, 1);
+    fwd.y = 0;
+    if (fwd.lengthSq() < 0.04) return false;
+    fwd.normalize();
+    return this.enemies.some((e) => {
+      if (e.hp <= 0 || e.kind === "drone") return false;
+      const rel = e.pos.clone().sub(a.pos);
+      rel.y = 0;
+      const dist = rel.length();
+      if (dist > 9 || dist < 0.05) return false;
+      return rel.normalize().dot(fwd) > 0.25;
+    });
+  }
+
+  private solidAt(x: number, z: number, pad: number, ignore?: Collider) {
+    for (const c of this.layout.colliders) {
+      if (c === ignore || c.top < 1 || c.top > 80) continue;
+      if (x + pad > c.minX && x - pad < c.maxX && z + pad > c.minZ && z - pad < c.maxZ) return true;
+    }
+    return false;
   }
 
   private moveCar(p: THREE.Vector3, yaw: number) {
@@ -674,7 +720,8 @@ export class Game3D {
         return this.runner?.pos ?? L.car.position;
       case "escort": {
         const a = this.allies.find((x) => x.path);
-        return a ? a.path![a.path!.length - 1] : L.terminal;
+        if (!a) return L.terminal;
+        return a.pos.distanceTo(L.terminal) < 7 ? L.terminal : a.pos;
       }
       case "boss":
         return this.boss?.pos ?? L.car.position;
@@ -943,10 +990,16 @@ export class Game3D {
       }
       case "escort": {
         const d = this.allies.find((a) => a.path);
-        if (d && d.wp >= d.path!.length) {
-          this.ev.onToast('Dani: "Cheguei! O terminal é todo seu."', "good");
+        const arrived = d && (d.wp >= d.path!.length || d.pos.distanceTo(L.terminal) < 4.5);
+        if (arrived) {
+          this.ev.onToast('Dani: "Cheguei! O interfone é todo seu. Aperte E."', "good");
           this.checkpoint = P.pos.clone();
           this.nextStep();
+          break;
+        }
+        const door = new THREE.Vector3(L.terminal.x - 1.1, P.pos.y, L.terminal.z);
+        if (control && P.pos.distanceTo(door) < 2.6 && input.use && !this.useHeld) {
+          this.ev.onToast("A Dani ainda não chegou. Fique perto dela — a seta mostra onde ela está.", "bad");
         }
         break;
       }
@@ -978,14 +1031,19 @@ export class Game3D {
     for (const a of this.allies) {
       let pose: Pose3 = this.talking === a.who ? "talk" : "idle";
       if (a.path && this.step?.k === "escort" && this.phase === "play") {
-        const threat = this.enemies.some((e) => e.hp > 0 && e.kind !== "drone" && e.pos.distanceTo(a.pos) < 15);
+        while (a.wp < a.path.length && this.solidAt(a.path[a.wp].x, a.path[a.wp].z, 0.4)) a.wp++;
+        const threat = this.guardAhead(a);
         if (threat) {
           if (!a.waiting) this.ev.onToast('Dani: "Tem segurança na frente! Me cobre!"', "bad");
           a.waiting = true;
           pose = "cower";
         } else {
           a.waiting = false;
-          const far = P.pos.distanceTo(a.pos) > 16;
+          const far = P.pos.distanceTo(a.pos) > 18;
+          if (far && this.warnT <= 0) {
+            this.ev.onToast('Dani: "Não me deixa para trás!"', "bad");
+            this.warnT = 5;
+          }
           const goal = a.path[a.wp];
           if (goal && !far) {
             const to = goal.clone().sub(a.pos);

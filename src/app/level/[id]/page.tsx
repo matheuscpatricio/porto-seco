@@ -204,7 +204,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
                 </>
               ) : phase === "play" && !last?.ok ? (
                 <>
-                  Siga a seta ⬆ e o objetivo no topo da tela. Quando chegar ao terminal de <b>{level.target}</b>, aperte E. Desafio: <Md text={level.task} />
+                  Siga a seta ⬆ e o objetivo no topo da tela. Aperte E quando o botão verde de hackear aparecer. Desafio: <Md text={level.task} />
                 </>
               ) : phase === "dive" || phase === "surface" || phase === "result" ? (
                 "Léo está dentro do sistema..."

@@ -120,7 +120,7 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       const path = [new THREE.Vector3(9, 0, 9), new THREE.Vector3(gx, 0, 9), new THREE.Vector3(gx, 0, s.pos.z), new THREE.Vector3(s.pos.x - 1.8, 0, s.pos.z + 1.2)];
       m.escortWave = [path[1].clone().lerp(path[2], 0.25), path[1].clone().lerp(path[2], 0.6), path[2].clone().add(new THREE.Vector3(3, 0, -6))];
       m.pickup = pickupNear(s);
-      m.steps = [{ k: "escort", path, text: `Proteja a Dani até a ${s.area}` }, { k: "hack" }, car];
+      m.steps = [{ k: "escort", path, text: `Fique perto da Dani e leve ela até a ${s.area}` }, { k: "hack" }, car];
       break;
     }
     case "fuga": {
