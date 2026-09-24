@@ -1,4 +1,5 @@
-import { BIKE_PARK, BLOCK, CENTRAL, COAST, districtAt, GREEN, HOME, ISLAND, JET, PIER, QUAY, SAND, SHOP_A, SHOP_B, STREET, type RoomGap } from "@/game3d/rules";
+import type { RideId } from "@/lib/progress-rules";
+import { BIKE_PARK, BLOCK, CENTRAL, COAST, districtAt, GREEN, HIDEOUT, HOME, ISLAND, JET, PIER, QUAY, ROOF, SAND, SHOP_A, SHOP_B, STREET, type RoomGap } from "@/game3d/rules";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
@@ -58,6 +59,7 @@ export type Layout = {
   beacon: THREE.Mesh;
   night: boolean;
   bike: THREE.Group;
+  bikes: Record<RideId, THREE.Group>;
   jet: THREE.Group;
   ships: THREE.Group[];
 };
@@ -647,9 +649,10 @@ function buildShip(hullColor: string) {
   return g;
 }
 
-function buildBike() {
+function buildBike(style: RideId = "entrega") {
   const g = new THREE.Group();
-  const paint = std({ color: "#b91c1c", metalness: 0.55, roughness: 0.32 });
+  const paintColor = style === "esportiva" ? "#22d3ee" : style === "noturna" ? "#6d28d9" : "#b91c1c";
+  const paint = std({ color: paintColor, metalness: style === "noturna" ? 0.75 : 0.55, roughness: 0.32, emissive: style === "noturna" ? "#4c1d95" : "#000000", emissiveIntensity: style === "noturna" ? 0.35 : 0 });
   const dark = std({ color: "#111827", metalness: 0.45, roughness: 0.4 });
   const rubber = std({ color: "#141414", roughness: 0.92 });
   const chrome = std({ color: "#e5e7eb", metalness: 0.92, roughness: 0.18 });
@@ -697,7 +700,15 @@ function buildBike() {
   mesh(new THREE.BoxGeometry(0.12, 0.08, 0.04), std({ color: "#ef4444", emissive: "#ef4444", emissiveIntensity: 0.6 }), 0, 0.7, -1.05, g, false);
   box(0.08, 0.04, 0.16, dark, 0.18, 0.36, 0.15, g, false);
   box(0.08, 0.04, 0.16, dark, -0.18, 0.36, 0.15, g, false);
+  if (style === "esportiva") {
+    box(0.46, 0.28, 0.08, std({ color: "#e0f2fe", roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.55 }), 0, 1.12, 0.72, g, false);
+  }
+  if (style === "noturna") {
+    mesh(new THREE.BoxGeometry(0.5, 0.04, 0.9), std({ color: "#c4b5fd", emissive: "#a78bfa", emissiveIntensity: 1.4 }), 0, 0.96, 0.15, g, false);
+  }
   g.userData.wheels = [front, rear];
+  if (style === "esportiva") g.scale.setScalar(1.06);
+  if (style === "noturna") g.scale.setScalar(1.14);
   return g;
 }
 
@@ -754,6 +765,84 @@ function drawScreen(canvasEl: HTMLCanvasElement, title: string, body: string[], 
 export function updateScreen(layout: Layout, title: string, body: string[], color = "#4ade80") {
   drawScreen(layout.screen.canvas, title, body, color);
   layout.screen.texture.needsUpdate = true;
+}
+
+function furnishHome(scene: THREE.Scene, addCol: (minX: number, maxX: number, minZ: number, maxZ: number, top: number) => void) {
+  const wood = std({ color: "#8a5a32", roughness: 0.75 });
+  const cloth = std({ color: "#1d4ed8", roughness: 0.85 });
+  const sheet = std({ color: "#e2e8f0", roughness: 0.9 });
+  const dark = std({ color: "#1f2937", roughness: 0.6 });
+  box(2.2, 0.35, 1.5, wood, 19.3, 0.45, 23.7, scene, true, 0.04);
+  box(2.05, 0.16, 1.35, sheet, 19.3, 0.68, 23.7, scene, false);
+  box(2.05, 0.18, 0.45, std({ color: "#bfdbfe" }), 19.3, 0.78, 24.15, scene, false);
+  addCol(18.2, 20.4, 22.9, 24.5, 0.85);
+  box(0.7, 1.7, 1.5, wood, 24.6, 1.15, 24.1, scene, true, 0.03);
+  addCol(24.2, 25.0, 23.3, 24.9, 1.9);
+  box(2.2, 0.45, 0.8, cloth, 24.0, 0.55, 19.7, scene, true, 0.05);
+  box(2.2, 0.4, 0.15, cloth, 24.0, 0.85, 20.05, scene, false);
+  addCol(22.8, 25.2, 19.3, 20.2, 0.9);
+  box(0.9, 0.45, 0.4, dark, 18.5, 0.55, 19.5, scene, true);
+  box(1.1, 0.7, 0.06, std({ color: "#0f172a", emissive: "#38bdf8", emissiveIntensity: 0.35 }), 18.5, 1.25, 19.35, scene, false);
+  addCol(18.0, 19.1, 19.2, 19.8, 0.8);
+  box(1.5, 0.08, 0.8, wood, 21.5, 0.78, 22.15, scene, true);
+  mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.7, 8), wood, 21.1, 0.4, 21.85, scene, true);
+  mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.7, 8), wood, 21.9, 0.4, 22.45, scene, true);
+  addCol(20.7, 22.3, 21.7, 22.6, 0.85);
+  box(0.4, 0.45, 0.4, dark, 21.5, 0.5, 21.15, scene, true);
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2.2), std({ color: "#7f1d1d", roughness: 1 }));
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.set(21.6, 0.28, 20.4);
+  scene.add(rug);
+}
+
+function buildHideout(scene: THREE.Scene, addCol: (minX: number, maxX: number, minZ: number, maxZ: number, top: number) => Collider) {
+  const concrete = std({ color: "#1e293b", roughness: 0.8 });
+  const trim = std({ color: "#334155", metalness: 0.3, roughness: 0.5 });
+  const { minX, maxX, minZ, maxZ } = CENTRAL;
+  const midX = (minX + maxX) / 2;
+  const wallT = 0.35;
+  const wallH = ROOF + 1.2;
+  const wall = (x0: number, x1: number, z0: number, z1: number) => {
+    box(x1 - x0, wallH, z1 - z0, concrete, (x0 + x1) / 2, wallH / 2, (z0 + z1) / 2, scene, true);
+    addCol(x0, x1, z0, z1, wallH);
+  };
+  wall(minX, minX + wallT, minZ, maxZ);
+  wall(maxX - wallT, maxX, minZ, maxZ);
+  wall(minX, maxX, maxZ - wallT, maxZ);
+  wall(minX, midX - 1.1, minZ, minZ + wallT);
+  wall(midX + 1.1, maxX, minZ, minZ + wallT);
+  const door = addCol(midX - 1.1, midX + 1.1, minZ, minZ + wallT, 2.6);
+  door.door = "central";
+  door.shut = 2.6;
+  const step = (x: number, z: number, top: number) => {
+    box(1.35, 0.16, 0.38, trim, x, top - 0.08, z, scene, true);
+    addCol(x - 0.68, x + 0.68, z - 0.2, z + 0.2, top);
+  };
+  for (let i = 0; i < 15; i++) step(37.4, 19.3 + i * 0.42, 0.34 * (i + 1));
+  box(3.4, 0.2, 1.5, trim, 38.6, 5.15, 26.0, scene, true);
+  addCol(36.9, 40.3, 25.2, 26.8, 5.25);
+  for (let i = 0; i < 15; i++) step(39.4, 25.8 - i * 0.4, 5.55 + i * 0.34);
+  box(6.2, 0.22, 8.2, std({ color: "#0f172a", roughness: 0.7 }), 43.0, ROOF - 0.08, 22.6, scene, true);
+  addCol(40.35, 45.7, 18.5, 26.85, ROOF);
+  addCol(39.7, 40.5, 19.9, 21.1, ROOF);
+  const lip = ROOF + 0.85;
+  const rail = (x0: number, x1: number, z0: number, z1: number) => {
+    box(Math.max(0.12, x1 - x0), 0.7, Math.max(0.12, z1 - z0), trim, (x0 + x1) / 2, ROOF + 0.45, (z0 + z1) / 2, scene, true);
+    addCol(x0, x1, z0, z1, lip);
+  };
+  rail(40.4, 45.7, 18.5, 18.7);
+  rail(45.5, 45.7, 18.5, 26.8);
+  rail(40.4, 45.7, 26.6, 26.85);
+  const screen = std({ color: "#082f49", emissive: "#22d3ee", emissiveIntensity: 0.85, roughness: 0.2 });
+  box(2.4, 0.12, 1.1, std({ color: "#111827" }), 42.6, ROOF + 0.75, 23.5, scene, true);
+  addCol(41.5, 43.8, 23.0, 24.1, ROOF + 0.9);
+  box(1.5, 1.35, 0.08, screen, 42.15, ROOF + 1.7, 23.95, scene, false);
+  box(1.5, 1.35, 0.08, screen, 43.7, ROOF + 1.7, 23.95, scene, false);
+  box(0.45, 0.9, 0.7, std({ color: "#020617", metalness: 0.4 }), 41.5, ROOF + 0.7, 23.2, scene, true);
+  mesh(new THREE.SphereGeometry(0.08, 10, 8), std({ color: "#22d3ee", emissive: "#22d3ee", emissiveIntensity: 2 }), 41.5, ROOF + 1.05, 23.45, scene, false);
+  const pole = mesh(new THREE.CylinderGeometry(0.06, 0.08, 3.2, 8), trim, HIDEOUT.x, ROOF + 1.8, 19.3, scene, true);
+  pole.castShadow = true;
+  mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshBasicMaterial({ color: "#38bdf8", toneMapped: false }), HIDEOUT.x, ROOF + 3.5, 19.3, scene, false);
 }
 
 export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, target: string): Layout {
@@ -1279,14 +1368,19 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     }
   };
   placeRoom(HOME.minX, HOME.maxX, HOME.minZ, HOME.maxZ, "home", HOME.gap);
+  furnishHome(scene, addCol);
   placeRoom(SHOP_A.minX, SHOP_A.maxX, SHOP_A.minZ, SHOP_A.maxZ, "shop", SHOP_A.gap);
   placeRoom(SHOP_B.minX, SHOP_B.maxX, SHOP_B.minZ, SHOP_B.maxZ, "shop", SHOP_B.gap);
-  placeRoom(CENTRAL.minX, CENTRAL.maxX, CENTRAL.minZ, CENTRAL.maxZ, "central", CENTRAL.gap);
-  const centralSign = labelPlane("CENTRAL DA DANI", "#38bdf8");
-  centralSign.position.set((CENTRAL.minX + CENTRAL.maxX) / 2, 3.15, CENTRAL.minZ - 0.05);
-  scene.add(centralSign);
-  box(0.35, 0.12, 0.5, std({ color: "#0f172a" }), 41, 0.9, 22.4, scene, false);
-  box(0.22, 0.08, 0.16, std({ color: "#111827" }), 41, 1.02, 22.2, scene, false);
+  const armas = labelPlane("ARMAS", "#f87171");
+  armas.position.set((SHOP_A.minX + SHOP_A.maxX) / 2, 2.7, SHOP_A.minZ - 0.06);
+  scene.add(armas);
+  const motos = labelPlane("MOTOS", "#38bdf8");
+  motos.position.set(SHOP_B.minX - 0.06, 2.7, (SHOP_B.minZ + SHOP_B.maxZ) / 2);
+  motos.rotation.y = -Math.PI / 2;
+  scene.add(motos);
+  box(2.2, 0.9, 0.5, std({ color: "#7f1d1d", roughness: 0.6 }), (SHOP_A.minX + SHOP_A.maxX) / 2, 0.7, (SHOP_A.minZ + SHOP_A.maxZ) / 2 + 1.2, scene, true);
+  box(0.5, 0.9, 2.2, std({ color: "#0e7490", roughness: 0.55 }), (SHOP_B.minX + SHOP_B.maxX) / 2 + 1.2, 0.7, (SHOP_B.minZ + SHOP_B.maxZ) / 2, scene, true);
+  buildHideout(scene, addCol);
   const yard = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), grassMat);
   yard.rotation.x = -Math.PI / 2;
   yard.position.set(23.2, 0.22, 23.2);
@@ -1302,9 +1396,17 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     scene.add(tree);
     addCol(tx - 0.25, tx + 0.25, tz - 0.25, tz + 0.25, 3);
   }
-  const bike = buildBike();
-  bike.position.set(BIKE_PARK.x, 0, BIKE_PARK.z);
-  scene.add(bike);
+  const bikes = {
+    entrega: buildBike("entrega"),
+    esportiva: buildBike("esportiva"),
+    noturna: buildBike("noturna"),
+  };
+  for (const id of ["entrega", "esportiva", "noturna"] as const) {
+    bikes[id].position.set(BIKE_PARK.x, 0, BIKE_PARK.z);
+    bikes[id].visible = id === "entrega";
+    scene.add(bikes[id]);
+  }
+  const bike = bikes.entrega;
   const port = buildPort(scene, addCol);
   const jet = buildJet();
   jet.position.set(JET.x, 0, JET.z);
@@ -1338,6 +1440,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     beacon,
     night,
     bike,
+    bikes,
     jet,
     ships: port,
   };

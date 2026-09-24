@@ -5,7 +5,8 @@ import { guardLook, people, randomLook } from "@/game/characters";
 import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
-import { canMount, CENTRAL_PHONE, decayWanted, doorOpen, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, roomExit, separateCircles, SHOPS, shirtFor } from "@/game3d/rules";
+import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
+import { canMount, CENTRAL_PHONE, decayWanted, doorOpen, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, ROOF, roomExit, separateCircles, SHOPS, shirtFor } from "@/game3d/rules";
 import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
@@ -17,8 +18,8 @@ export type GameEvents = {
   onPhase: (p: Phase) => void;
   onToast: (text: string, tone?: "info" | "bad" | "good") => void;
   onStudy?: () => void;
-  onShop?: () => void;
-  onPhone?: () => void;
+  onShop?: (kind: "armas" | "motos") => void;
+  onHelp?: () => void;
 };
 
 export type Hud = {
@@ -59,7 +60,7 @@ type Enemy = {
 };
 type Ped = { rig: Rig; pos: THREE.Vector3; yaw: number; loop: number; wp: number; dir: 1 | -1; speed: number; panic: number; t: number; talkT: number; still: boolean; pitch: number; stepD: number };
 type Traffic = { mesh: THREE.Group; pos: THREE.Vector3; from: [number, number]; to: [number, number]; speed: number; want: number; blockedT: number; honkT: number; ignoreT: number; yaw: number };
-type Bullet = { mesh: THREE.Mesh; vel: THREE.Vector3; mine: boolean; life: number };
+type Bullet = { mesh: THREE.Mesh; vel: THREE.Vector3; mine: boolean; life: number; damage: number };
 type Particle = { mesh: THREE.Mesh; vel: THREE.Vector3; life: number };
 
 const GRAV = 22;
@@ -173,6 +174,9 @@ export class Game3D {
   private wanted = 0;
   private mounted = false;
   private rideSpeed = 0;
+  private weapon: WeaponId = "choque";
+  private ride: RideId = "entrega";
+  private dani: Rig | null = null;
   private jetting = false;
   private cops: { mesh: THREE.Group; pos: THREE.Vector3; yaw: number; speed: number }[] = [];
   private owned = false;
@@ -231,6 +235,12 @@ export class Game3D {
     this.driver.armed = false;
     this.driver.root.scale.setScalar(0.9);
     this.scene.add(this.driver.root);
+
+    this.dani = buildHuman(people.dani.look);
+    this.dani.armed = false;
+    this.dani.root.position.set(HIDEOUT.x + 1.6, ROOF, HIDEOUT.z + 0.4);
+    this.dani.root.rotation.y = -0.8;
+    this.scene.add(this.dani.root);
 
     const n = level.display.kind === "locks" ? level.display.events.length : 1;
     for (let i = 0; i < n; i++) {
@@ -560,7 +570,7 @@ export class Game3D {
     this.stepIdx = this.mission.steps.length;
     if (this.phase === "play") this.ev.onPhase("play");
     else this.setPhase("play");
-    this.ev.onToast("Você está na ilha. E em casa estuda. E na moto sobe e desce. E na Central da Dani liga para ela.", "info");
+    this.ev.onToast("Você está na ilha. A torre com o ponto azul é o esconderijo da Dani. As lojas gastam o dinheiro da missão.", "info");
   }
 
   beginMission() {
@@ -575,6 +585,11 @@ export class Game3D {
 
   setOwned(owned: boolean) {
     this.owned = owned;
+  }
+
+  setLoadout(weapon: WeaponId, ride: RideId) {
+    this.weapon = weapon;
+    this.ride = ride;
   }
 
   private clearPolice() {
@@ -871,6 +886,7 @@ export class Game3D {
       escape: { x: this.layout.car.position.x, z: this.layout.car.position.z },
       runner: this.runner ? { x: this.runner.pos.x, z: this.runner.pos.z } : null,
       compound: this.layout.compound,
+      hideout: HIDEOUT,
     };
   }
 
@@ -930,7 +946,7 @@ export class Game3D {
         vx /= Math.max(1, len);
         vz /= Math.max(1, len);
         P.running = input.run || len > 0.95;
-        const speed = (P.running ? 7.5 : 4.2) * (this.jetting ? 2.15 : this.mounted ? 1.65 : 1);
+        const speed = (P.running ? 7.5 : 4.2) * (this.jetting ? 2.15 : this.mounted ? RIDES[this.ride].speed : 1);
         this.rideSpeed = speed;
         P.pos.x += vx * speed * dt;
         P.pos.z += vz * speed * dt;
@@ -1044,8 +1060,9 @@ export class Game3D {
     }
     const rig = P.rig;
     rig.root.visible = this.phase !== "escape" && this.phase !== "done" && !(P.inv > 0 && P.downT <= 0 && Math.floor(this.t * 16) % 2 === 0);
-    const bike = L.bike;
+    const bike = L.bikes[this.ride];
     const jet = L.jet;
+    for (const id of ["entrega", "esportiva", "noturna"] as const) L.bikes[id].visible = id === this.ride;
     if (this.jetting) {
       jet.position.set(P.pos.x, 0.05, P.pos.z);
       jet.rotation.y = P.yaw;
@@ -1067,6 +1084,7 @@ export class Game3D {
     rig.root.rotation.y = P.yaw;
     animate(rig, pose, this.t, dt);
 
+    if (this.dani) animate(this.dani, "type", this.t, dt);
     this.updateAllies(dt);
     const car = L.car;
     this.driver.root.position.set(car.position.x, car.position.y + 0.25, car.position.z);
@@ -1103,9 +1121,9 @@ export class Game3D {
     if (this.free && this.phase === "play") {
       if (control && input.use && !this.useHeld) {
         const study = new THREE.Vector3(HOME_STUDY.x, P.pos.y, HOME_STUDY.z);
-        const shop = SHOPS.some((p) => P.pos.distanceTo(new THREE.Vector3(p.x, P.pos.y, p.z)) < 2.4);
+        const shop = SHOPS.find((p) => P.pos.distanceTo(new THREE.Vector3(p.x, P.pos.y, p.z)) < 2.4);
         if (P.pos.distanceTo(study) < 2.3) this.ev.onStudy?.();
-        else if (shop) this.ev.onShop?.();
+        else if (shop) this.ev.onShop?.(shop.kind);
       }
       this.useHeld = input.use;
       return;
@@ -1350,8 +1368,8 @@ export class Game3D {
       this.ev.onToast("Você desceu do jet ski.", "info");
       return true;
     }
-    if (!hackNear && P.pos.distanceTo(new THREE.Vector3(CENTRAL_PHONE.x, P.pos.y, CENTRAL_PHONE.z)) < 2.3) {
-      this.ev.onPhone?.();
+    if (!hackNear && P.pos.y > ROOF - 1.5 && P.pos.distanceTo(new THREE.Vector3(CENTRAL_PHONE.x, P.pos.y, CENTRAL_PHONE.z)) < 2.6) {
+      this.ev.onHelp?.();
       return true;
     }
     const place = indoors(P.pos.x, P.pos.z) ? "indoor" : inSea(P.pos.x, P.pos.z) ? "sea" : "street";
@@ -1360,7 +1378,7 @@ export class Game3D {
       this.ev.onToast("Você desceu da moto.", "info");
       return true;
     }
-    if (!this.mounted && !this.jetting && canMount(place, true) && P.pos.distanceTo(this.layout.bike.position) < 2.2) {
+    if (!this.mounted && !this.jetting && canMount(place, true) && P.pos.distanceTo(this.layout.bikes[this.ride].position) < 2.2) {
       this.mounted = true;
       this.ev.onToast("Você subiu na moto.", "good");
       return true;
@@ -1595,7 +1613,8 @@ export class Game3D {
 
   private playerShoot() {
     const P = this.player;
-    P.cooldown = 0.25;
+    const gun = WEAPONS[this.weapon];
+    P.cooldown = gun.cooldown;
     P.shootT = 0.3;
     const origin = P.pos.clone().add(new THREE.Vector3(0, 1.35, 0));
     let dir = new THREE.Vector3(Math.sin(this.camYaw), 0, Math.cos(this.camYaw));
@@ -1623,7 +1642,7 @@ export class Game3D {
     mesh.position.copy(origin).addScaledVector(dir, 0.6);
     mesh.lookAt(mesh.position.clone().add(dir));
     this.scene.add(mesh);
-    this.bullets.push({ mesh, vel: dir.multiplyScalar(60), mine: true, life: 1 });
+    this.bullets.push({ mesh, vel: dir.multiplyScalar(60), mine: true, life: 1, damage: gun.damage });
     this.burst(origin.clone().addScaledVector(dir, 0.7), "#ffd27a", 3);
     sound.sfx("shoot");
     if (this.t - this.lastShot > 1.5) this.panicAll(P.pos);
@@ -1714,7 +1733,7 @@ export class Game3D {
         mesh.position.copy(from).addScaledVector(dir, 0.5);
         mesh.lookAt(mesh.position.clone().add(dir));
         this.scene.add(mesh);
-        this.bullets.push({ mesh, vel: dir.multiplyScalar(e.kind === "drone" ? 16 : 20), mine: false, life: 2.2 });
+        this.bullets.push({ mesh, vel: dir.multiplyScalar(e.kind === "drone" ? 16 : 20), mine: false, life: 2.2, damage: 1 });
         sound.sfx("enemyShoot", this.at3(from, 70));
       });
     }
@@ -1741,7 +1760,7 @@ export class Game3D {
         const rn = this.runner;
         if (rn && rn.state === "flee" && Math.abs(pos.x - rn.pos.x) < 1.3 && Math.abs(pos.z - rn.pos.z) < 2.3 && pos.y < 1.8) {
           b.life = 0;
-          rn.hits++;
+          rn.hits += b.damage;
           sound.sfx("hit", this.at3(pos));
           this.burst(pos, "#fbbf24", 8);
           if (rn.hits >= 5) {
@@ -1758,7 +1777,7 @@ export class Game3D {
           const rad = e.kind === "drone" ? 0.8 : 0.7;
           if (Math.abs(pos.x - c.x) < rad && Math.abs(pos.z - c.z) < rad && Math.abs(pos.y - c.y) < (e.kind === "drone" ? 0.6 : 1.0)) {
             b.life = 0;
-            e.hp -= 1;
+            e.hp -= b.damage;
             if (e.rig) e.rig.flash = 0.1;
             sound.sfx("hit", this.at3(pos));
             this.burst(pos, "#b91c1c", 6);

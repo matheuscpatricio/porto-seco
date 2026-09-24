@@ -80,9 +80,11 @@ export const BIKE_PARK = { x: 21.5, z: 15.4 };
 export const SHOP_A: RoomBox = { minX: 136.6, maxX: 145.4, minZ: 16.6, maxZ: 24.2, gap: "minusZ" };
 /** Corner shop on the northwest lot, door toward the west sidewalk. */
 export const SHOP_B: RoomBox = { minX: 16.6, maxX: 24.2, minZ: 136.6, maxZ: 145.4, gap: "west" };
-/** Dani's office, east of Léo's house, door toward the south sidewalk. */
+/** Dani's tower, east of Léo's house. The hideout is the roof, not a sign on the street. */
 export const CENTRAL: RoomBox = { minX: 36, maxX: 46, minZ: 18, maxZ: 27.2, gap: "minusZ" };
-export const CENTRAL_PHONE = { x: 41, z: 22.4 };
+export const ROOF = 10.28;
+export const HIDEOUT = { x: 41, z: 22.6 };
+export const CENTRAL_PHONE = { x: 42.6, z: 22.2 };
 export const ROOMS: RoomBox[] = [HOME, SHOP_A, SHOP_B, CENTRAL];
 /** Walkable dock over the south beach. The driving lanes stay on the island. */
 export const QUAY = { minX: 58, maxX: 102, minZ: -7, maxZ: 0.2 };
@@ -97,8 +99,8 @@ export function onPier(x: number, z: number): boolean {
   return quay || pier;
 }
 export const SHOPS = [
-  { x: (SHOP_A.minX + SHOP_A.maxX) / 2, z: (SHOP_A.minZ + SHOP_A.maxZ) / 2 },
-  { x: (SHOP_B.minX + SHOP_B.maxX) / 2, z: (SHOP_B.minZ + SHOP_B.maxZ) / 2 },
+  { kind: "armas" as const, x: (SHOP_A.minX + SHOP_A.maxX) / 2, z: (SHOP_A.minZ + SHOP_A.maxZ) / 2 },
+  { kind: "motos" as const, x: (SHOP_B.minX + SHOP_B.maxX) / 2, z: (SHOP_B.minZ + SHOP_B.maxZ) / 2 },
 ];
 
 export function indoors(x: number, z: number): boolean {

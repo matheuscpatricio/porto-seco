@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { allLevels } from "@/content/worlds";
-import { buyBike, EMPTY_LIFE, firstClearPay, mergeRecord } from "@/lib/progress-rules";
+import { buyBike, buyRide, buyWeapon, EMPTY_LIFE, firstClearPay, mergeRecord, RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
 
 export type Progress = {
   xp: number;
@@ -13,6 +13,9 @@ export type Progress = {
   streak: number;
   money: number;
   bike: boolean;
+  weapon: WeaponId;
+  ride: RideId;
+  helped: boolean;
   introSeen?: boolean;
 };
 
@@ -38,6 +41,9 @@ function load(): Progress {
     cache = { ...empty };
   }
   cache.bike = true;
+  if (!WEAPONS[cache.weapon]) cache.weapon = "choque";
+  if (!RIDES[cache.ride]) cache.ride = "entrega";
+  if (typeof cache.helped !== "boolean") cache.helped = false;
   return cache!;
 }
 
@@ -91,11 +97,12 @@ export function completeLevel(id: string, stars: number) {
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
   const streak = p.lastDay === today ? p.streak : p.lastDay === yesterday ? p.streak + 1 : 1;
-  const pay = firstClearPay(prev, level.xp);
+  const pay = firstClearPay(prev, level.xp, p.helped);
   const next: Progress = {
     ...p,
     xp: p.xp + gainedXp,
     money: p.money + pay,
+    helped: false,
     stars: { ...p.stars, [id]: Math.max(prev, stars) },
     lastDay: today,
     streak,
@@ -112,6 +119,26 @@ export function completeLevel(id: string, stars: number) {
   next.achievements = [...next.achievements, ...newAch];
   save(next);
   return { gainedXp, pay, newAch, stars: next.stars[id] };
+}
+
+export function markHelped() {
+  const p = load();
+  if (!p.helped) save({ ...p, helped: true });
+  return true;
+}
+
+export function purchaseWeapon(id: WeaponId) {
+  const p = load();
+  const deal = buyWeapon(p.money, p.weapon, id);
+  if (deal.bought) save({ ...p, money: deal.money, weapon: deal.weapon });
+  return deal;
+}
+
+export function purchaseRide(id: RideId) {
+  const p = load();
+  const deal = buyRide(p.money, p.ride, id);
+  if (deal.bought) save({ ...p, money: deal.money, ride: deal.ride });
+  return deal;
 }
 
 export function purchaseBike() {

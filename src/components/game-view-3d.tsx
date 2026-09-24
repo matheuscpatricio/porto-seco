@@ -3,12 +3,13 @@
 import { Dialogue } from "@/components/dialogue";
 import { Button } from "@/components/ui/button";
 import type { Level, Who, World } from "@/content/types";
-import { phoneLines } from "@/content/phone";
+import { MODULES } from "@/content/modules";
 import { connector } from "@/content/story";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
 import { PIER, QUAY } from "@/game3d/rules";
 import { BLOCK, blockStart, COAST, GREEN, SIZE } from "@/game3d/world";
-import { useProgress } from "@/lib/progress";
+import { markHelped, purchaseRide, purchaseWeapon, useProgress } from "@/lib/progress";
+import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -112,6 +113,7 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
   };
   for (const car of m.cars) dot(car.x, car.z, 2.5, "#cbd5e1");
   for (const cop of m.cops) dot(cop.x, cop.z, 3, "#2563eb");
+  dot(m.hideout.x, m.hideout.z, 5, "#38bdf8");
   dot(m.escape.x, m.escape.z, 4, "#f43f5e");
   if (m.runner) dot(m.runner.x, m.runner.z, 4, "#fb923c");
   for (const al of m.allies) dot(al.x, al.z, 3.5, "#38bdf8");
@@ -182,10 +184,10 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
     const [hub, setHub] = useState(false);
     const hubRef = useRef(false);
     const [notes, setNotes] = useState(false);
-    const [shop, setShop] = useState(false);
-    const [phone, setPhone] = useState(false);
+    const [shop, setShop] = useState<"armas" | "motos" | null>(null);
+    const [help, setHelp] = useState<string | null>(null);
     const overlayRef = useRef(false);
-    overlayRef.current = notes || shop || phone;
+    overlayRef.current = notes || !!shop || help !== null;
     const progress = useProgress();
     const link = connector(level.id);
     const toastId = useRef(0);
@@ -220,8 +222,8 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
         },
         onToast: toast,
         onStudy: () => setNotes(true),
-        onShop: () => setShop(true),
-        onPhone: () => setPhone(true),
+        onShop: (kind) => setShop(kind),
+        onHelp: () => setHelp("lista"),
       });
       gameRef.current = game;
       game.scene.environment = envMap;
@@ -310,7 +312,8 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
 
     useEffect(() => {
       gameRef.current?.setOwned(progress.bike);
-    }, [progress.bike]);
+      gameRef.current?.setLoadout(progress.weapon, progress.ride);
+    }, [progress.bike, progress.weapon, progress.ride]);
 
     useEffect(() => {
       const typing = (e: KeyboardEvent) => {
@@ -544,7 +547,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
             >
               Começar missão
             </Button>
-            <p className="w-full text-center text-xs text-white/80">R$ {progress.money} · moto na calçada</p>
+            <p className="w-full text-center text-xs text-white/80">R$ {progress.money} · {RIDES[progress.ride].name} · {WEAPONS[progress.weapon].name}</p>
           </div>
         )}
 
@@ -559,23 +562,88 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
           </div>
         )}
 
-        {phone && (
-          <div className="absolute inset-x-0 bottom-0 z-20 p-2 sm:p-4">
-            <Dialogue
-              lines={phoneLines(level)}
-              doneLabel="Desligar"
-              onDone={() => setPhone(false)}
-            />
+        {help && (
+          <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/70 p-3 sm:items-center">
+            <div className="max-h-[80vh] w-full max-w-lg space-y-3 overflow-y-auto rounded-2xl bg-card p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-sky-300">Computador da Dani</p>
+              {help === "lista" ? (
+                <>
+                  <p className="text-sm">Escolha o módulo. Se pedir a ajuda, a Dani explica e essa missão não paga.</p>
+                  <div className="space-y-2">
+                    {["Começo", "Decisão", "Repetição", "Dados", "Funções", "Objetos", "Avançado"].map((band) => (
+                      <div key={band}>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-white/50">{band}</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {MODULES.filter((m) => m.band === band).map((m) => (
+                            <Button key={m.id} size="sm" variant="secondary" onClick={() => setHelp(m.id)}>
+                              {m.title}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="ghost" onClick={() => setHelp(null)}>
+                    Sair sem pedir
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Dialogue
+                    lines={[
+                      { who: "dani", text: "Se eu te explicar isso agora, o pagamento dessa missão some. O aprendizado fica." },
+                      ...(MODULES.find((m) => m.id === help)?.lines ?? []).map((text) => ({ who: "dani" as const, text })),
+                    ]}
+                    doneLabel="Entendi"
+                    onDone={() => {
+                      markHelped();
+                      toast("A Dani ajudou. Essa missão não paga.", "info");
+                      setHelp(null);
+                    }}
+                  />
+                </>
+              )}
+            </div>
           </div>
         )}
 
         {shop && (
           <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/60 p-3 sm:items-center">
             <div className="w-full max-w-sm space-y-3 rounded-2xl bg-card p-4">
-              <p className="text-xs font-black uppercase tracking-widest text-amber-200">Oficina</p>
-              <p className="text-sm">A moto já é sua, desde o primeiro dia. Ela fica na calçada da casa. Chegue perto e aperte E para subir. Aperte E de novo para descer.</p>
-              <p className="text-sm text-white/70">Você tem R$ {progress.money}. O dinheiro continua contando nas missões.</p>
-              <Button onClick={() => setShop(false)}>Sair</Button>
+              <p className="text-xs font-black uppercase tracking-widest text-amber-200">{shop === "armas" ? "Loja de armas" : "Loja de motos"}</p>
+              <p className="text-sm">Você tem R$ {progress.money}. O que já é seu não cobra de novo.</p>
+              {shop === "armas"
+                ? (["rajada", "pesada"] as WeaponId[]).map((id) => (
+                    <Button
+                      key={id}
+                      className="w-full"
+                      onClick={() => {
+                        const deal = purchaseWeapon(id);
+                        if (deal.bought) toast(`${WEAPONS[id].name} é sua.`, "good");
+                        else toast(progress.weapon === id ? "Você já tem essa arma." : "Ainda falta dinheiro.", "bad");
+                        setShop(null);
+                      }}
+                    >
+                      {WEAPONS[id].name} · R$ {WEAPONS[id].price} · {WEAPONS[id].blurb}
+                    </Button>
+                  ))
+                : (["esportiva", "noturna"] as RideId[]).map((id) => (
+                    <Button
+                      key={id}
+                      className="w-full"
+                      onClick={() => {
+                        const deal = purchaseRide(id);
+                        if (deal.bought) toast(`${RIDES[id].name} está na calçada de casa.`, "good");
+                        else toast(progress.ride === id ? "Você já tem essa moto." : "Ainda falta dinheiro.", "bad");
+                        setShop(null);
+                      }}
+                    >
+                      {RIDES[id].name} · R$ {RIDES[id].price} · {RIDES[id].blurb}
+                    </Button>
+                  ))}
+              <Button variant="ghost" onClick={() => setShop(null)}>
+                Sair
+              </Button>
             </div>
           </div>
         )}

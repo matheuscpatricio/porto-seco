@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buyBike, EMPTY_LIFE, firstClearPay, mergeRecord } from "./progress-rules.ts";
+import { buyBike, buyRide, buyWeapon, EMPTY_LIFE, firstClearPay, mergeRecord } from "./progress-rules.ts";
 
 test("first completion pays ten times the lesson xp", () => {
   assert.equal(firstClearPay(0, 40), 400);
@@ -9,6 +9,27 @@ test("first completion pays ten times the lesson xp", () => {
 test("a replay pays nothing", () => {
   assert.equal(firstClearPay(2, 40), 0);
   assert.equal(firstClearPay(3, 40), 0);
+});
+
+test("asking Dani for help pays nothing", () => {
+  assert.equal(firstClearPay(0, 40, true), 0);
+});
+
+test("a weapon purchase needs the price and replaces the old gun", () => {
+  assert.equal(buyWeapon(100, "choque", "rajada").bought, false);
+  const deal = buyWeapon(480, "choque", "rajada");
+  assert.equal(deal.bought, true);
+  assert.equal(deal.money, 0);
+  assert.equal(deal.weapon, "rajada");
+  assert.equal(buyWeapon(2000, "rajada", "rajada").bought, false);
+});
+
+test("a bike purchase needs the price", () => {
+  assert.equal(buyRide(649, "entrega", "esportiva").bought, false);
+  const deal = buyRide(650, "entrega", "esportiva");
+  assert.equal(deal.bought, true);
+  assert.equal(deal.ride, "esportiva");
+  assert.equal(deal.money, 0);
 });
 
 test("a save without money or bike fills the empty life", () => {

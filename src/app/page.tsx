@@ -91,7 +91,7 @@ export default function Home() {
               </button>
             </div>
             <p className="mt-3 text-xs text-white/60">
-              {done} de {allLevels.length} missões concluídas · R$ {p.money} · a moto já está na calçada · Teclado: ← → andar, ↑ pular, F atirar, E hackeia, sobe na moto e liga para a Dani na central · No celular há botões na tela
+              {done} de {allLevels.length} missões concluídas · R$ {p.money} · a moto fica na calçada · o ponto azul no mapa é o esconderijo da Dani · lojas de armas e de motos gastam o pagamento · Teclado: ← → andar, ↑ pular, F atirar, E hackeia, sobe na moto e pede ajuda no computador da torre · No celular há botões na tela
             </p>
           </div>
           <div className="pointer-events-none absolute bottom-0 right-4 hidden items-end gap-3 md:flex">
