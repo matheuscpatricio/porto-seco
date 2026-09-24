@@ -62,7 +62,7 @@ const bulletGeo = new THREE.CapsuleGeometry(0.035, 0.5, 2, 6).rotateX(Math.PI / 
 const mineMat = new THREE.MeshBasicMaterial({ color: "#fff2b0", toneMapped: false });
 const enemyMat = new THREE.MeshBasicMaterial({ color: "#ff8a65", toneMapped: false });
 const partGeo = new THREE.SphereGeometry(0.06, 6, 4);
-const markerGeo = new THREE.ConeGeometry(0.2, 0.42, 16).rotateX(Math.PI);
+const markerGeo = new THREE.ConeGeometry(0.26, 0.55, 16).rotateX(Math.PI);
 const markerMat = new THREE.MeshBasicMaterial({ color: "#ff1f1f", toneMapped: false, transparent: true, opacity: 0.95 });
 const bossMarkerMat = new THREE.MeshBasicMaterial({ color: "#ff0040", toneMapped: false });
 const contactMat = new THREE.MeshBasicMaterial({ color: "#facc15", toneMapped: false });
@@ -671,7 +671,7 @@ export class Game3D {
   }
 
   update(dt: number, input: Input3) {
-    dt = Math.min(dt, 1 / 25);
+    dt = Math.max(0, Math.min(dt, 1 / 25));
     this.t += dt;
     this.phaseT += dt;
     const due = this.queue.filter((q) => this.t >= q.at);

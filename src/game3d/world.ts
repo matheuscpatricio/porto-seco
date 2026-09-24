@@ -198,7 +198,7 @@ function facadeTextures(base: string, night: boolean, kind: Theme["kind"], r: ()
     const ww = cw * (glassTower ? 0.84 : 0.52);
     const wy = S * (glassTower ? 0.12 : 0.22);
     const wh = S * (glassTower ? 0.74 : 0.52);
-    const lit = r() < (night ? 0.5 : 0.08);
+    const lit = r() < (night ? 0.35 : 0.08);
     if (!glassTower) {
       g.fillStyle = "rgba(240,235,225,0.85)";
       g.fillRect(wx - 8, wy - 8, ww + 16, wh + 16);
@@ -561,7 +561,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
         e1.needsUpdate = true;
         m.emissiveMap = e1;
         m.emissive = new THREE.Color("#ffffff");
-        m.emissiveIntensity = 1.1;
+        m.emissiveIntensity = 0.55;
       }
       return m;
     };
@@ -616,7 +616,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
         aw.position.set(fx + nx * 0.62, 2.75, fz + nz * 0.62);
         aw.castShadow = true;
         scene.add(aw);
-        const shop = std({ color: night ? "#ffd08a" : "#223040", emissive: night ? "#ffb85c" : "#000000", emissiveIntensity: night ? 0.9 : 0, roughness: 0.1, metalness: 0.3 });
+        const shop = std({ color: night ? "#ffd08a" : "#223040", emissive: night ? "#ffb85c" : "#000000", emissiveIntensity: night ? 0.45 : 0, roughness: 0.1, metalness: 0.3 });
         if (nx !== 0) box(0.06, 2.1, along * 0.5, shop, fx + nx * 0.04, 1.35, fz, scene, false);
         else box(along * 0.5, 2.1, 0.06, shop, fx, 1.35, fz + nz * 0.04, scene, false);
       }

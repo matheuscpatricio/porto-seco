@@ -106,6 +106,7 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
       });
       gameRef.current = game;
       game.scene.environment = envMap;
+      if (process.env.NODE_ENV !== "production") (window as unknown as { __game: Game3D }).__game = game;
       game.scene.environmentIntensity = world.id === "w2" || world.id === "w5" || world.id === "w6" ? 0.25 : 0.55;
       if (skipBrief) game.startPlay();
       const resize = () => {
@@ -123,7 +124,7 @@ export const GameView3D = forwardRef<GameHandle, { level: Level; world: World; i
       let lastNear = false;
       let frames = 0;
       const loop = (now: number) => {
-        const dt = (now - last) / 1000;
+        const dt = Math.max(0, (now - last) / 1000);
         last = now;
         const k = keys.current;
         const tp = taps.current;
