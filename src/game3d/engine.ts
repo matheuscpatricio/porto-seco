@@ -627,6 +627,7 @@ export class Game3D {
       const e = this.spawn("guard", a, this.sidewalkSpot(), 1, { look: thugLook, hp: 8, damage: 26, faction: "caveira" });
       e.name = "Capanga";
       e.fireGap = 1.45;
+      e.cooldown = 0.45;
       e.marker.material = new THREE.MeshBasicMaterial({ color: "#eab308", toneMapped: false });
     }
   }
