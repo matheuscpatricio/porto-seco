@@ -34,9 +34,9 @@ const gunGeo = {
 };
 
 function kindFor(look: Look) {
-  if (look.extras.includes("vest")) return "soldier";
   if (look.hairStyle === "ponytail" || (look.hairStyle === "curly" && look.build === "slim")) return "michelle";
-  return "xbot";
+  // Xbot is the denser body, but that file ships without a photo. Soldier and Michelle carry real textures.
+  return "soldier";
 }
 
 function bone(root: THREE.Object3D, name: string) {
@@ -148,7 +148,7 @@ export function trySkinned(look: Look): Rig | null {
     const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((m) => {
       const copy = m.clone() as THREE.MeshStandardMaterial;
       const n = copy.name.toLowerCase();
-      if (!n.includes("visor") && !n.includes("glass") && copy.color) copy.color.lerp(tint, 0.16);
+      if (!n.includes("visor") && !n.includes("glass") && copy.color) copy.color.lerp(tint, copy.map ? 0.12 : 0.16);
       rig.materials.push(copy);
       return copy;
     });
