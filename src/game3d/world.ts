@@ -486,31 +486,53 @@ function addCoast(scene: THREE.Scene, night: boolean) {
   return cols;
 }
 
-function buildPort(scene: THREE.Scene) {
-  const concrete = std({ color: "#9aa0a6", roughness: 0.9 });
+function buildPort(scene: THREE.Scene, addCol: (minX: number, maxX: number, minZ: number, maxZ: number, top: number) => void) {
+  const concrete = std({ color: "#9aa0a6", roughness: 0.92 });
   const wood = std({ color: "#8a5a32", roughness: 0.85 });
-  const deck = (w: number, d: number, x: number, z: number, mat: THREE.Material) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, d), mat);
-    m.position.set(x, 0.2, z);
+  concrete.polygonOffset = true;
+  concrete.polygonOffsetFactor = -1;
+  concrete.polygonOffsetUnits = -1;
+  wood.polygonOffset = true;
+  wood.polygonOffsetFactor = -1;
+  wood.polygonOffsetUnits = -1;
+  const slab = (w: number, h: number, d: number, x: number, y: number, z: number, mat: THREE.Material) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z);
     m.receiveShadow = true;
-    m.castShadow = true;
+    m.castShadow = false;
     scene.add(m);
   };
-  const quayW = QUAY.maxX - QUAY.minX;
-  const quayD = 0.2 - QUAY.minZ;
-  deck(quayW, quayD, (QUAY.minX + QUAY.maxX) / 2, (QUAY.minZ + 0.2) / 2, concrete);
-  const pierW = PIER.maxX - PIER.minX;
-  const pierD = 0.2 - PIER.minZ;
-  deck(pierW, pierD, (PIER.minX + PIER.maxX) / 2, (PIER.minZ + 0.2) / 2, wood);
-  for (const x of [QUAY.minX + 4, QUAY.maxX - 4, 80]) {
-    mesh(new THREE.CylinderGeometry(0.28, 0.32, 1.1, 8), std({ color: "#1f2937" }), x, 0.7, -1.2, scene, true);
+  const quayTop = 0.22;
+  const quayH = 0.16;
+  const quayZ0 = QUAY.minZ;
+  const quayZ1 = 0.35;
+  slab(QUAY.maxX - QUAY.minX, quayH, quayZ1 - quayZ0, (QUAY.minX + QUAY.maxX) / 2, quayTop - quayH / 2, (quayZ0 + quayZ1) / 2, concrete);
+  addCol(QUAY.minX, QUAY.maxX, quayZ0, quayZ1, quayTop);
+  const pierTop = 0.26;
+  const pierH = 0.2;
+  const pierZ1 = quayZ0 - 0.04;
+  slab(PIER.maxX - PIER.minX, pierH, pierZ1 - PIER.minZ, (PIER.minX + PIER.maxX) / 2, pierTop - pierH / 2, (PIER.minZ + pierZ1) / 2, wood);
+  addCol(PIER.minX, PIER.maxX, PIER.minZ, pierZ1, pierTop);
+  for (let i = 0; i < 8; i++) {
+    const z = -9 - i * 1.7;
+    mesh(new THREE.BoxGeometry(PIER.maxX - PIER.minX - 0.4, 0.035, 0.16), std({ color: "#6b4428", roughness: 0.8 }), 80, pierTop + 0.04, z, scene, false);
   }
+  for (const x of [QUAY.minX + 4, QUAY.maxX - 4, 74, 86]) {
+    mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.7, 8), std({ color: "#1f2937", metalness: 0.4, roughness: 0.5 }), x, quayTop + 0.35, -1.4, scene, true);
+  }
+  const postMat = std({ color: "#374151", metalness: 0.6, roughness: 0.4 });
+  for (const x of [77.4, 82.6]) {
+    mesh(new THREE.CylinderGeometry(0.08, 0.1, 3.15, 8), postMat, x, quayTop + 1.57, 0.15, scene, true);
+    mesh(new THREE.BoxGeometry(0.28, 0.12, 0.28), concrete, x, quayTop + 0.06, 0.15, scene, true);
+  }
+  mesh(new THREE.BoxGeometry(5.6, 0.1, 0.1), postMat, 80, quayTop + 3.15, 0.15, scene, true);
+  mesh(new THREE.BoxGeometry(4.7, 0.95, 0.12), std({ color: "#0b1220", roughness: 0.7 }), 80, quayTop + 2.55, 0.15, scene, true);
   const sign = labelPlane("PORTO", "#fbbf24");
-  sign.position.set(80, 3.2, 0.4);
+  sign.position.set(80, quayTop + 2.55, 0.23);
   scene.add(sign);
   const ships = [buildShip("#1e3a5f"), buildShip("#7f1d1d")];
-  ships[0].position.set(63, 0, -16);
-  ships[1].position.set(97, 0, -22);
+  ships[0].position.set(56, 0.35, -20);
+  ships[1].position.set(104, 0.35, -21);
   ships.forEach((s) => scene.add(s));
   return ships;
 }
@@ -525,16 +547,157 @@ function labelPlane(text: string, color: string) {
   g.textBaseline = "middle";
   g.fillText(text, 256, 48);
   const map = tex(c);
-  return new THREE.Mesh(new THREE.PlaneGeometry(4.4, 0.82), new THREE.MeshBasicMaterial({ map, toneMapped: false }));
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 0.82), new THREE.MeshBasicMaterial({ map, toneMapped: false, side: THREE.DoubleSide }));
+  panel.position.z = 0.01;
+  return panel;
+}
+
+function shipHull(color: string) {
+  const sections = [
+    { x: 13.2, b: 0.12, k: -0.05, d: 0.45 },
+    { x: 10.4, b: 1.25, k: -1.05, d: 1.15 },
+    { x: 6.2, b: 2.15, k: -1.85, d: 1.55 },
+    { x: 1.2, b: 2.4, k: -2.15, d: 1.62 },
+    { x: -4.2, b: 2.3, k: -2.0, d: 1.7 },
+    { x: -8.6, b: 1.85, k: -1.45, d: 1.9 },
+    { x: -12.4, b: 1.05, k: -0.75, d: 2.05 },
+  ];
+  const ringOf = (s: (typeof sections)[number]) => [
+    [s.x, s.k, 0],
+    [s.x, s.k * 0.25, s.b * 0.96],
+    [s.x, 0.05, s.b],
+    [s.x, s.d, s.b * 0.78],
+    [s.x, s.d, -s.b * 0.78],
+    [s.x, 0.05, -s.b],
+    [s.x, s.k * 0.25, -s.b * 0.96],
+  ];
+  const rings = sections.map(ringOf);
+  const n = rings[0].length;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  rings.forEach((ring, i) => {
+    for (const p of ring) positions.push(p[0], p[1], p[2]);
+    if (i === 0) return;
+    const a0 = (i - 1) * n;
+    const b0 = i * n;
+    for (let k = 0; k < n; k++) {
+      const k2 = (k + 1) % n;
+      indices.push(a0 + k, b0 + k2, b0 + k, a0 + k, a0 + k2, b0 + k2);
+    }
+  });
+  const cap = (ringIndex: number, bow: boolean) => {
+    const base = ringIndex * n;
+    const c = positions.length / 3;
+    const s = sections[ringIndex];
+    positions.push(s.x, (s.k + s.d) * 0.5, 0);
+    for (let k = 0; k < n; k++) {
+      const k2 = (k + 1) % n;
+      if (bow) indices.push(c, base + k, base + k2);
+      else indices.push(c, base + k2, base + k);
+    }
+  };
+  cap(0, true);
+  cap(sections.length - 1, false);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  const hull = new THREE.Mesh(geo, std({ color, roughness: 0.42, metalness: 0.35, side: THREE.DoubleSide }));
+  hull.castShadow = true;
+  hull.receiveShadow = true;
+  return hull;
 }
 
 function buildShip(hullColor: string) {
   const g = new THREE.Group();
-  const hull = std({ color: hullColor, roughness: 0.55, metalness: 0.35 });
-  const cabin = std({ color: "#e7e5e4", roughness: 0.6 });
-  box(16, 2.4, 4.2, hull, 0, 1.3, 0, g, true, 0.15);
-  box(5, 2.2, 3.2, cabin, -2.2, 3.2, 0, g, true, 0.08);
-  box(0.45, 2.4, 0.45, std({ color: "#44403c" }), 2.4, 4.2, 0, g, true);
+  g.add(shipHull(hullColor));
+  const white = std({ color: "#f5f5f4", roughness: 0.55 });
+  const glass = std({ color: "#0f172a", roughness: 0.08, metalness: 0.45, emissive: "#38bdf8", emissiveIntensity: 0.35 });
+  const dark = std({ color: "#1c1917", roughness: 0.7, metalness: 0.2 });
+  box(6.2, 1.7, 3.5, white, -6.4, 2.55, 0, g, true, 0.06);
+  box(4.4, 1.35, 3.1, white, -6.8, 3.9, 0, g, true, 0.05);
+  box(3.2, 1.05, 2.6, white, -7.1, 5.0, 0, g, true, 0.04);
+  box(2.6, 0.55, 0.08, glass, -7.1, 5.15, 1.28, g, false);
+  box(2.6, 0.55, 0.08, glass, -7.1, 5.15, -1.28, g, false);
+  box(0.08, 0.7, 2.2, glass, -5.5, 4.05, 0, g, false);
+  box(1.1, 1.5, 1.1, std({ color: "#b45309", roughness: 0.5, metalness: 0.3 }), -5.2, 6.15, 0, g, true, 0.04);
+  box(0.7, 0.25, 0.7, dark, -5.2, 7.0, 0, g, true);
+  const boxes: [string, number][] = [
+    ["#dc2626", 2.2],
+    ["#1d4ed8", 4.6],
+    ["#15803d", 7.0],
+    ["#ca8a04", 3.4],
+    ["#7c3aed", 5.8],
+  ];
+  boxes.forEach(([color, x], i) => {
+    const z = i % 2 === 0 ? -0.85 : 0.85;
+    box(2.05, 1.15, 1.45, std({ color, roughness: 0.6, metalness: 0.15 }), x, 2.15, z, g, true, 0.03);
+  });
+  box(0.12, 4.2, 0.12, dark, 8.6, 3.6, 0, g, true);
+  mesh(new THREE.TorusGeometry(0.55, 0.04, 6, 16), dark, 8.6, 5.5, 0, g, true).rotation.x = Math.PI / 2;
+  box(1.6, 0.45, 0.7, std({ color: "#f97316", roughness: 0.6 }), -3.2, 2.15, 1.7, g, true, 0.04);
+  for (const z of [-2.15, 2.15]) {
+    for (let i = 0; i < 9; i++) {
+      mesh(new THREE.BoxGeometry(0.05, 0.45, 0.05), dark, 10.5 - i * 1.7, 1.85, z, g, false);
+    }
+    mesh(new THREE.BoxGeometry(15, 0.04, 0.04), dark, 2.5, 2.05, z, g, false);
+  }
+  mesh(new THREE.SphereGeometry(0.18, 10, 8), std({ color: "#ef4444", emissive: "#ef4444", emissiveIntensity: 0.8 }), -12.2, 2.3, 1.15, g, false);
+  mesh(new THREE.SphereGeometry(0.18, 10, 8), std({ color: "#22c55e", emissive: "#22c55e", emissiveIntensity: 0.8 }), -12.2, 2.3, -1.15, g, false);
+  return g;
+}
+
+function buildBike() {
+  const g = new THREE.Group();
+  const paint = std({ color: "#b91c1c", metalness: 0.55, roughness: 0.32 });
+  const dark = std({ color: "#111827", metalness: 0.45, roughness: 0.4 });
+  const rubber = std({ color: "#141414", roughness: 0.92 });
+  const chrome = std({ color: "#e5e7eb", metalness: 0.92, roughness: 0.18 });
+  const wheel = (z: number) => {
+    const w = new THREE.Group();
+    const tire = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.075, 12, 28), rubber);
+    tire.rotation.y = Math.PI / 2;
+    tire.castShadow = true;
+    w.add(tire);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 18), chrome);
+    rim.rotation.z = Math.PI / 2;
+    w.add(rim);
+    for (let i = 0; i < 5; i++) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.34, 0.012), chrome);
+      spoke.rotation.z = (i / 5) * Math.PI;
+      w.add(spoke);
+    }
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.08, 10), dark);
+    hub.rotation.z = Math.PI / 2;
+    w.add(hub);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.015, 16), std({ color: "#9ca3af", metalness: 0.8, roughness: 0.25 }));
+    disc.rotation.z = Math.PI / 2;
+    disc.position.x = 0.05;
+    w.add(disc);
+    w.position.set(0, 0.33, z);
+    g.add(w);
+    return w;
+  };
+  const front = wheel(0.86);
+  const rear = wheel(-0.78);
+  box(0.08, 0.08, 1.15, dark, 0, 0.48, 0.05, g, true);
+  box(0.42, 0.32, 0.38, std({ color: "#1f2937", metalness: 0.7, roughness: 0.35 }), 0, 0.46, 0.02, g, true, 0.04);
+  box(0.55, 0.28, 0.85, paint, 0, 0.78, 0.22, g, true, 0.08);
+  box(0.42, 0.1, 0.48, dark, 0, 0.86, -0.22, g, true, 0.03);
+  box(0.12, 0.16, 0.7, dark, 0.16, 0.4, -0.35, g, true);
+  mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.7, 8), chrome, 0.22, 0.32, -0.55, g, true).rotation.x = Math.PI / 2;
+  box(0.5, 0.08, 0.7, dark, 0, 0.5, 0.72, g, true, 0.02);
+  box(0.06, 0.42, 0.06, chrome, 0.1, 0.78, 0.5, g, true);
+  box(0.06, 0.42, 0.06, chrome, -0.1, 0.78, 0.5, g, true);
+  mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.62, 8), chrome, 0, 1.02, 0.42, g, true).rotation.z = Math.PI / 2;
+  mesh(new THREE.SphereGeometry(0.045, 10, 8), rubber, 0.32, 1.02, 0.42, g, false);
+  mesh(new THREE.SphereGeometry(0.045, 10, 8), rubber, -0.32, 1.02, 0.42, g, false);
+  mesh(new THREE.SphereGeometry(0.09, 12, 8), std({ color: "#f8fafc", emissive: "#fff7d6", emissiveIntensity: 0.7 }), 0, 0.84, 1.02, g, false);
+  box(0.16, 0.1, 0.22, paint, 0, 0.62, -0.95, g, true, 0.02);
+  mesh(new THREE.BoxGeometry(0.12, 0.08, 0.04), std({ color: "#ef4444", emissive: "#ef4444", emissiveIntensity: 0.6 }), 0, 0.7, -1.05, g, false);
+  box(0.08, 0.04, 0.16, dark, 0.18, 0.36, 0.15, g, false);
+  box(0.08, 0.04, 0.16, dark, -0.18, 0.36, 0.15, g, false);
+  g.userData.wheels = [front, rear];
   return g;
 }
 
@@ -1139,14 +1302,10 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     scene.add(tree);
     addCol(tx - 0.25, tx + 0.25, tz - 0.25, tz + 0.25, 3);
   }
-  const bike = new THREE.Group();
-  box(1.7, 0.45, 0.28, std({ color: "#111827", metalness: 0.45, roughness: 0.4 }), 0, 0.55, 0, bike, true, 0.06);
-  box(0.35, 0.55, 0.12, std({ color: "#1f2937" }), -0.15, 0.85, 0, bike, true, 0.04);
-  mesh(new THREE.TorusGeometry(0.32, 0.08, 8, 16), std({ color: "#0a0a0a" }), 0.55, 0.32, 0, bike, true).rotation.y = Math.PI / 2;
-  mesh(new THREE.TorusGeometry(0.32, 0.08, 8, 16), std({ color: "#0a0a0a" }), -0.7, 0.32, 0, bike, true).rotation.y = Math.PI / 2;
+  const bike = buildBike();
   bike.position.set(BIKE_PARK.x, 0, BIKE_PARK.z);
   scene.add(bike);
-  const port = buildPort(scene);
+  const port = buildPort(scene, addCol);
   const jet = buildJet();
   jet.position.set(JET.x, 0, JET.z);
   scene.add(jet);

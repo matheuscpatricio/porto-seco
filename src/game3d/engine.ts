@@ -172,6 +172,7 @@ export class Game3D {
   private free = false;
   private wanted = 0;
   private mounted = false;
+  private rideSpeed = 0;
   private jetting = false;
   private cops: { mesh: THREE.Group; pos: THREE.Vector3; yaw: number; speed: number }[] = [];
   private owned = false;
@@ -918,6 +919,7 @@ export class Game3D {
     }
 
     P.moving = false;
+    this.rideSpeed = 0;
     if (control) {
       const fx = Math.sin(this.camYaw);
       const fz = Math.cos(this.camYaw);
@@ -929,6 +931,7 @@ export class Game3D {
         vz /= Math.max(1, len);
         P.running = input.run || len > 0.95;
         const speed = (P.running ? 7.5 : 4.2) * (this.jetting ? 2.15 : this.mounted ? 1.65 : 1);
+        this.rideSpeed = speed;
         P.pos.x += vx * speed * dt;
         P.pos.z += vz * speed * dt;
         P.moving = true;
@@ -1032,6 +1035,8 @@ export class Game3D {
     else if (!P.grounded) pose = "jump";
     else if (P.shootT > 0) pose = "shoot";
     else if (P.moving) pose = P.running ? "run" : "walk";
+    const typing = this.phase === "dive" || this.phase === "hack" || this.phase === "result" || this.phase === "brief";
+    if (this.mounted && !typing && pose !== "down") pose = P.shootT > 0 ? "shoot" : "ride";
     if (this.phase === "dive" || this.phase === "hack" || this.phase === "result") {
       P.pos.x += (L.terminal.x - 1.05 - P.pos.x) * Math.min(1, dt * 6);
       P.pos.z += (L.terminal.z - P.pos.z) * Math.min(1, dt * 6);
@@ -1049,11 +1054,16 @@ export class Game3D {
       jet.rotation.y = 0;
     }
     if (this.mounted) {
-      bike.position.set(P.pos.x, 0, P.pos.z);
+      bike.position.set(P.pos.x, P.pos.y, P.pos.z);
       bike.rotation.y = P.yaw;
+      const spin = (this.rideSpeed * dt) / 0.33;
+      for (const w of bike.userData.wheels as THREE.Group[]) w.rotation.x += spin;
     }
     rig.root.position.copy(P.pos);
-    if (this.mounted || this.jetting) rig.root.position.y += 0.42;
+    if (this.mounted) {
+      rig.root.position.x -= Math.sin(P.yaw) * 0.2;
+      rig.root.position.z -= Math.cos(P.yaw) * 0.2;
+    } else if (this.jetting) rig.root.position.y += 0.42;
     rig.root.rotation.y = P.yaw;
     animate(rig, pose, this.t, dt);
 
@@ -1405,7 +1415,7 @@ export class Game3D {
     this.layout.ships.forEach((ship, i) => {
       const t = this.t * 0.08 + i * 2.4;
       const along = Math.sin(t);
-      ship.position.set(i === 0 ? 63 : 97, -0.35, -16 + along * 8);
+      ship.position.set(i === 0 ? 56 : 104, 0.35 + Math.sin(t * 1.7) * 0.08, -20 + along * 6);
       ship.rotation.y = along > 0 ? 0.15 : Math.PI - 0.15;
     });
   }

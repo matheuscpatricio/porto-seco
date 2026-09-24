@@ -17,7 +17,7 @@ function SoundToggles() {
   const cls = (on: boolean) =>
     `rounded-full border px-2 py-1 text-xs font-semibold transition ${on ? "border-white/20 bg-white/10 text-foreground" : "border-white/10 text-muted-foreground line-through"}`;
   return (
-    <button className={cls(a.sfx)} onClick={() => sound.set({ sfx: !a.sfx })} aria-pressed={a.sfx} title="Sons da cidade e efeitos">
+    <button className={cls(a.sfx)} onClick={() => sound.set({ sfx: !a.sfx })} aria-pressed={a.sfx} title="Música e sons da cidade">
       {a.sfx ? "🔊" : "🔈"} <span className="hidden sm:inline">Som</span>
     </button>
   );

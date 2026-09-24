@@ -14,6 +14,7 @@ export type Pose3 =
   | "hurt"
   | "down"
   | "sit"
+  | "ride"
   | "phone"
   | "cower";
 
@@ -489,6 +490,7 @@ type Target = {
   bodyRx: number;
   bodyY: number;
   twist: number;
+  spread: number;
 };
 
 /** Poses the rig. `t` is time in seconds; `speed` scales the gait cycle. Rotations use negative X for swinging a limb forward. */
@@ -509,6 +511,7 @@ export function animate(r: Rig, pose: Pose3, t: number, dt: number, speed = 1) {
     bodyRx: 0,
     bodyY: 0,
     twist: 0,
+    spread: 0,
   };
   const breathe = Math.sin(t * 1.8) * 0.015;
   switch (pose) {
@@ -595,6 +598,18 @@ export function animate(r: Rig, pose: Pose3, t: number, dt: number, speed = 1) {
       T.sR = [-1.0, 0, -0.1];
       T.eL = T.eR = -0.5;
       break;
+    case "ride":
+      T.hipsY = 0.74;
+      T.hL = T.hR = -1.45;
+      T.kL = T.kR = 1.85;
+      T.spread = 0.62;
+      T.sL = [-1.25, 0, -0.22];
+      T.sR = [-1.25, 0, 0.22];
+      T.eL = T.eR = -0.95;
+      T.chest = 0.48;
+      T.head = -0.28;
+      T.bodyRx = 0.12;
+      break;
     case "down":
       T.bodyRx = -Math.PI / 2;
       T.bodyY = 0.18;
@@ -613,6 +628,8 @@ export function animate(r: Rig, pose: Pose3, t: number, dt: number, speed = 1) {
   r.elbowR.rotation.x = lerp(r.elbowR.rotation.x, T.eR, k);
   r.hipL.rotation.x = lerp(r.hipL.rotation.x, T.hL, k);
   r.hipR.rotation.x = lerp(r.hipR.rotation.x, T.hR, k);
+  r.hipL.rotation.z = lerp(r.hipL.rotation.z, T.spread, k);
+  r.hipR.rotation.z = lerp(r.hipR.rotation.z, -T.spread, k);
   r.kneeL.rotation.x = lerp(r.kneeL.rotation.x, T.kL, k);
   r.kneeR.rotation.x = lerp(r.kneeR.rotation.x, T.kR, k);
   r.chest.rotation.x = lerp(r.chest.rotation.x, T.chest + breathe, k);

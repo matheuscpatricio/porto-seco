@@ -52,6 +52,12 @@ class Sound {
   private engines: { osc: OscillatorNode; osc2: OscillatorNode; filter: BiquadFilterNode; gain: GainNode; pan: StereoPannerNode; tire: GainNode }[] = [];
   private ambience: Ambience = "off";
   private ambTimer: ReturnType<typeof setInterval> | null = null;
+  private musicGain: GainNode | null = null;
+  private musicEcho: GainNode | null = null;
+  private musicTimer: ReturnType<typeof setInterval> | null = null;
+  private musicOn = false;
+  private musicNext = 0;
+  private musicStep = 0;
   private listeners = new Set<() => void>();
   private alarmUntil = 0;
   settings: Settings = { sfx: true };
@@ -156,7 +162,23 @@ class Sound {
       src.start(0, Math.random());
       this.engines.push({ osc, osc2, filter, gain, pan, tire });
     }
+    this.musicGain = ctx.createGain();
+    this.musicGain.gain.value = 0;
+    this.musicGain.connect(this.master);
+    const delay = ctx.createDelay(0.6);
+    delay.delayTime.value = 0.24;
+    const damp = ctx.createBiquadFilter();
+    damp.type = "lowpass";
+    damp.frequency.value = 2400;
+    const feedback = ctx.createGain();
+    feedback.gain.value = 0.32;
+    delay.connect(damp).connect(feedback).connect(delay);
+    delay.connect(this.musicGain);
+    this.musicEcho = ctx.createGain();
+    this.musicEcho.gain.value = 0.4;
+    this.musicEcho.connect(delay);
     this.startAmbience();
+    this.musicTimer = setInterval(() => this.pumpMusic(), 90);
   }
 
   setAmbience(a: Ambience) {
@@ -206,6 +228,47 @@ class Sound {
     this.amb.hiss.gain.setTargetAtTime(city ? (a === "night" ? 0.012 : 0.02) : 0, t, 0.6);
     this.amb.hum.gain.setTargetAtTime(a === "cyber" ? 0.08 : 0, t, 0.3);
     if (a !== "day" && a !== "night") this.setEngines([]);
+    const musical = a === "day" || a === "night" || a === "menu" || a === "cyber";
+    this.musicOn = musical;
+    this.musicGain?.gain.setTargetAtTime(musical ? 0.7 : 0, t, 0.45);
+    if (musical && this.musicNext < t) this.musicNext = t + 0.06;
+  }
+
+  private pumpMusic() {
+    const ctx = this.ctx;
+    if (!ctx || !this.musicOn || !this.musicGain || !this.settings.sfx) return;
+    if (this.musicNext < ctx.currentTime - 0.05) this.musicNext = ctx.currentTime + 0.02;
+    const horizon = ctx.currentTime + 0.28;
+    while (this.musicNext < horizon) {
+      this.playMusicStep(this.musicNext, this.musicStep);
+      this.musicStep = (this.musicStep + 1) % 16;
+      this.musicNext += 60 / 98 / 2;
+    }
+  }
+
+  private playMusicStep(t: number, step: number) {
+    const bus = this.musicGain!;
+    const cyber = this.ambience === "cyber";
+    const bass = cyber
+      ? [33, 0, 33, 0, 40, 0, 36, 0, 33, 0, 31, 0, 36, 0, 28, 0]
+      : [45, 0, 45, 52, 0, 45, 48, 0, 43, 0, 43, 50, 0, 43, 48, 45];
+    const arp = cyber
+      ? [81, 84, 88, 91, 88, 84, 81, 76, 79, 83, 86, 91, 86, 83, 79, 76]
+      : [69, 72, 76, 79, 76, 72, 69, 67, 65, 69, 72, 76, 72, 69, 67, 64];
+    const kick = cyber ? [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0] : [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0];
+    const hat = [1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0];
+    const snare = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, cyber ? 1 : 0];
+    if (bass[step]) this.tone(t, midi(bass[step]), 0.22, "sawtooth", 0.07, bus, 240);
+    if (arp[step]) {
+      this.tone(t, midi(arp[step]), cyber ? 0.12 : 0.2, "square", 0.028, bus, cyber ? 1800 : 1400);
+      if (this.musicEcho) this.tone(t, midi(arp[step]), 0.16, "square", 0.016, this.musicEcho, 1600);
+    }
+    if (kick[step]) this.tone(t, 130, 0.16, "sine", 0.16, bus, 200, 46);
+    if (hat[step]) this.noiseHit(t, 0.03, 0.025, "highpass", 7000, bus);
+    if (snare[step]) this.noiseHit(t, 0.12, 0.05, "bandpass", 1800, bus);
+    if (step % 8 === 0) {
+      for (const n of cyber ? [64, 67, 71] : [57, 60, 64]) this.tone(t, midi(n), 1.3, "sine", 0.018, bus, 900);
+    }
   }
 
   private ambientEvent() {

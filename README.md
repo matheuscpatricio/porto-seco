@@ -26,7 +26,7 @@ Os carros param para pedestres e buzinam se o Léo ficar na frente. Tiros assust
 
 ## Som
 
-Não há música. Todo o som é gerado no navegador com a Web Audio API (`src/game/audio.ts`), sem arquivos de áudio: ronco da cidade, motores dos carros que passam (com volume e lado de acordo com a distância), buzinas, sirenes ao longe, passarinhos de dia, cachorro à noite, passos, tiros com eco, vozes sintetizadas de pedestres conversando e dos personagens nos diálogos. O botão Som, na barra do topo, liga e desliga tudo, e a escolha fica salva.
+A trilha é um tema tecnológico gerado no navegador, sem arquivo de áudio: baixo, arpejo, bateria eletrônica e um eco. Dentro do sistema o tema fica mais digital. O resto do som também sai da Web Audio API (`src/game/audio.ts`): ronco da cidade, motores dos carros que passam (com volume e lado de acordo com a distância), buzinas, sirenes ao longe, passarinhos de dia, cachorro à noite, passos, tiros com eco, vozes sintetizadas de pedestres conversando e dos personagens nos diálogos. O botão Som, na barra do topo, liga e desliga música e efeitos, e a escolha fica salva.
 
 ## Controles
 
