@@ -1,4 +1,4 @@
-import type { Look } from "@/game/characters";
+import { ARMOR, type Look } from "@/game/characters";
 import type { Pose3, Rig } from "@/game3d/human";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -56,10 +56,8 @@ const gunGeo = {
 };
 
 function kindFor(look: Look) {
-  const woman = look.hairStyle === "ponytail" || (look.hairStyle === "curly" && look.build !== "big");
-  if (woman) return "michelle";
-  if (look.extras.includes("vest")) return "soldier";
-  return "xbot";
+  if (look.mesh === "helper") return "michelle";
+  return "soldier";
 }
 
 function bone(root: THREE.Object3D, name: string) {
@@ -522,16 +520,18 @@ function faceRect(src: ImageData) {
 function photoMap(kind: "michelle" | "soldier", look: Look) {
   const src = kind === "michelle" ? michelleSrc : soldierSrc;
   if (!src) return null;
-  const key = kind === "soldier" ? `soldier|${look.skin}` : `michelle|${look.skin}|${look.shirt}|${look.hair}`;
+  const armorName = look.armor ?? "npc";
+  const key = kind === "soldier" ? `soldier|${armorName}` : `michelle|${look.skin}|${look.shirt}|${look.hair}`;
   const cached = photoCache.get(key);
   if (cached) return cached;
   const skin = hexRgb(look.skin);
   const shirt = hexRgb(look.shirt);
   const hair = hexRgb(look.hair);
+  const armor = hexRgb(ARMOR[armorName]);
   const { width: w, height: h, data } = src;
   const cls = new Uint8Array(w * h);
   const face = soldierFace;
-  const acc = [0, 1, 2, 3, 4].map(() => [0, 0, 0, 0]);
+  const acc = [0, 1, 2, 3, 4, 5].map(() => [0, 0, 0, 0]);
   const add = (k: number, r: number, g: number, b: number) => {
     acc[k][0] += r;
     acc[k][1] += g;
@@ -546,9 +546,10 @@ function photoMap(kind: "michelle" | "soldier", look: Look) {
       const g = data[o + 1];
       const b = data[o + 2];
       if (kind === "soldier") {
-        if (face && x >= face.x0 && x < face.x1 && y >= face.y0 && y < face.y1 && r > 70 && g > 40 && b > 25 && r + 15 > g && r > b + 8 && r < 250) {
-          cls[i] = 4;
-          add(4, r, g, b);
+        const faceHit = !!(face && x >= face.x0 && x < face.x1 && y >= face.y0 && y < face.y1 && r > 70 && g > 40 && b > 25 && r + 15 > g && r > b + 8 && r < 250);
+        if (!faceHit && Math.max(r, g, b) >= 42) {
+          cls[i] = 5;
+          add(5, r, g, b);
         }
         continue;
       }
@@ -588,12 +589,12 @@ function photoMap(kind: "michelle" | "soldier", look: Look) {
   const aSkin = meanOf(1);
   const aCloth = meanOf(2);
   const aHair = meanOf(3);
-  const aFace = meanOf(4);
+  const aArmor = meanOf(5);
   for (let i = 0; i < cls.length; i++) {
     if (cls[i] === 1) grade(i, skin, aSkin);
     else if (cls[i] === 2) grade(i, shirt, aCloth);
     else if (cls[i] === 3) grade(i, hair, aHair);
-    else if (cls[i] === 4) grade(i, skin, aFace);
+    else if (cls[i] === 5) grade(i, armor, aArmor);
   }
   ctx.putImageData(img, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
@@ -604,7 +605,7 @@ function photoMap(kind: "michelle" | "soldier", look: Look) {
   return tex;
 }
 
-/** Mixamo heroes. Civilians wear a painted Xbot; vests keep the photographed soldier. */
+/** Mixamo heroes. Maya keeps Michelle. Everyone else is the photographed soldier. */
 export async function preloadCast(onStatus?: (label: string, pct: number) => void) {
   if (typeof window === "undefined") return;
   if (templates.size) {
@@ -749,8 +750,7 @@ export function trySkinned(look: Look): Rig | null {
   rig.root.userData.skin = look.skin;
   rig.body.add(model);
   rig.root.add(rig.body);
-  if (kind === "xbot") dressXbot(model, look, rig);
-  else dressPhoto(model, look, kind, rig);
+  dressPhoto(model, look, kind, rig);
   const gun = pistol();
   const hand = bone(model, "mixamorigRightHand");
   if (hand) {

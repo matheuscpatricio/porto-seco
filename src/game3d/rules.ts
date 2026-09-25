@@ -71,7 +71,7 @@ export function doorOpen(place: DoorPlace, step: DoorStep): boolean {
 export type RoomGap = "east" | "west" | "plusZ" | "minusZ";
 export type RoomBox = { minX: number; maxX: number; minZ: number; maxZ: number; gap: RoomGap };
 
-/** Léo's house, on the southwest lot, door facing the south sidewalk. */
+/** Cole's house, on the southwest lot, door facing the south sidewalk. */
 export const HOME: RoomBox = { minX: 17, maxX: 26, minZ: 17, maxZ: 25.6, gap: "minusZ" };
 export const HOME_STUDY = { x: 21.5, z: 21.3 };
 /** Parked on the sidewalk in front of the door, off the driving lane. */
@@ -80,7 +80,7 @@ export const BIKE_PARK = { x: 21.5, z: 15.4 };
 export const SHOP_A: RoomBox = { minX: 136.6, maxX: 145.4, minZ: 16.6, maxZ: 24.2, gap: "minusZ" };
 /** Corner shop on the northwest lot, door toward the west sidewalk. */
 export const SHOP_B: RoomBox = { minX: 16.6, maxX: 24.2, minZ: 136.6, maxZ: 145.4, gap: "west" };
-/** Dani's skyscraper, in the center block. The shaft is the roof you stand on. */
+/** Maya's skyscraper, in the center block. The shaft is the roof you stand on. */
 export const TOWER = { x: 82, z: 82 };
 export const ROOF = 140;
 /** Hideout floor, raised off the shaft cap so the two surfaces do not share a plane. */
@@ -88,9 +88,9 @@ export const DECK = ROOF + 0.16;
 export const CENTRAL: RoomBox = { minX: 76, maxX: 88, minZ: 66, maxZ: 90, gap: "minusZ" };
 export const ELEVATOR = { x: 82, z: 74.2 };
 export const HIDEOUT = { x: 82, z: 82 };
-/** Dani's chair, facing +Z into the monitors. */
+/** Maya's chair, facing +Z into the monitors. */
 export const DANI_CHAIR = { x: 82, z: 85.85 };
-/** Where Léo stands to enter the computer. South of the chair, inside the room. */
+/** Where Cole stands to enter the computer. South of the chair, inside the room. */
 export const CENTRAL_PHONE = { x: 82, z: 83.4 };
 /** Cargo ships sit in the water, past the beach. */
 export const BERTHS = [
@@ -119,7 +119,7 @@ export function indoors(x: number, z: number): boolean {
   return ROOMS.some((room) => x > room.minX && x < room.maxX && z > room.minZ && z < room.maxZ);
 }
 
-/** Stand in front of the door so a closed door cannot trap Léo inside. */
+/** Stand in front of the door so a closed door cannot trap Cole inside. */
 export function roomExit(x: number, z: number): { x: number; z: number } | null {
   for (const room of ROOMS) {
     if (x <= room.minX || x >= room.maxX || z <= room.minZ || z >= room.maxZ) continue;
@@ -192,7 +192,7 @@ export function inSea(x: number, z: number): boolean {
   return waterDepth(x, z) > 0.05;
 }
 
-/** Water past this covers Léo and the shark attacks. */
+/** Water past this covers Cole and the shark attacks. */
 export const SWIM_HEIGHT = 1.75;
 
 /** Ambient special and federal officers grow with the mission index. */
@@ -222,7 +222,7 @@ export function separateCircles(ax: number, az: number, bx: number, bz: number, 
 
 export const WANTED_SECONDS = 45;
 export const PLAYER_MAX_HP = 100;
-/** Mission guards, drones and bosses still drop Léo in three hits. */
+/** Mission guards, drones and bosses still drop Cole in three hits. */
 export const SECURITY_HIT = 34;
 
 export type PoliceRank = "guarda" | "especial" | "federal";

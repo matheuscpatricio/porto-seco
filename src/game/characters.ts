@@ -3,6 +3,16 @@ import type { Who } from "@/content/types";
 export type HairStyle = "short" | "ponytail" | "curly" | "slick" | "bald" | "buzz";
 export type Extra = "glasses" | "mustache" | "tie" | "cap" | "mask" | "vest" | "jacket" | "beard";
 
+/** One suit color per role. The mesh stays the same soldier. */
+export type Armor = "player" | "npc" | "police" | "thug";
+
+export const ARMOR: Record<Armor, string> = {
+  player: "#e11d48",
+  npc: "#a8a29e",
+  police: "#2563eb",
+  thug: "#eab308",
+};
+
 export type Look = {
   skin: string;
   hair: string;
@@ -14,6 +24,9 @@ export type Look = {
   extras: Extra[];
   build: "slim" | "normal" | "big";
   accent?: string;
+  armor?: Armor;
+  /** Maya keeps the photographed helper. Everyone else is the soldier mesh. */
+  mesh?: "helper";
 };
 
 export const policeLooks: Record<"guarda" | "especial" | "federal", Look> = {
@@ -28,6 +41,7 @@ export const policeLooks: Record<"guarda" | "especial" | "federal", Look> = {
     extras: ["cap", "vest"],
     build: "normal",
     accent: "#1e3a8a",
+    armor: "police",
   },
   especial: {
     skin: "#a97856",
@@ -40,6 +54,7 @@ export const policeLooks: Record<"guarda" | "especial" | "federal", Look> = {
     extras: ["mask", "vest"],
     build: "big",
     accent: "#f59e0b",
+    armor: "police",
   },
   federal: {
     skin: "#e0b18a",
@@ -52,10 +67,11 @@ export const policeLooks: Record<"guarda" | "especial" | "federal", Look> = {
     extras: ["vest", "jacket"],
     build: "big",
     accent: "#eab308",
+    armor: "police",
   },
 };
 
-/** Caveira's men. Dark clothes, mask, vest, gold accent. They are not police. */
+/** Kane's men. Dark clothes, mask, vest, gold accent. They are not police. */
 export const thugLook: Look = {
   skin: "#6b4a33",
   hair: "#111111",
@@ -67,6 +83,7 @@ export const thugLook: Look = {
   extras: ["mask", "vest"],
   build: "big",
   accent: "#eab308",
+  armor: "thug",
 };
 
 export const guardLook: Look = {
@@ -80,68 +97,69 @@ export const guardLook: Look = {
   extras: ["cap", "vest"],
   build: "normal",
   accent: "#1f2937",
+  armor: "police",
 };
 
 export const people: Record<Who, { name: string; role: string; look: Look; ally: boolean }> = {
   leo: {
-    name: "Léo",
+    name: "Cole",
     role: "motoboy e hacker novato",
     ally: true,
-    look: { skin: "#b97a56", hair: "#151515", hairStyle: "short", shirt: "#f1f5f9", jacket: "#e11d48", pants: "#1e3a5f", shoes: "#f8fafc", extras: ["jacket"], build: "normal" },
+    look: { skin: "#b97a56", hair: "#151515", hairStyle: "short", shirt: "#f1f5f9", jacket: "#e11d48", pants: "#1e3a5f", shoes: "#f8fafc", extras: ["jacket"], build: "normal", armor: "player" },
   },
   dani: {
-    name: "Dani",
+    name: "Maya",
     role: "hacker, ex-funcionária da Vértice",
     ally: true,
-    look: { skin: "#f0c8a0", hair: "#6d28d9", hairStyle: "ponytail", shirt: "#111827", pants: "#374151", shoes: "#a855f7", extras: ["glasses"], build: "slim" },
+    look: { skin: "#f0c8a0", hair: "#6d28d9", hairStyle: "ponytail", shirt: "#111827", pants: "#374151", shoes: "#a855f7", extras: ["glasses"], build: "slim", mesh: "helper" },
   },
   rui: {
-    name: "Tio Rui",
+    name: "Hank",
     role: "motorista da equipe",
     ally: true,
-    look: { skin: "#7a4a2a", hair: "#d1d5db", hairStyle: "short", shirt: "#f97316", pants: "#57534e", shoes: "#292524", extras: ["mustache"], build: "big" },
+    look: { skin: "#7a4a2a", hair: "#d1d5db", hairStyle: "short", shirt: "#f97316", pants: "#57534e", shoes: "#292524", extras: ["mustache"], build: "big", armor: "npc" },
   },
   bia: {
-    name: "Bia",
+    name: "Brooke",
     role: "mecânica da equipe",
     ally: true,
-    look: { skin: "#d9a066", hair: "#2b160c", hairStyle: "curly", shirt: "#1d4ed8", pants: "#1d4ed8", shoes: "#111111", extras: [], build: "slim" },
+    look: { skin: "#d9a066", hair: "#2b160c", hairStyle: "curly", shirt: "#1d4ed8", pants: "#1d4ed8", shoes: "#111111", extras: [], build: "slim", armor: "npc" },
   },
   vidal: {
-    name: "Augusto Vidal",
+    name: "Victor Hale",
     role: "dono da Vértice Segurança",
     ally: false,
-    look: { skin: "#f3d2b3", hair: "#9ca3af", hairStyle: "slick", shirt: "#e5e7eb", jacket: "#0b0b0f", pants: "#0b0b0f", shoes: "#000000", extras: ["jacket", "tie"], build: "normal", accent: "#b91c1c" },
+    look: { skin: "#f3d2b3", hair: "#9ca3af", hairStyle: "slick", shirt: "#e5e7eb", jacket: "#0b0b0f", pants: "#0b0b0f", shoes: "#000000", extras: ["jacket", "tie"], build: "normal", accent: "#b91c1c", armor: "police" },
   },
   caveira: {
-    name: "Caveira",
+    name: "Kane",
     role: "agiota e chefe dos seguranças",
     ally: false,
-    look: { skin: "#6b4a33", hair: "#111111", hairStyle: "bald", shirt: "#1f1f1f", jacket: "#262626", pants: "#171717", shoes: "#0a0a0a", extras: ["mask", "vest"], build: "big" },
+    look: { skin: "#6b4a33", hair: "#111111", hairStyle: "bald", shirt: "#1f1f1f", jacket: "#262626", pants: "#171717", shoes: "#0a0a0a", extras: ["mask", "vest"], build: "big", armor: "thug" },
   },
   baiano: {
-    name: "Baiano",
-    role: "cobrador do Caveira",
+    name: "Dex",
+    role: "cobrador do Kane",
     ally: false,
-    look: { skin: "#8a5a3b", hair: "#111111", hairStyle: "buzz", shirt: "#eab308", pants: "#3f3f46", shoes: "#18181b", extras: ["cap", "mustache"], build: "big", accent: "#15803d" },
+    look: { skin: "#8a5a3b", hair: "#111111", hairStyle: "buzz", shirt: "#eab308", pants: "#3f3f46", shoes: "#18181b", extras: ["cap", "mustache"], build: "big", accent: "#15803d", armor: "thug" },
   },
   brito: {
-    name: "Sargento Brito",
+    name: "Sergeant Briggs",
     role: "segurança da Vértice",
     ally: false,
-    look: { ...guardLook, skin: "#e0b18a", extras: ["cap", "vest", "mustache"], build: "big" },
+    look: { ...guardLook, skin: "#e0b18a", extras: ["cap", "vest", "mustache"], build: "big", armor: "police" },
   },
   tanque: {
-    name: "Tanque",
+    name: "Brick",
     role: "capanga do porto",
     ally: false,
-    look: { skin: "#c08a63", hair: "#000000", hairStyle: "bald", shirt: "#475569", pants: "#1f2937", shoes: "#111827", extras: ["beard"], build: "big" },
+    look: { skin: "#c08a63", hair: "#000000", hairStyle: "bald", shirt: "#475569", pants: "#1f2937", shoes: "#111827", extras: ["beard"], build: "big", armor: "thug" },
   },
   marreta: {
-    name: "Marreta",
+    name: "Mack",
     role: "dono do desmanche",
     ally: false,
-    look: { skin: "#9c6b4a", hair: "#6b7280", hairStyle: "curly", shirt: "#78350f", pants: "#78350f", shoes: "#1c1917", extras: ["glasses", "beard"], build: "big" },
+    look: { skin: "#9c6b4a", hair: "#6b7280", hairStyle: "curly", shirt: "#78350f", pants: "#78350f", shoes: "#1c1917", extras: ["glasses", "beard"], build: "big", armor: "thug" },
   },
 };
 
@@ -185,5 +203,6 @@ export function randomLook(r: () => number): Look {
     extras,
     build,
     accent: pick(SHIRTS),
+    armor: "npc",
   };
 }

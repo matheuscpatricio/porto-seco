@@ -1,4 +1,4 @@
-/** Plain lessons Dani teaches from the roof. Mission checks stay in the chapters. */
+/** Plain lessons Maya teaches from the roof. Mission checks stay in the chapters. */
 export type Visual =
   | { kind: "sequence"; items: string[]; lit: number }
   | { kind: "fork"; question: string; yes: string; no: string; path: "yes" | "no" }
@@ -43,7 +43,7 @@ export const MODULES: Module[] = [
         visual: {
           kind: "slots",
           slots: [
-            { name: "nome", value: '"Léo"', kind: "texto" },
+            { name: "nome", value: '"Cole"', kind: "texto" },
             { name: "idade", value: "23", kind: "número" },
           ],
         },
@@ -177,9 +177,9 @@ export const MODULES: Module[] = [
         say: "Um dicionário liga um nome a um valor, como uma ficha. Você pede pelo nome.",
         visual: {
           kind: "cards",
-          title: "ficha do Léo",
+          title: "ficha do Cole",
           pairs: [
-            { key: "nome", value: "Léo", hot: true },
+            { key: "nome", value: "Cole", hot: true },
             { key: "moto", value: "entrega" },
           ],
         },
@@ -190,7 +190,7 @@ export const MODULES: Module[] = [
           kind: "cards",
           title: "ficha[\"moto\"]",
           pairs: [
-            { key: "nome", value: "Léo" },
+            { key: "nome", value: "Cole" },
             { key: "moto", value: "entrega", hot: true },
           ],
         },
@@ -204,7 +204,7 @@ export const MODULES: Module[] = [
     steps: [
       {
         say: "Uma função é uma receita com nome. def cria. Você chama pelo nome quando quiser repetir.",
-        visual: { kind: "code", lines: ["def saudar(nome):", "    return \"Oi, \" + nome", "saudar(\"Léo\")"], focus: 2 },
+        visual: { kind: "code", lines: ["def saudar(nome):", "    return \"Oi, \" + nome", "saudar(\"Cole\")"], focus: 2 },
       },
       {
         say: "return entrega o resultado e sai. O que vem depois da receita não roda.",
@@ -224,7 +224,7 @@ export const MODULES: Module[] = [
           title: "planta Moto → objeto",
           pairs: [
             { key: "planta", value: "Moto" },
-            { key: "objeto", value: "entrega do Léo", hot: true },
+            { key: "objeto", value: "entrega do Cole", hot: true },
           ],
         },
       },

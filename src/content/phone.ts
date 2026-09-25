@@ -131,7 +131,7 @@ export function phoneLines(level: { id: string; theory: string; example: string 
     `Um jeito de escrever é este: ${level.example.split("\n")[0]}`,
   ];
   return [
-    { who: "dani", text: "Léo, aqui é a Dani. Eu fico na central. Te explico por telefone, sem aparecer no meio da rua." },
+    { who: "dani", text: "Cole, aqui é a Maya. Eu fico na central. Te explico por telefone, sem aparecer no meio da rua." },
     ...lesson.map((text) => ({ who: "dani" as const, text })),
     { who: "dani", text: "Quando fizer sentido, desliga e volta para a missão. Eu continuo aqui se precisar ligar de novo." },
   ];

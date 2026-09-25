@@ -1,12 +1,12 @@
 import type { Level, Who, World } from "@/content/types";
 import { allLevels } from "@/content/worlds";
 import { sound } from "@/game/audio";
-import { diverseLook, guardLook, people, policeLooks, randomLook, thugLook } from "@/game/characters";
+import { guardLook, people, policeLooks, randomLook, thugLook } from "@/game/characters";
 import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
-import { BERTHS, canMount, CENTRAL_PHONE, DANI_CHAIR, decayWanted, DECK, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, PLAYER_MAX_HP, POLICE_RANK, policeRank, policeRankForMission, policeRoster, ROOF, roomExit, SECURITY_HIT, separateCircles, SHOPS, shirtFor, SWIM_HEIGHT, TOWER, waterDepth, type PoliceRank } from "@/game3d/rules";
+import { BERTHS, canMount, CENTRAL_PHONE, DANI_CHAIR, decayWanted, DECK, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, PLAYER_MAX_HP, POLICE_RANK, policeRank, policeRankForMission, policeRoster, ROOF, roomExit, SECURITY_HIT, separateCircles, SHOPS, SWIM_HEIGHT, TOWER, waterDepth, type PoliceRank } from "@/game3d/rules";
 import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
@@ -273,8 +273,7 @@ export class Game3D {
     if (M.terminal) this.moveTerminal(M.terminal);
     if (M.pickup) this.moveCar(this.openCurb(M.pickup.pos, M.pickup.yaw), M.pickup.yaw);
 
-    const chapter = Math.max(0, Number(world.id.replace(/\D/g, "")) - 1);
-    const rig = buildHuman({ ...people.leo.look, shirt: shirtFor(chapter) });
+    const rig = buildHuman(people.leo.look);
     this.scene.add(rig.root);
     this.player = { rig, pos: L.spawn.clone(), vy: 0, yaw: Math.PI / 4, grounded: true, hp: PLAYER_MAX_HP, inv: 0, shootT: 0, cooldown: 0, downT: 0, cheerT: 0, moving: false, running: false, stepD: 0 };
     this.checkpoint = L.spawn.clone();
@@ -490,7 +489,7 @@ export class Game3D {
     b.name = people[this.level.boss!].name;
     this.scene.remove(b.mesh);
     const rigB = buildHuman(people[this.level.boss!].look);
-    rigB.root.scale.setScalar(1.18);
+    rigB.root.scale.setScalar(1.55);
     b.rig = rigB;
     b.mesh = rigB.root;
     b.marker.material = bossMarkerMat;
@@ -556,8 +555,7 @@ export class Game3D {
     let mesh: THREE.Object3D;
     if (kind === "drone") mesh = buildDrone();
     else {
-      const authored = opts?.look ?? guardLook;
-      const look = authored.extras.includes("vest") ? diverseLook(authored, Math.random) : authored;
+      const look = opts?.look ?? guardLook;
       rig = buildHuman(look, { simple: true });
       mesh = rig.root;
     }
@@ -614,7 +612,7 @@ export class Game3D {
     return p;
   }
 
-  /** Special and federal officers patrol. Caveira's men hunt Léo on sight. */
+  /** Special and federal officers patrol. Kane's men hunt Cole on sight. */
   private spawnRoster() {
     const roster = policeRoster(this.index);
     const wave = (rank: PoliceRank, n: number) => {
@@ -758,7 +756,7 @@ export class Game3D {
     if (this.phase === "play") this.ev.onPhase("play");
     else this.setPhase("play");
     this.lift = null;
-    this.ev.onToast("Você está na ilha. O arranha-céu do centro, o ponto azul, é o esconderijo da Dani. E no elevador sobe.", "info");
+    this.ev.onToast("Você está na ilha. O arranha-céu do centro, o ponto azul, é o esconderijo da Maya. E no elevador sobe.", "info");
   }
 
   beginMission() {
@@ -1384,14 +1382,14 @@ export class Game3D {
         const d = this.allies.find((a) => a.path);
         const arrived = d && (d.wp >= d.path!.length || d.pos.distanceTo(L.terminal) < 4.5);
         if (arrived) {
-          this.ev.onToast('Dani: "Cheguei! O interfone é todo seu. Aperte E."', "good");
+          this.ev.onToast('Maya: "Cheguei! O interfone é todo seu. Aperte E."', "good");
           this.checkpoint = P.pos.clone();
           this.nextStep();
           break;
         }
         const door = new THREE.Vector3(L.terminal.x - 1.1, P.pos.y, L.terminal.z);
         if (control && P.pos.distanceTo(door) < 2.6 && input.use && !this.useHeld) {
-          this.ev.onToast("A Dani ainda não chegou. Fique perto dela — a seta mostra onde ela está.", "bad");
+          this.ev.onToast("A Maya ainda não chegou. Fique perto dela — a seta mostra onde ela está.", "bad");
         }
         break;
       }
@@ -1426,7 +1424,7 @@ export class Game3D {
           } else {
             this.setPhase("escape");
             sound.sfx("car");
-            this.ev.onToast('Tio Rui: "Entra, entra! Segura firme!"', "good");
+            this.ev.onToast('Hank: "Entra, entra! Segura firme!"', "good");
           }
         }
         break;
@@ -1443,14 +1441,14 @@ export class Game3D {
         while (a.wp < a.path.length && this.solidAt(a.path[a.wp].x, a.path[a.wp].z, 0.4)) a.wp++;
         const threat = this.guardAhead(a);
         if (threat) {
-          if (!a.waiting) this.ev.onToast('Dani: "Tem segurança na frente! Me cobre!"', "bad");
+          if (!a.waiting) this.ev.onToast('Maya: "Tem segurança na frente! Me cobre!"', "bad");
           a.waiting = true;
           pose = "cower";
         } else {
           a.waiting = false;
           const far = P.pos.distanceTo(a.pos) > 18;
           if (far && this.warnT <= 0) {
-            this.ev.onToast('Dani: "Não me deixa para trás!"', "bad");
+            this.ev.onToast('Maya: "Não me deixa para trás!"', "bad");
             this.warnT = 5;
           }
           const goal = a.path[a.wp];
@@ -1682,7 +1680,7 @@ export class Game3D {
     this.jetting = false;
     this.lift = { t: 0, up, start: this.player.pos.clone() };
     sound.sfx("gate");
-    this.ev.onToast(up ? "Elevador. Subindo para a cobertura da Dani." : "Elevador. Descendo para o saguão.", "info");
+    this.ev.onToast(up ? "Elevador. Subindo para a cobertura da Maya." : "Elevador. Descendo para o saguão.", "info");
   }
 
   private updateLift(dt: number) {
@@ -1721,7 +1719,7 @@ export class Game3D {
       this.liftFloor = ride.up ? "roof" : "ground";
       this.lift = null;
       sound.sfx("gate");
-      if (ride.up) this.ev.onToast("Sala da Dani. Aperte E para entrar no computador.", "good");
+      if (ride.up) this.ev.onToast("Sala da Maya. Aperte E para entrar no computador.", "good");
     }
   }
 

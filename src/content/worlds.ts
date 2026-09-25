@@ -5,13 +5,13 @@ import type { Level, Line, World } from "@/content/types";
 export type { Display, Level, Line, LockEvent, Who, World } from "@/content/types";
 
 export const prologue: Line[] = [
-  { who: "leo", text: "Meu nome é Léo. Sou motoboy de aplicativo em Porto Seco e devo R$ 8 mil para o Caveira, o agiota que manda no meu bairro." },
-  { who: "leo", text: "O Caveira trabalha para a Vértice Segurança, a empresa que controla as câmeras, os drones e os seguranças desta cidade. O dono dela é Augusto Vidal." },
-  { who: "dani", text: "E é aí que eu entro. Sou a Dani. Trabalhei na Vértice até descobrir que o Vidal forjou as provas que colocaram meu irmão na cadeia." },
+  { who: "leo", text: "Meu nome é Cole. Sou motoboy de aplicativo em Porto Seco e devo R$ 8 mil para o Kane, o agiota que manda no meu bairro." },
+  { who: "leo", text: "O Kane trabalha para a Vértice Segurança, a empresa que controla as câmeras, os drones e os seguranças desta cidade. O dono dela é Victor Hale." },
+  { who: "dani", text: "E é aí que eu entro. Sou a Maya. Trabalhei na Vértice até descobrir que o Hale forjou as provas que colocaram meu irmão na cadeia." },
   { who: "dani", text: "As provas verdadeiras estão num servidor no topo da Torre Vértice. Para chegar lá, preciso de alguém rápido na rua que aprenda a programar em Python." },
   { who: "leo", text: "Eu nunca programei na vida." },
   { who: "dani", text: "Melhor ainda. Programar é só dar ordens bem claras para o computador. Ele obedece tudo, mas ao pé da letra. Eu te ensino um passo de cada vez." },
-  { who: "rui", text: "Eu sou o Tio Rui, o motorista. A Bia cuida dos carros. Você corre, pula, derruba os seguranças com a pistola de choque e hackeia o que estiver no caminho." },
+  { who: "rui", text: "Eu sou o Hank, o motorista. A Brooke cuida dos carros. Você corre, pula, derruba os seguranças com a pistola de choque e hackeia o que estiver no caminho." },
   { who: "leo", text: "Fechado. Bora derrubar a Vértice." },
 ];
 

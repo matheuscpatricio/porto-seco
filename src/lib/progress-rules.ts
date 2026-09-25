@@ -28,7 +28,7 @@ export function mergeRecord<T extends Record<string, unknown>>(empty: T, parsed:
   return { ...empty, ...(parsed as Partial<T>) };
 }
 
-/** First completion pays. A replay pays nothing. Asking Dani for help also pays nothing. */
+/** First completion pays. A replay pays nothing. Asking Maya for help also pays nothing. */
 export function firstClearPay(prevStars: number, levelXp: number, helped = false): number {
   if (helped || prevStars > 0) return 0;
   return levelXp * 10;

@@ -70,7 +70,7 @@ function grid(v: number) {
 export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: number, bossName: string | null): Mission {
   const r = rng(index * 31 + 7);
   const m: Mission = { kind, title: SCRIPT_LABEL[kind], steps: [], terminal: null, pickup: null, bossAt: null, gate: false, alarmAfterHack: false, chasePath: [], escortWave: [] };
-  const car = { k: "car" as const, text: "Carro de fuga do Tio Rui" };
+  const car = { k: "car" as const, text: "Carro de fuga do Hank" };
   switch (kind) {
     case "invasao":
       m.gate = true;
@@ -83,7 +83,7 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       m.terminal = b.pos.clone();
       m.pickup = pickupNear(far(L.spots, b.pos, 30, r));
       m.steps = [
-        { k: "contact", to: a.pos.clone().add(new THREE.Vector3(-1.4, 0, 0)), text: `Encontre o contato da Dani na ${a.area}`, arrive: `Contato: "Toma o pendrive. O terminal fica na ${b.area}. Some daqui!"` },
+        { k: "contact", to: a.pos.clone().add(new THREE.Vector3(-1.4, 0, 0)), text: `Encontre o contato da Maya na ${a.area}`, arrive: `Contato: "Toma o pendrive. O terminal fica na ${b.area}. Some daqui!"` },
         { k: "hack" },
         { k: "go", to: a.pos.clone(), text: "Devolva o resultado ao contato", arrive: 'Contato: "Recebido. Pode ir para casa."' },
       ];
@@ -121,7 +121,7 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       const path = [new THREE.Vector3(9, 0, 9), new THREE.Vector3(gx, 0, 9), new THREE.Vector3(gx, 0, s.pos.z), new THREE.Vector3(s.pos.x - 1.8, 0, s.pos.z + 1.2)];
       m.escortWave = [path[1].clone().lerp(path[2], 0.25), path[1].clone().lerp(path[2], 0.6), path[2].clone().add(new THREE.Vector3(3, 0, -6))];
       m.pickup = pickupNear(s);
-      m.steps = [{ k: "escort", path, text: `Fique perto da Dani e leve ela até a ${s.area}` }, { k: "hack" }];
+      m.steps = [{ k: "escort", path, text: `Fique perto da Maya e leve ela até a ${s.area}` }, { k: "hack" }];
       break;
     }
     case "fuga": {
@@ -147,7 +147,7 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
       m.terminal = t.pos.clone();
       m.pickup = pickupNear(t);
       m.steps = [
-        { k: "go", to: m.bossAt.clone().add(new THREE.Vector3(0, 0, -14)), text: `${bossName} está esperando na ${plaza.area}`, arrive: `${bossName}: "Você de novo, moleque? Hoje acaba."`, spawnBoss: true },
+        { k: "go", to: m.bossAt.clone().add(new THREE.Vector3(0, 0, -14)), text: `${bossName} está esperando na ${plaza.area}`, arrive: `${bossName}: "Você de novo, garoto? Hoje acaba."`, spawnBoss: true },
         { k: "boss", text: `Derrube ${bossName}` },
         { k: "hack" },
       ];

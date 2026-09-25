@@ -190,7 +190,7 @@ export function ComputerLesson({
           <span>aula · o pagamento fica</span>
         </div>
         <div className="space-y-3 overflow-y-auto p-4">
-          <p className="text-sm text-emerald-50">Escolha o módulo. A Dani explica na tela, um passo de cada vez, com o desenho do que ela está falando.</p>
+          <p className="text-sm text-emerald-50">Escolha o módulo. A Maya explica na tela, um passo de cada vez, com o desenho do que ela está falando.</p>
           <p className="text-xs text-white/60">Essa aula na cobertura não tira o dinheiro da missão. O pagamento some só se, no terminal, ela escrever o código no seu lugar.</p>
           {BANDS.map((band) => (
             <div key={band}>
@@ -268,7 +268,7 @@ function LessonRoom({ module, onBack, onClose }: { module: Module; onBack: () =>
         <VisualView visual={step.visual} />
       </div>
       <div className="border-t border-emerald-400/20 bg-black/50 p-4">
-        <p className="text-[11px] font-black uppercase tracking-widest text-sky-300">Dani</p>
+        <p className="text-[11px] font-black uppercase tracking-widest text-sky-300">Maya</p>
         <p className="mt-1 min-h-12 text-sm leading-relaxed sm:text-base">
           {typed}
           {!done && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-emerald-300 align-middle" />}

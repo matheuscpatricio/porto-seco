@@ -11,7 +11,7 @@ test("a replay pays nothing", () => {
   assert.equal(firstClearPay(3, 40), 0);
 });
 
-test("asking Dani for help pays nothing", () => {
+test("asking Maya for help pays nothing", () => {
   assert.equal(firstClearPay(0, 40, true), 0);
 });
 

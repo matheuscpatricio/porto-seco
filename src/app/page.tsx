@@ -79,7 +79,7 @@ export default function Home() {
             <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-300">Um jogo de ação para aprender Python do zero</p>
             <h1 className="mt-2 text-4xl font-black uppercase leading-none tracking-tight sm:text-6xl">Porto Seco</h1>
             <p className="mt-3 text-white/80">
-              O Léo é motoboy, está endividado e nunca programou. Com a ajuda da Dani, ele corre, pula, enfrenta os capangas do Caveira e hackeia a cidade inteira, aprendendo
+              O Cole é motoboy, está endividado e nunca programou. Com a ajuda da Maya, ele corre, pula, enfrenta os capangas do Kane e hackeia a cidade inteira, aprendendo
               Python a cada missão. A ilha tem costa irregular. A polícia só reage a um hack ou a uma morte, e a água funda traz um tubarão.
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -91,7 +91,7 @@ export default function Home() {
               </button>
             </div>
             <p className="mt-3 text-xs text-white/60">
-              {done} de {allLevels.length} missões concluídas · R$ {p.money} · a moto fica na calçada · o ponto azul no mapa é o arranha-céu da Dani, no centro · na sala da cobertura, E entra no computador e a aula não tira o pagamento · lojas de armas e de motos gastam o pagamento · Teclado: ← → andar, ↑ pular, F atirar, E hackeia, sobe na moto e abre o computador da torre · No celular há botões na tela
+              {done} de {allLevels.length} missões concluídas · R$ {p.money} · a moto fica na calçada · o ponto azul no mapa é o arranha-céu da Maya, no centro · na sala da cobertura, E entra no computador e a aula não tira o pagamento · lojas de armas e de motos gastam o pagamento · Teclado: ← → andar, ↑ pular, F atirar, E hackeia, sobe na moto e abre o computador da torre · No celular há botões na tela
             </p>
           </div>
           <div className="pointer-events-none absolute bottom-0 right-4 hidden items-end gap-3 md:flex">

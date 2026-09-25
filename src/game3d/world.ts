@@ -1,7 +1,7 @@
 import type { RideId } from "@/lib/progress-rules";
 import { photoMaterial } from "@/game3d/pbr";
 import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, COAST, coastReach, DANI_CHAIR, DECK, districtAt, ELEVATOR, GREEN, HIDEOUT, HOME, ISLAND, JET, pastShore, PIER, QUAY, ROOF, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
-import { takeCar } from "@/game3d/vehicles";
+import { takeBike, takeCar } from "@/game3d/vehicles";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
@@ -26,7 +26,7 @@ export type Theme = {
 };
 
 export const THEMES: Record<string, Theme> = {
-  w1: { sky: ["#6d9fd6", "#f5c08a"], fog: "#e7b98f", sun: "#ffd9ae", sunIntensity: 2.6, hemi: ["#ffe2c4", "#6b5040", 0.7], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [5, 11], night: false, peds: 42, traffic: 7 },
+  w1: { sky: ["#6d4ea8", "#f3e8ff"], fog: "#f4ecff", sun: "#f7f2ff", sunIntensity: 3.4, hemi: ["#f6f0ff", "#6d5b8c", 1.3], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [5, 11], night: false, peds: 42, traffic: 7 },
   w2: { sky: ["#070b1f", "#2b3566"], fog: "#1b2246", sun: "#b8c8ff", sunIntensity: 0.9, hemi: ["#8ea6ff", "#1b1b2e", 0.45], kind: "towers", palette: ["#5b6778", "#3e4b63", "#6f7b8a", "#44615d", "#57565e"], heights: [18, 48], night: true, peds: 30, traffic: 8 },
   w3: { sky: ["#5d97c9", "#cfe0e2"], fog: "#a9c3c6", sun: "#fff3dc", sunIntensity: 2.4, hemi: ["#d6ecee", "#3a4545", 0.65], kind: "containers", palette: ["#a8322b", "#2c5aa0", "#2f7a47", "#c08f1e", "#cf6a2a", "#2a7c8c"], heights: [2.6, 10.4], night: false, peds: 28, traffic: 6 },
   w4: { sky: ["#7f8fa6", "#e0b27a"], fog: "#b89468", sun: "#ffd29a", sunIntensity: 2.2, hemi: ["#f2d3a0", "#3a2a1a", 0.65], kind: "sheds", palette: ["#8d8680", "#6b6661", "#aaa39c", "#8c4a1f", "#57524d"], heights: [5, 9], night: false, peds: 30, traffic: 6 },
@@ -146,7 +146,7 @@ function facadeTextures(base: string, night: boolean, kind: Theme["kind"], r: ()
     const ww = cw * (glassTower ? 0.84 : 0.52);
     const wy = S * (glassTower ? 0.12 : 0.22);
     const wh = S * (glassTower ? 0.74 : 0.52);
-    const lit = r() < (night ? 0.35 : 0.08);
+    const lit = r() < (night ? 0.9 : 0.74);
     if (!glassTower) {
       g.fillStyle = "rgba(240,235,225,0.85)";
       g.fillRect(wx - 8, wy - 8, ww + 16, wh + 16);
@@ -161,8 +161,8 @@ function facadeTextures(base: string, night: boolean, kind: Theme["kind"], r: ()
     }
     const glass = g.createLinearGradient(wx, wy, wx + ww, wy + wh);
     if (lit) {
-      glass.addColorStop(0, "#ffe8b0");
-      glass.addColorStop(1, "#f2b765");
+      glass.addColorStop(0, "#e0f2fe");
+      glass.addColorStop(1, "#38bdf8");
     } else if (night) {
       glass.addColorStop(0, "#0d1426");
       glass.addColorStop(1, "#1a2440");
@@ -176,7 +176,7 @@ function facadeTextures(base: string, night: boolean, kind: Theme["kind"], r: ()
     gb.fillStyle = "#383838";
     gb.fillRect(wx, wy, ww, wh);
     if (lit) {
-      ge.fillStyle = "#ffd28a";
+      ge.fillStyle = "#38bdf8";
       ge.fillRect(wx, wy, ww, wh);
       if (r() < 0.5) {
         g.fillStyle = "rgba(90,50,30,0.5)";
@@ -196,7 +196,7 @@ function facadeTextures(base: string, night: boolean, kind: Theme["kind"], r: ()
       g.fill();
     }
   }
-  return { map: tex(c), bump: tex(b, 1, 1, false), emissive: night ? tex(e) : null };
+  return { map: tex(c), bump: tex(b, 1, 1, false), emissive: tex(e) };
 }
 
 function skyTexture(top: string, bottom: string, sun: string, night: boolean) {
@@ -722,12 +722,12 @@ function buildLamp(night: boolean) {
   head.rotation.z = Math.PI / 2;
   head.position.set(-1.75, 6.45, 0);
   g.add(head);
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshStandardMaterial({ color: "#fff3c4", emissive: "#ffd98a", emissiveIntensity: night ? 3 : 0.4 }));
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshStandardMaterial({ color: "#e0f2fe", emissive: "#38bdf8", emissiveIntensity: night ? 4.2 : 2.8 }));
   bulb.scale.set(1.8, 0.5, 1);
   bulb.position.set(-1.75, 6.33, 0);
   g.add(bulb);
-  if (night) {
-    const pool = new THREE.Mesh(new THREE.CircleGeometry(3.4, 24), new THREE.MeshBasicMaterial({ color: "#ffcf7a", transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending }));
+  {
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(3.4, 24), new THREE.MeshBasicMaterial({ color: "#7dd3fc", transparent: true, opacity: night ? 0.22 : 0.14, depthWrite: false, blending: THREE.AdditiveBlending }));
     pool.rotation.x = -Math.PI / 2;
     pool.position.set(-1.75, 0.2, 0);
     g.add(pool);
@@ -803,7 +803,7 @@ function monitorFace(title: string, lines: string[], color: string) {
 }
 
 function buildSkyHideout(scene: THREE.Scene, night: boolean, addCol: (minX: number, maxX: number, minZ: number, maxZ: number, top: number) => Collider) {
-  const glass = std({ color: night ? "#7dd3fc" : "#dbeafe", emissive: night ? "#38bdf8" : "#93c5fd", emissiveIntensity: night ? 0.55 : 0.18, roughness: 0.18, metalness: 0.62, transparent: true, opacity: 0.82 });
+  const glass = std({ color: "#7dd3fc", emissive: "#38bdf8", emissiveIntensity: night ? 1.5 : 1.15, roughness: 0.18, metalness: 0.62, transparent: true, opacity: 0.82 });
   const steel = std({ color: "#1e293b", metalness: 0.55, roughness: 0.4 });
   const wall = std({ color: "#0b0e14", roughness: 0.92, metalness: 0.04 });
   const dark = std({ color: "#07090d", roughness: 0.88 });
@@ -1078,7 +1078,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   };
 
   scene.background = skyTexture(theme.sky[0], theme.sky[1], theme.sun, night);
-  scene.fog = new THREE.Fog(theme.fog, 45, night ? 140 : 190);
+  scene.fog = new THREE.Fog(theme.fog, night ? 40 : 96, night ? 150 : 340);
 
   const water = new THREE.Mesh(new THREE.PlaneGeometry(SEA_SPAN, SEA_SPAN), seaMaterial());
   water.name = "sea";
@@ -1161,6 +1161,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   const tileMat = photoMaterial("clay_roof_tiles", 3, 2, { color: night ? "#9a8078" : "#ffffff", rough: 0.82 });
   const darkWins: THREE.Matrix4[] = [];
   const litWins: THREE.Matrix4[] = [];
+  const deepWins: THREE.Matrix4[] = [];
   const winQ = new THREE.Quaternion();
   const winUp = new THREE.Vector3(0, 0, 1);
   const outward = new THREE.Vector3();
@@ -1234,7 +1235,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
         aw.position.set(fx + nx * 0.62, 2.75, fz + nz * 0.62);
         aw.castShadow = true;
         scene.add(aw);
-        const shop = std({ color: night ? "#ffd08a" : "#223040", emissive: night ? "#ffb85c" : "#000000", emissiveIntensity: night ? 0.45 : 0, roughness: 0.1, metalness: 0.3 });
+        const shop = std({ color: "#bae6fd", emissive: "#38bdf8", emissiveIntensity: night ? 1.6 : 1.15, roughness: 0.1, metalness: 0.3 });
         if (nx !== 0) box(0.06, 2.1, along * 0.5, shop, fx + nx * 0.04, 1.35, fz, scene, false);
         else box(along * 0.5, 2.1, 0.06, shop, fx, 1.35, fz + nz * 0.04, scene, false);
       }
@@ -1250,7 +1251,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
             const offset = (col - (cols - 1) / 2) * 2.35;
             const px = nx !== 0 ? fx + nx * 0.16 : fx + offset;
             const pz = nz !== 0 ? fz + nz * 0.16 : fz + offset;
-            const bucket = night && r() < 0.38 ? litWins : darkWins;
+            const roll = r();
+            const bucket = roll < 0.58 ? litWins : roll < 0.86 ? deepWins : darkWins;
             bucket.push(new THREE.Matrix4().compose(new THREE.Vector3(px, y, pz), winQ, new THREE.Vector3(1.15, 1.55, 1)));
           }
         }
@@ -1280,7 +1282,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     scene.add(win);
   };
   placeWins(darkWins, new THREE.MeshPhysicalMaterial({ color: "#163044", roughness: 0.06, metalness: 0.55, envMapIntensity: 1.3, transparent: true, opacity: 0.72 }));
-  placeWins(litWins, new THREE.MeshStandardMaterial({ color: "#ffd7a1", emissive: "#ffb15a", emissiveIntensity: 1.5, roughness: 0.4 }));
+  placeWins(litWins, new THREE.MeshStandardMaterial({ color: "#e0f2fe", emissive: "#38bdf8", emissiveIntensity: 3.1, roughness: 0.35 }));
+  placeWins(deepWins, new THREE.MeshStandardMaterial({ color: "#1e3a8a", emissive: "#2563eb", emissiveIntensity: 2.2, roughness: 0.4 }));
 
   const crateMat = std({ color: "#8a5a2b", roughness: 0.95 });
   const binMat = std({ color: "#2f5d3a", roughness: 0.6 });
@@ -1530,6 +1533,20 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     box(maxX - minX, 0.1, maxZ - minZ, mat, midX, 0.26, midZ, scene, false);
     const t = 0.28;
     const h = 2.8;
+    const roomWin = new THREE.MeshStandardMaterial({ color: "#e0f2fe", emissive: "#38bdf8", emissiveIntensity: 2.6, roughness: 0.35 });
+    const glow = (x: number, z: number, yaw: number) => {
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.95), roomWin);
+      pane.position.set(x, 1.65, z);
+      pane.rotation.y = yaw;
+      scene.add(pane);
+    };
+    if (gap !== "west") glow(minX - 0.04, (minZ + maxZ) / 2, -Math.PI / 2);
+    if (gap !== "east") glow(maxX + 0.04, (minZ + maxZ) / 2, Math.PI / 2);
+    if (gap !== "minusZ") glow((minX + maxX) / 2, minZ - 0.04, Math.PI);
+    if (gap !== "plusZ") glow((minX + maxX) / 2, maxZ + 0.04, 0);
+    const roomLight = new THREE.PointLight("#7dd3fc", 7, 16, 1.6);
+    roomLight.position.set(midX, 2.15, midZ);
+    scene.add(roomLight);
     const slab = (x0: number, x1: number, z0: number, z1: number, tagged = false) => {
       if (x1 - x0 < 0.2 || z1 - z0 < 0.2) return;
       if (!tagged) box(x1 - x0, h, z1 - z0, mat, (x0 + x1) / 2, h / 2, (z0 + z1) / 2, scene, true, 0.04);
@@ -1602,9 +1619,9 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     addCol(tx - 0.25, tx + 0.25, tz - 0.25, tz + 0.25, 3);
   }
   const bikes = {
-    entrega: buildBike("entrega"),
-    esportiva: buildBike("esportiva"),
-    noturna: buildBike("noturna"),
+    entrega: takeBike("entrega") ?? buildBike("entrega"),
+    esportiva: takeBike("esportiva") ?? buildBike("esportiva"),
+    noturna: takeBike("noturna") ?? buildBike("noturna"),
   };
   for (const id of ["entrega", "esportiva", "noturna"] as const) {
     bikes[id].position.set(BIKE_PARK.x, 0, BIKE_PARK.z);

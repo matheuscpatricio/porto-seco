@@ -104,7 +104,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
   }
 
   function solve() {
-    if (!confirm("A Dani escreve o código por você. A missão vale só 1 estrela e não paga dinheiro. Continuar?")) return;
+    if (!confirm("A Maya escreve o código por você. A missão vale só 1 estrela e não paga dinheiro. Continuar?")) return;
     markHelped();
     setCode(level.solution);
     run(level.solution, true);
@@ -228,16 +228,16 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
                 "Ouça o briefing da equipe."
               ) : phase === "play" && last && !last.ok ? (
                 <>
-                  <b className="text-rose-300">Dani:</b> {feedback(level, last)} Volte ao terminal e aperte E para tentar de novo.
+                  <b className="text-rose-300">Maya:</b> {feedback(level, last)} Volte ao terminal e aperte E para tentar de novo.
                 </>
               ) : phase === "play" && !last?.ok ? (
                 <>
                   Siga a seta ⬆ e o objetivo no topo da tela. Aperte E quando o botão verde de hackear aparecer. Desafio: <Md text={level.task} />
                 </>
               ) : phase === "dive" || phase === "surface" || phase === "result" ? (
-                "Léo está dentro do sistema..."
+                "Cole está dentro do sistema..."
               ) : phase === "escape" ? (
-                "Fuga com o Tio Rui!"
+                "Fuga com o Hank!"
               ) : phase === "done" ? (
                 "Missão encerrada."
               ) : (
@@ -254,7 +254,7 @@ function Mission({ id, savedCode, alreadyDone }: { id: string; savedCode?: strin
               <p className="text-xs font-black uppercase tracking-widest text-emerald-300">{level.boss ? `${people[level.boss].name} derrotado` : "Missão cumprida"}</p>
               <Stars n={win.stars} size="text-5xl" />
               <p className="text-sm text-muted-foreground">
-                +{win.xp} XP de reputação{win.pay ? ` · +R$ ${win.pay}` : alreadyDone ? "" : " · sem dinheiro, a Dani ajudou"}{solved ? " · resolvido pela Dani" : ""}
+                +{win.xp} XP de reputação{win.pay ? ` · +R$ ${win.pay}` : alreadyDone ? "" : " · sem dinheiro, a Maya ajudou"}{solved ? " · resolvido pela Maya" : ""}
               </p>
             </div>
             <Dialogue

@@ -82,7 +82,7 @@ export function HackPanel({
         <span className="font-mono text-xs font-bold text-emerald-300">💻 TERMINAL · {level.target.toUpperCase()}</span>
         <span className="flex-1" />
         <button className="text-xs text-emerald-200/70 hover:text-white" onClick={() => setShowNotes((s) => !s)}>
-          {showNotes ? "Esconder anotações" : "Anotações da Dani"}
+          {showNotes ? "Esconder anotações" : "Anotações da Maya"}
         </button>
         <button className="text-xs text-emerald-200/70 hover:text-white" onClick={onExit} disabled={busy}>
           Sair ✕
@@ -128,7 +128,7 @@ export function HackPanel({
               Dica ({hintsShown}/{level.hints.length}) −1★
             </Button>
             <Button size="sm" variant="ghost" disabled={busy} onClick={onSolve}>
-              Dani resolve
+              Maya resolve
             </Button>
           </div>
         </div>
@@ -164,7 +164,7 @@ export function HackPanel({
           )}
           {last && !last.ok && !busy && (
             <p className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1.5 text-xs leading-snug text-rose-100">
-              <b>Dani:</b> {feedback(level, last)}
+              <b>Maya:</b> {feedback(level, last)}
             </p>
           )}
           {last && (last.stdout || last.error) && (

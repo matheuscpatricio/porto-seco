@@ -154,7 +154,7 @@ test("police ranks escalate in health and damage", () => {
   assert.equal(policeRankForMission(24), "federal");
 });
 
-test("the shore bends and the water gets deep enough to cover Léo", () => {
+test("the shore bends and the water gets deep enough to cover Cole", () => {
   const east = [10, 40, 80, 120, 150].map((along) => coastReach(1, along));
   assert.ok(Math.max(...east) - Math.min(...east) > 4);
   assert.equal(waterDepth(-2, 20), 0);
