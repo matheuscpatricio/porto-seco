@@ -222,29 +222,30 @@ function skyTexture(top: string, mid: string, fog: string, night: boolean) {
   if (night) {
     const star = rng(90210);
     g.fillStyle = "#f7f3ff";
-    for (let i = 0; i < 420; i++) {
+    for (let i = 0; i < 720; i++) {
       const x = star() * W;
-      const y = star() * H * 0.46;
-      const s = star() < 0.08 ? 2.2 : 1;
-      g.globalAlpha = 0.35 + star() * 0.65;
+      const elevStar = (3 + star() * star() * 28) * (Math.PI / 180);
+      const y = ((Math.PI / 2 - elevStar) / Math.PI) * H;
+      const s = star() < 0.06 ? 2.2 : 1;
+      g.globalAlpha = 0.4 + star() * 0.6;
       g.fillRect(x, y, s, s);
     }
     g.globalAlpha = 1;
-    const elev = (42 * Math.PI) / 180;
-    const u = 0.22;
+    const elev = (12 * Math.PI) / 180;
+    const u = 0.107;
     const mx = u * W;
     const my = ((Math.PI / 2 - elev) / Math.PI) * H;
-    const glow = g.createRadialGradient(mx, my, 8, mx, my, 74);
+    const glow = g.createRadialGradient(mx, my, 6, mx, my, 46);
     glow.addColorStop(0, "#fffaf2");
-    glow.addColorStop(0.28, "#f4e8ff");
+    glow.addColorStop(0.34, "#f4e8ff");
     glow.addColorStop(1, "rgba(244,232,255,0)");
     g.fillStyle = glow;
     g.beginPath();
-    g.arc(mx, my, 74, 0, Math.PI * 2);
+    g.arc(mx, my, 46, 0, Math.PI * 2);
     g.fill();
     g.fillStyle = "#fff9f0";
     g.beginPath();
-    g.arc(mx, my, 16, 0, Math.PI * 2);
+    g.arc(mx, my, 13, 0, Math.PI * 2);
     g.fill();
   }
   const t = new THREE.CanvasTexture(c);

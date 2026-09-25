@@ -1958,9 +1958,9 @@ export class Game3D {
       c.ignoreT = Math.max(0, c.ignoreT - dt);
       const ob = this.obstacleAhead(c.pos, new THREE.Vector3(Math.sin(c.yaw), 0, Math.cos(c.yaw)), c, c.ignoreT > 0);
       const dodge = ob === "car" ? (Math.sin(c.pos.x * 0.37 + c.pos.z * 0.21) >= 0 ? 1 : -1) : 0;
-      const alongX = Math.abs(Math.sin(c.yaw)) > Math.abs(Math.cos(c.yaw));
+      const alongX = Math.abs(f.x) > Math.abs(f.z);
       const sig = trafficSignal(this.t, alongX);
-      const stopAt = this.lightAhead(c.pos, c.yaw);
+      const stopAt = this.lightAhead(c.pos, Math.atan2(f.x, f.z));
       let want = ob === "car" ? Math.max(2.2, c.want * 0.45) : ob ? 0 : c.want;
       if (stopAt < Infinity) {
         if (sig === "red") want = 0;
