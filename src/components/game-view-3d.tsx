@@ -200,7 +200,7 @@ function CityBoot({ pct, label }: { pct: number; label: string }) {
       </div>
       <div className="relative z-10 flex h-[62%] flex-col items-center justify-center px-5 text-center">
         <p className="font-mono text-[10px] tracking-[0.45em] text-cyan-200/60">ILHA DE VÉRTICE</p>
-        <h1 className="mt-3 text-4xl font-light tracking-tight text-white sm:text-6xl">Porto Seco</h1>
+        <h1 className="mt-3 font-display text-4xl font-medium tracking-[0.08em] text-white sm:text-6xl">Porto Seco</h1>
         <p className="mt-3 max-w-xs text-sm text-white/45">O Cole espera na doca.</p>
         <div className="mt-10 w-full max-w-xs">
           <div className="h-px overflow-hidden bg-white/15">

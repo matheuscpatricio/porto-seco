@@ -72,7 +72,7 @@ export function TopBar() {
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#07060c]/80 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center gap-4 px-5 py-3">
-        <Link href="/" className="font-light tracking-[0.22em] text-white/90 uppercase">
+        <Link href="/" className="font-display text-sm font-medium tracking-[0.16em] text-white/90 uppercase">
           Porto Seco
         </Link>
         <div className="flex flex-1 items-center gap-3">

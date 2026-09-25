@@ -33,7 +33,7 @@ export default function Home() {
         <TopBar />
         <NightField>
           <p className="font-mono text-[11px] tracking-[0.45em] text-cyan-200/60">VÉRTICE</p>
-          <h1 className="mt-4 text-5xl font-light tracking-tight sm:text-7xl">Porto Seco</h1>
+          <h1 className="mt-4 font-display text-4xl font-medium tracking-[0.08em] sm:text-6xl">Porto Seco</h1>
           <p className="mt-6 font-mono text-xs text-white/40">Abrindo a cidade</p>
         </NightField>
       </>
@@ -46,7 +46,7 @@ export default function Home() {
         <TopBar />
         <NightField>
           <p className="font-mono text-[11px] tracking-[0.45em] text-cyan-200/60">00 · A DÍVIDA</p>
-          <h1 className="mt-3 text-4xl font-light tracking-tight sm:text-6xl">Porto Seco</h1>
+          <h1 className="mt-3 font-display text-4xl font-medium tracking-[0.08em] sm:text-6xl">Porto Seco</h1>
           <div className="my-8 flex max-w-3xl flex-wrap items-end justify-center gap-x-4 gap-y-5 sm:gap-x-6">
             {[...crew, ...villains].map((w) => (
               <div key={w} className="flex flex-col items-center gap-2">
@@ -78,7 +78,7 @@ export default function Home() {
         <section className="grid items-end gap-10 pt-16 sm:pt-24 lg:grid-cols-[1.4fr_0.6fr]">
           <div>
             <p className="font-mono text-[11px] tracking-[0.45em] text-cyan-200/60">ILHA DE VÉRTICE</p>
-            <h1 className="mt-4 text-5xl font-light tracking-tight text-white sm:text-7xl">Porto Seco</h1>
+            <h1 className="mt-4 font-display text-4xl font-medium tracking-[0.08em] text-white sm:text-6xl">Porto Seco</h1>
             <p className="mt-5 max-w-md text-sm leading-relaxed text-white/55">Cole aprende Python na rua. Cada missão abre um sistema da cidade.</p>
             <div className="mt-8 flex flex-wrap items-center gap-6">
               <LinkButton
