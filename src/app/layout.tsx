@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { signFontClass } from "@/game/sign-fonts";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,7 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${signFontClass} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

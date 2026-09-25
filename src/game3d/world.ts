@@ -1,3 +1,4 @@
+import { SIGN_FONTS } from "@/game/sign-fonts";
 import type { RideId } from "@/lib/progress-rules";
 import { photoMaterial } from "@/game3d/pbr";
 import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, COAST, coastReach, DANI_CHAIR, DECK, districtAt, ELEVATOR, GREEN, GRID, HIDEOUT, HOME, ISLAND, JET, pastShore, PIER, QUAY, ROOF, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
@@ -27,11 +28,11 @@ export type Theme = {
 
 export const THEMES: Record<string, Theme> = {
   w1: { sky: ["#c4b5fd", "#f8f4ff"], fog: "#f7f3ff", sun: "#fff8ff", sunIntensity: 4.1, hemi: ["#f7f3ff", "#b7a8d4", 1.75], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [10, 24], night: false, peds: 56, traffic: 11 },
-  w2: { sky: ["#070b1f", "#2b3566"], fog: "#1b2246", sun: "#b8c8ff", sunIntensity: 0.9, hemi: ["#8ea6ff", "#1b1b2e", 0.45], kind: "towers", palette: ["#5b6778", "#3e4b63", "#6f7b8a", "#44615d", "#57565e"], heights: [22, 54], night: true, peds: 30, traffic: 8 },
+  w2: { sky: ["#070b1f", "#2b3566"], fog: "#1b2246", sun: "#b8c8ff", sunIntensity: 0.9, hemi: ["#8ea6ff", "#1b1b2e", 0.45], kind: "towers", palette: ["#5b6778", "#3e4b63", "#6f7b8a", "#44615d", "#57565e"], heights: [32, 68], night: true, peds: 30, traffic: 8 },
   w3: { sky: ["#5d97c9", "#cfe0e2"], fog: "#a9c3c6", sun: "#fff3dc", sunIntensity: 2.4, hemi: ["#d6ecee", "#3a4545", 0.65], kind: "containers", palette: ["#a8322b", "#2c5aa0", "#2f7a47", "#c08f1e", "#cf6a2a", "#2a7c8c"], heights: [2.6, 10.4], night: false, peds: 28, traffic: 6 },
   w4: { sky: ["#7f8fa6", "#e0b27a"], fog: "#b89468", sun: "#ffd29a", sunIntensity: 2.2, hemi: ["#f2d3a0", "#3a2a1a", 0.65], kind: "sheds", palette: ["#8d8680", "#6b6661", "#aaa39c", "#8c4a1f", "#57524d"], heights: [9, 18], night: false, peds: 30, traffic: 6 },
-  w5: { sky: ["#07040f", "#2a1a4a"], fog: "#1b1233", sun: "#c9bbff", sunIntensity: 0.8, hemi: ["#a78bfa", "#120a22", 0.45], kind: "corporate", palette: ["#4a4d6b", "#35344f", "#51405f", "#3b3b40", "#5a4c7a"], heights: [26, 58], night: true, peds: 32, traffic: 9 },
-  w6: { sky: ["#0a0306", "#3b1018"], fog: "#2a0c12", sun: "#fdb4be", sunIntensity: 0.8, hemi: ["#fb7185", "#14060a", 0.4], kind: "corporate", palette: ["#3a3432", "#3b3b40", "#5a2a2a", "#2e2e33"], heights: [28, 62], night: true, peds: 28, traffic: 9 },
+  w5: { sky: ["#07040f", "#2a1a4a"], fog: "#1b1233", sun: "#c9bbff", sunIntensity: 0.8, hemi: ["#a78bfa", "#120a22", 0.45], kind: "corporate", palette: ["#4a4d6b", "#35344f", "#51405f", "#3b3b40", "#5a4c7a"], heights: [36, 74], night: true, peds: 32, traffic: 9 },
+  w6: { sky: ["#0a0306", "#3b1018"], fog: "#2a0c12", sun: "#fdb4be", sunIntensity: 0.8, hemi: ["#fb7185", "#14060a", 0.4], kind: "corporate", palette: ["#3a3432", "#3b3b40", "#5a2a2a", "#2e2e33"], heights: [38, 78], night: true, peds: 28, traffic: 9 },
 };
 
 export const LANE = 2.2;
@@ -65,7 +66,8 @@ export type Layout = {
   jet: THREE.Group;
   ships: THREE.Group[];
   elevator: THREE.Group;
-  ads: THREE.Mesh[];
+  ads: { mesh: THREE.Mesh; frames: THREE.CanvasTexture[]; cursor: number; next: number }[];
+  parked: THREE.Group[];
 };
 
 function rng(seed: number) {
@@ -325,26 +327,83 @@ export function buildCar(color: string, kind: "sedan" | "hatch" | "van" = "sedan
   return g;
 }
 
+function leafTexture() {
+  const [c, g] = canvas(128, 160);
+  g.clearRect(0, 0, 128, 160);
+  g.fillStyle = "#1f6b34";
+  g.beginPath();
+  g.moveTo(64, 6);
+  g.bezierCurveTo(118, 40, 110, 120, 64, 154);
+  g.bezierCurveTo(18, 120, 10, 40, 64, 6);
+  g.fill();
+  g.strokeStyle = "#14532d";
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(64, 18);
+  g.lineTo(64, 148);
+  g.stroke();
+  for (let i = 0; i < 6; i++) {
+    const y = 36 + i * 18;
+    g.beginPath();
+    g.moveTo(64, y);
+    g.lineTo(36, y + 10);
+    g.moveTo(64, y);
+    g.lineTo(92, y + 10);
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+const LEAF_MAP = typeof document === "undefined" ? null : leafTexture();
+
 function buildTree(r: () => number, night: boolean) {
   const g = new THREE.Group();
-  const bark = std({ color: "#5b4332", roughness: 1 });
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 2.6, 10), bark);
-  trunk.position.y = 1.3;
-  trunk.rotation.z = (r() - 0.5) * 0.12;
-  trunk.castShadow = true;
-  g.add(trunk);
-  const leaf = std({ color: night ? "#1d3324" : ["#4f7a3a", "#5d8a42", "#3f6b35"][Math.floor(r() * 3)], roughness: 0.95 });
-  const n = 5 + Math.floor(r() * 4);
-  for (let i = 0; i < n; i++) {
-    const s = 0.8 + r() * 0.8;
-    const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), leaf);
-    blob.position.set((r() - 0.5) * 1.6, 3 + r() * 1.4, (r() - 0.5) * 1.6);
-    blob.scale.y = 0.8;
-    blob.castShadow = true;
-    g.add(blob);
+  const bark = std({ color: night ? "#3f2e22" : "#6b4a32", roughness: 0.95 });
+  let y = 0.15;
+  let x = 0;
+  let z = 0;
+  for (let i = 0; i < 4; i++) {
+    const h = 0.7 - i * 0.08;
+    const rad = 0.22 - i * 0.035;
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(Math.max(0.06, rad - 0.03), rad, h, 8), bark);
+    seg.position.set(x, y + h / 2, z);
+    seg.castShadow = true;
+    g.add(seg);
+    x += (r() - 0.5) * 0.16;
+    z += (r() - 0.5) * 0.16;
+    y += h * 0.92;
   }
-  const bed = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.12, 16), std({ color: "#3b2f25" }));
-  bed.position.y = 0.2;
+  const leafMat = new THREE.MeshStandardMaterial({
+    color: night ? "#16301f" : ["#3d7a3a", "#4c8c3e", "#2f6a32"][Math.floor(r() * 3)],
+    map: LEAF_MAP,
+    alphaTest: 0.35,
+    roughness: 0.85,
+    side: THREE.DoubleSide,
+  });
+  const broad = r() > 0.45;
+  if (broad) {
+    for (let i = 0; i < 14; i++) {
+      const leaf = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.95), leafMat);
+      const a = (i / 14) * Math.PI * 2;
+      const ring = i < 8 ? 0.7 : 0.35;
+      leaf.position.set(x + Math.cos(a) * ring, y + 0.2 + (i % 3) * 0.28, z + Math.sin(a) * ring);
+      leaf.lookAt(x, leaf.position.y + 0.2, z);
+      leaf.castShadow = true;
+      g.add(leaf);
+    }
+  } else {
+    for (let i = 0; i < 4; i++) {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(1.15 - i * 0.22, 1.15, 8), leafMat);
+      cone.position.set(x, y + i * 0.55, z);
+      cone.castShadow = true;
+      g.add(cone);
+    }
+  }
+  const bed = new THREE.Mesh(new THREE.CircleGeometry(0.7, 10), std({ color: "#3b2f25", roughness: 1 }));
+  bed.rotation.x = -Math.PI / 2;
+  bed.position.y = 0.04;
   g.add(bed);
   return g;
 }
@@ -381,37 +440,89 @@ function addCoast(scene: THREE.Scene, night: boolean) {
   const bushes = spots.filter((s) => s.kind === "bush");
   const palms = spots.filter((s) => s.kind === "palm");
   const rocks = spots.filter((s) => s.kind === "rock");
-  const bushGeo = new THREE.IcosahedronGeometry(1, 0);
-  const bushMat = std({ color: night ? "#1d3324" : "#2f6b38", roughness: 1 });
-  const bushMesh = new THREE.InstancedMesh(bushGeo, bushMat, bushes.length);
   const m4 = new THREE.Matrix4();
-  bushes.forEach((s, i) => {
-    bushMesh.setMatrixAt(i, m4.makeScale(s.s, s.s * 0.7, s.s).setPosition(s.x, 0.35 * s.s, s.z));
-  });
-  bushMesh.castShadow = true;
-  scene.add(bushMesh);
-
-  const trunkGeo = new THREE.CylinderGeometry(0.16, 0.28, 4.4, 6);
-  const trunkMat = std({ color: "#6a4a32", roughness: 1 });
-  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, palms.length);
-  palms.forEach((s, i) => trunks.setMatrixAt(i, m4.makeScale(s.s, s.s, s.s).setPosition(s.x, 2.2 * s.s, s.z)));
-  trunks.castShadow = true;
-  scene.add(trunks);
-  const frondGeo = new THREE.ConeGeometry(0.28, 2.2, 4);
-  const frondMat = std({ color: night ? "#214428" : "#2f8a3e", roughness: 0.9 });
-  const fronds = new THREE.InstancedMesh(frondGeo, frondMat, palms.length * 6);
   const q = new THREE.Quaternion();
   const v = new THREE.Vector3();
-  palms.forEach((s, i) => {
-    for (let k = 0; k < 6; k++) {
-      q.setFromEuler(new THREE.Euler(Math.PI / 2.5, (k / 6) * Math.PI * 2, 0));
-      v.set(s.x, 4.15 * s.s, s.z);
-      fronds.setMatrixAt(i * 6 + k, m4.compose(v, q, new THREE.Vector3(s.s, s.s, s.s)));
+  const sc = new THREE.Vector3();
+  const bushMat = new THREE.MeshStandardMaterial({ color: night ? "#16301f" : "#2f7a3a", roughness: 0.9, map: LEAF_MAP, alphaTest: 0.2 });
+  const lobeGeo = new THREE.IcosahedronGeometry(0.48, 1);
+  const lobes = new THREE.InstancedMesh(lobeGeo, bushMat, Math.max(1, bushes.length * 5));
+  const shrubGeo = new THREE.PlaneGeometry(0.7, 0.85);
+  const shrubs = new THREE.InstancedMesh(shrubGeo, bushMat, Math.max(1, bushes.length * 4));
+  bushes.forEach((s, i) => {
+    const lobesAt: [number, number, number, number][] = [
+      [0, 0.42, 0, 1],
+      [0.38, 0.28, 0.12, 0.72],
+      [-0.34, 0.26, 0.16, 0.66],
+      [0.08, 0.55, -0.28, 0.58],
+      [-0.12, 0.62, 0.08, 0.5],
+    ];
+    lobesAt.forEach(([ox, oy, oz, k], n) => {
+      lobes.setMatrixAt(i * 5 + n, m4.makeScale(s.s * k, s.s * k * 0.72, s.s * k * 0.9).setPosition(s.x + ox * s.s, oy * s.s, s.z + oz * s.s));
+    });
+    for (let n = 0; n < 4; n++) {
+      const yaw = (n / 4) * Math.PI * 2 + s.x;
+      q.setFromEuler(new THREE.Euler(0.35, yaw, 0, "YXZ"));
+      v.set(s.x + Math.sin(yaw) * 0.28 * s.s, 0.55 * s.s, s.z + Math.cos(yaw) * 0.28 * s.s);
+      shrubs.setMatrixAt(i * 4 + n, m4.compose(v, q, sc.set(s.s * 0.9, s.s * 1.05, 1)));
     }
-    cols.push({ minX: s.x - 0.2, maxX: s.x + 0.2, minZ: s.z - 0.2, maxZ: s.z + 0.2 });
   });
+  lobes.count = bushes.length * 5;
+  shrubs.count = bushes.length * 4;
+  lobes.castShadow = true;
+  shrubs.castShadow = true;
+  scene.add(lobes, shrubs);
+
+  const segN = 6;
+  const trunkGeo = new THREE.CylinderGeometry(0.1, 0.16, 0.95, 8);
+  const trunkMat = std({ color: "#7a5536", roughness: 0.95 });
+  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, Math.max(1, palms.length * segN));
+  const frondGeo = new THREE.PlaneGeometry(0.42, 1.85);
+  const frondMat = new THREE.MeshStandardMaterial({
+    color: night ? "#1d4a28" : "#3cb454",
+    map: LEAF_MAP,
+    alphaTest: 0.35,
+    roughness: 0.78,
+    side: THREE.DoubleSide,
+  });
+  const fronds = new THREE.InstancedMesh(frondGeo, frondMat, Math.max(1, palms.length * 8));
+  const nutGeo = new THREE.SphereGeometry(0.12, 8, 6);
+  const nutMat = std({ color: "#6b3f24", roughness: 0.8 });
+  const nuts = new THREE.InstancedMesh(nutGeo, nutMat, Math.max(1, palms.length * 3));
+  palms.forEach((s, i) => {
+    let x = s.x;
+    let z = s.z;
+    let y = 0.02;
+    const lean = (c() - 0.5) * 0.55;
+    const leanZ = (c() - 0.5) * 0.4;
+    for (let k = 0; k < segN; k++) {
+      const h = 0.9 * s.s;
+      const taper = 1 - k * 0.08;
+      q.setFromEuler(new THREE.Euler(leanZ * 0.18, 0, lean * 0.18));
+      v.set(x, y + h * 0.45, z);
+      trunks.setMatrixAt(i * segN + k, m4.compose(v, q, sc.set(s.s * taper, s.s, s.s * taper)));
+      x += Math.sin(lean) * h * 0.28;
+      z += Math.sin(leanZ) * h * 0.28;
+      y += h * 0.86;
+    }
+    for (let k = 0; k < 8; k++) {
+      const yaw = (k / 8) * Math.PI * 2 + s.x * 0.2;
+      q.setFromEuler(new THREE.Euler(1.18, yaw, 0.08, "YXZ"));
+      v.set(x + Math.sin(yaw) * 0.28 * s.s, y + 0.05, z + Math.cos(yaw) * 0.28 * s.s);
+      fronds.setMatrixAt(i * 8 + k, m4.compose(v, q, sc.set(s.s * 1.35, s.s * 1.55, 1)));
+    }
+    for (let k = 0; k < 3; k++) {
+      const yaw = (k / 3) * Math.PI * 2;
+      nuts.setMatrixAt(i * 3 + k, m4.makeScale(s.s, s.s, s.s).setPosition(x + Math.sin(yaw) * 0.18, y - 0.15, z + Math.cos(yaw) * 0.18));
+    }
+    cols.push({ minX: s.x - 0.25, maxX: s.x + 0.25, minZ: s.z - 0.25, maxZ: s.z + 0.25 });
+  });
+  trunks.count = palms.length * segN;
+  fronds.count = palms.length * 8;
+  nuts.count = palms.length * 3;
+  trunks.castShadow = true;
   fronds.castShadow = true;
-  scene.add(fronds);
+  scene.add(trunks, fronds, nuts);
 
   const rockGeo = new THREE.DodecahedronGeometry(0.7, 0);
   const rockMat = std({ color: "#b7aa96", roughness: 0.95 });
@@ -463,29 +574,127 @@ function buildPort(scene: THREE.Scene, addCol: (minX: number, maxX: number, minZ
   }
   mesh(new THREE.BoxGeometry(5.6, 0.1, 0.1), postMat, 80, quayTop + 3.15, 0.15, scene, true);
   mesh(new THREE.BoxGeometry(4.7, 0.95, 0.12), std({ color: "#0b1220", roughness: 0.7 }), 80, quayTop + 2.55, 0.15, scene, true);
-  const sign = labelPlane("PORTO", "#fbbf24");
+  const sign = designedSign("PORTO", 5.6, 1.25);
   sign.position.set(80, quayTop + 2.55, 0.23);
   scene.add(sign);
   const ships = [buildShip("#1e3a5f"), buildShip("#7f1d1d")];
   ships[0].position.set(BERTHS[0].x, 0.15, BERTHS[0].z);
   ships[1].position.set(BERTHS[1].x, 0.15, BERTHS[1].z);
-  ships.forEach((s) => scene.add(s));
+  ships.forEach((s, i) => {
+    scene.add(s);
+    const yaw = i === 0 ? 0.2 : Math.PI - 0.2;
+    const cs = Math.abs(Math.cos(yaw));
+    const sn = Math.abs(Math.sin(yaw));
+    const ex = 13.4 * cs + 2.7 * sn;
+    const ez = 13.4 * sn + 2.7 * cs;
+    const x = BERTHS[i].x;
+    const z = BERTHS[i].z;
+    s.userData.hull = addCol(x - ex, x + ex, z - ez, z + ez, 7.4);
+  });
   return ships;
 }
 
-function labelPlane(text: string, color: string) {
-  const [c, g] = canvas(512, 96);
-  g.fillStyle = "#0b1220";
-  g.fillRect(0, 0, 512, 96);
-  g.fillStyle = color;
-  g.font = "bold 42px sans-serif";
+function designedSign(kind: "PORTO" | "ARMAS" | "MOTOS", w: number, h: number) {
+  const [c, g] = canvas(512, 128);
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText(text, 256, 48);
+  if (kind === "PORTO") {
+    g.fillStyle = "#071525";
+    g.fillRect(0, 0, 512, 128);
+    g.strokeStyle = "#d4af37";
+    g.lineWidth = 8;
+    g.strokeRect(10, 10, 492, 108);
+    g.strokeStyle = "#fbbf24";
+    g.lineWidth = 4;
+    g.beginPath();
+    g.arc(78, 58, 14, 0, Math.PI * 2);
+    g.moveTo(78, 44);
+    g.lineTo(78, 96);
+    g.moveTo(62, 74);
+    g.lineTo(94, 74);
+    g.moveTo(66, 96);
+    g.lineTo(78, 84);
+    g.lineTo(90, 96);
+    g.stroke();
+    g.fillStyle = "#f8e7b0";
+    g.font = `700 62px ${SIGN_FONTS.roman}`;
+    g.fillText("PORTO", 300, 58);
+    g.font = `700 16px ${SIGN_FONTS.serif}`;
+    g.fillStyle = "#e7c56a";
+    g.fillText("CAIS  ·  MARÉ  ·  CARGA", 300, 96);
+  } else if (kind === "ARMAS") {
+    g.fillStyle = "#0a0a0a";
+    g.fillRect(0, 0, 512, 128);
+    g.fillStyle = "#b91c1c";
+    for (let i = -2; i < 14; i++) {
+      g.beginPath();
+      g.moveTo(i * 40, 0);
+      g.lineTo(i * 40 + 16, 0);
+      g.lineTo(i * 40 + 16 - 36, 128);
+      g.lineTo(i * 40 - 36, 128);
+      g.fill();
+    }
+    g.fillStyle = "#111111";
+    g.fillRect(108, 16, 388, 96);
+    g.strokeStyle = "#fbbf24";
+    g.lineWidth = 4;
+    g.strokeRect(108, 16, 388, 96);
+    g.strokeStyle = "#fecaca";
+    g.lineWidth = 5;
+    g.beginPath();
+    g.moveTo(28, 48);
+    g.lineTo(92, 48);
+    g.lineTo(92, 64);
+    g.lineTo(58, 64);
+    g.lineTo(50, 92);
+    g.lineTo(34, 92);
+    g.lineTo(40, 64);
+    g.lineTo(28, 64);
+    g.closePath();
+    g.stroke();
+    g.fillStyle = "#fff1f2";
+    g.font = `600 54px ${SIGN_FONTS.condensed}`;
+    g.fillText("ARMAS", 302, 58);
+    g.font = `600 16px ${SIGN_FONTS.poster}`;
+    g.fillStyle = "#fca5a5";
+    g.fillText("OFICINA  ·  MUNIÇÃO", 302, 92);
+  } else {
+    const sky = g.createLinearGradient(0, 0, 512, 0);
+    sky.addColorStop(0, "#082f49");
+    sky.addColorStop(1, "#0369a1");
+    g.fillStyle = sky;
+    g.fillRect(0, 0, 512, 128);
+    g.fillStyle = "#e0f2fe";
+    g.beginPath();
+    g.moveTo(0, 128);
+    g.lineTo(150, 0);
+    g.lineTo(196, 0);
+    g.lineTo(46, 128);
+    g.fill();
+    g.fillStyle = "#38bdf8";
+    g.beginPath();
+    g.moveTo(36, 128);
+    g.lineTo(186, 0);
+    g.lineTo(214, 0);
+    g.lineTo(64, 128);
+    g.fill();
+    g.strokeStyle = "#f8fafc";
+    g.lineWidth = 4;
+    g.beginPath();
+    g.arc(78, 86, 16, 0, Math.PI * 2);
+    g.arc(132, 86, 16, 0, Math.PI * 2);
+    g.moveTo(94, 86);
+    g.lineTo(116, 86);
+    g.stroke();
+    g.fillStyle = "#f0f9ff";
+    g.font = `italic 600 56px ${SIGN_FONTS.condensed}`;
+    g.fillText("MOTOS", 330, 58);
+    g.font = `italic 700 18px ${SIGN_FONTS.serif}`;
+    g.fillStyle = "#bae6fd";
+    g.fillText("velocidade na ilha", 330, 96);
+  }
   const map = tex(c);
-  const panel = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 0.82), new THREE.MeshBasicMaterial({ map, toneMapped: false, side: THREE.DoubleSide }));
-  panel.position.z = 0.01;
-  return panel;
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map, toneMapped: false, side: THREE.DoubleSide }));
 }
 
 function shipHull(color: string) {
@@ -697,14 +906,51 @@ function buildBike(style: RideId = "entrega") {
 
 function buildJet() {
   const g = new THREE.Group();
-  const hullMat = new THREE.MeshPhysicalMaterial({ color: "#f97316", roughness: 0.38, metalness: 0.28, clearcoat: 0.45, clearcoatRoughness: 0.2 });
-  const hull = new THREE.Mesh(new THREE.SphereGeometry(0.4, 20, 14), hullMat);
-  hull.scale.set(0.72, 0.34, 2.15);
-  hull.position.set(0, 0.38, 0.05);
+  const hullMat = new THREE.MeshPhysicalMaterial({ color: "#f97316", roughness: 0.32, metalness: 0.35, clearcoat: 0.62, clearcoatRoughness: 0.16 });
+  const hullPts: [number, number][] = [
+    [-1.45, 0.06],
+    [-1.2, 0.2],
+    [-0.75, 0.34],
+    [-0.2, 0.4],
+    [0.35, 0.44],
+    [0.9, 0.36],
+    [1.35, 0.2],
+    [1.55, 0.1],
+    [1.25, 0.04],
+    [0.3, 0.03],
+    [-0.7, 0.03],
+    [-1.3, 0.04],
+  ];
+  const hull = new THREE.Mesh(extrudeSide(hullPts, 0.78, 0.05, 24), hullMat);
   hull.castShadow = true;
+  hull.receiveShadow = true;
   g.add(hull);
-  box(0.42, 0.28, 0.36, std({ color: "#111827", roughness: 0.5 }), -0.15, 0.58, -0.05, g, true, 0.06);
-  mesh(new THREE.BoxGeometry(0.04, 0.16, 0.22), std({ color: "#1f2937" }), 0, 0.32, 0.95, g, false);
+  const deck = std({ color: "#111827", roughness: 0.55 });
+  const rubber = std({ color: "#1f2937", roughness: 0.9 });
+  const chrome = std({ color: "#e5e7eb", metalness: 0.9, roughness: 0.18 });
+  box(0.46, 0.08, 0.7, deck, 0, 0.46, -0.15, g, true, 0.03);
+  const seat = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.1, 0.48, 3, 0.03), deck);
+  seat.position.set(0, 0.52, -0.28);
+  seat.rotation.x = -0.22;
+  seat.castShadow = true;
+  g.add(seat);
+  box(0.5, 0.06, 0.35, rubber, 0, 0.4, 0.35, g, false, 0.02);
+  box(0.5, 0.06, 0.28, rubber, 0, 0.38, -0.72, g, false, 0.02);
+  mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.42, 8), chrome, 0.16, 0.62, 0.55, g, true).rotation.x = -0.7;
+  mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.42, 8), chrome, -0.16, 0.62, 0.55, g, true).rotation.x = -0.7;
+  mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.46, 8), chrome, 0, 0.78, 0.72, g, true).rotation.z = Math.PI / 2;
+  mesh(new THREE.SphereGeometry(0.045, 10, 8), rubber, 0.24, 0.78, 0.72, g, false);
+  mesh(new THREE.SphereGeometry(0.045, 10, 8), rubber, -0.24, 0.78, 0.72, g, false);
+  box(0.42, 0.28, 0.04, std({ color: "#e0f2fe", roughness: 0.05, metalness: 0.15, transparent: true, opacity: 0.55 }), 0, 0.72, 0.95, g, false);
+  box(0.04, 0.22, 0.16, chrome, 0.2, 0.58, 0.92, g, false);
+  box(0.04, 0.22, 0.16, chrome, -0.2, 0.58, 0.92, g, false);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 2.2), new THREE.MeshStandardMaterial({ color: "#fff7ed", emissive: "#fdba74", emissiveIntensity: 0.4 }));
+  stripe.position.set(0.22, 0.28, 0.05);
+  g.add(stripe);
+  mesh(new THREE.SphereGeometry(0.06, 10, 8), std({ color: "#f8fafc", emissive: "#fff7d6", emissiveIntensity: 0.9 }), 0, 0.32, 1.42, g, false);
+  box(0.22, 0.16, 0.28, std({ color: "#1f2937", metalness: 0.4, roughness: 0.45 }), 0, 0.22, -1.28, g, true, 0.03);
+  mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.12, 12), std({ color: "#0f172a", metalness: 0.5, roughness: 0.4 }), 0, 0.2, -1.42, g, true).rotation.x = Math.PI / 2;
+  box(0.16, 0.08, 0.06, std({ color: "#ef4444", emissive: "#ef4444", emissiveIntensity: 0.7 }), 0, 0.3, -1.48, g, false);
   return g;
 }
 
@@ -1168,7 +1414,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   const ledMag: THREE.Matrix4[] = [];
   const ledAmber: THREE.Matrix4[] = [];
   const ledWhite: THREE.Matrix4[] = [];
-  const ads: THREE.Mesh[] = [];
+  const ads: Layout["ads"] = [];
   const ledBox = (list: THREE.Matrix4[], x: number, y: number, z: number, sx: number, sy: number, sz: number) => {
     list.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(sx, sy, sz)));
   };
@@ -1191,42 +1437,83 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     ] as const) ledBox(ledWhite, x, h / 2, z, 0.16, h, 0.16);
     ledBox(ledCyan, cx, h + 0.12, cz, w + 0.35, 0.14, d + 0.35);
   };
-  const adCopy = [
-    ["VÉRTICE", "A ILHA NÃO DORME"],
-    ["PORTO SECO", "ABERTO 24H"],
-    ["NEON", "LUZ NO CAIS"],
-    ["OPEN", "SISTEMA ONLINE"],
-    ["NIGHT RUN", "COLE // MAYA"],
-    ["PYTHON", "ESTUDE EM CASA"],
+  const campaigns: { title: string; sub: string; titleFont: string; subFont: string; a: string; b: string; ink: string; accent: string; badge: string }[][] = [
+    [
+      { title: "VÉRTICE", sub: "A ILHA NÃO DORME", titleFont: SIGN_FONTS.poster, subFont: SIGN_FONTS.condensed, a: "#020617", b: "#0e7490", ink: "#f8fafc", accent: "#22d3ee", badge: "24H" },
+      { title: "Vértice", sub: "luz no cais", titleFont: SIGN_FONTS.script, subFont: SIGN_FONTS.serif, a: "#1e1b4b", b: "#6d28d9", ink: "#fdf4ff", accent: "#e879f9", badge: "NOITE" },
+      { title: "VÉRTICE", sub: "cidade aberta", titleFont: SIGN_FONTS.roman, subFont: SIGN_FONTS.marker, a: "#111827", b: "#1e3a8a", ink: "#e0f2fe", accent: "#fbbf24", badge: "ILHA" },
+    ],
+    [
+      { title: "PORTO SECO", sub: "ABERTO 24H", titleFont: SIGN_FONTS.condensed, subFont: SIGN_FONTS.poster, a: "#082f49", b: "#155e75", ink: "#ecfeff", accent: "#fbbf24", badge: "CAIS" },
+      { title: "Porto Seco", sub: "maré e carga", titleFont: SIGN_FONTS.serif, subFont: SIGN_FONTS.script, a: "#0c4a6e", b: "#1e293b", ink: "#fef3c7", accent: "#38bdf8", badge: "MAR" },
+      { title: "PORTO", sub: "navios no cais", titleFont: SIGN_FONTS.roman, subFont: SIGN_FONTS.condensed, a: "#0f172a", b: "#7c2d12", ink: "#ffedd5", accent: "#fb923c", badge: "DOCA" },
+    ],
+    [
+      { title: "NEON", sub: "LUZ NO CAIS", titleFont: SIGN_FONTS.poster, subFont: SIGN_FONTS.marker, a: "#2e1065", b: "#0f172a", ink: "#f5f3ff", accent: "#e879f9", badge: "LED" },
+      { title: "Neon", sub: "a avenida acende", titleFont: SIGN_FONTS.script, subFont: SIGN_FONTS.serif, a: "#4a044e", b: "#1e1b4b", ink: "#fae8ff", accent: "#22d3ee", badge: "NOITE" },
+      { title: "NEON", sub: "faixa na fachada", titleFont: SIGN_FONTS.condensed, subFont: SIGN_FONTS.poster, a: "#020617", b: "#be185d", ink: "#fdf2f8", accent: "#f9a8d4", badge: "ON" },
+    ],
+    [
+      { title: "OPEN", sub: "SISTEMA ONLINE", titleFont: SIGN_FONTS.poster, subFont: SIGN_FONTS.condensed, a: "#022c22", b: "#064e3b", ink: "#ecfdf5", accent: "#34d399", badge: "LIVE" },
+      { title: "Open", sub: "rede da ilha", titleFont: SIGN_FONTS.script, subFont: SIGN_FONTS.marker, a: "#052e16", b: "#0f172a", ink: "#d1fae5", accent: "#a3e635", badge: "NET" },
+      { title: "ONLINE", sub: "porta aberta", titleFont: SIGN_FONTS.roman, subFont: SIGN_FONTS.serif, a: "#0f172a", b: "#14532d", ink: "#f0fdf4", accent: "#4ade80", badge: "OK" },
+    ],
+    [
+      { title: "NIGHT RUN", sub: "COLE  //  MAYA", titleFont: SIGN_FONTS.condensed, subFont: SIGN_FONTS.poster, a: "#1e1b4b", b: "#9f1239", ink: "#fff1f2", accent: "#fb7185", badge: "RUN" },
+      { title: "Night Run", sub: "a moto não para", titleFont: SIGN_FONTS.script, subFont: SIGN_FONTS.serif, a: "#111827", b: "#4c0519", ink: "#ffe4e6", accent: "#fda4af", badge: "MOTO" },
+      { title: "COLE", sub: "maya na cobertura", titleFont: SIGN_FONTS.marker, subFont: SIGN_FONTS.script, a: "#18181b", b: "#312e81", ink: "#e0e7ff", accent: "#a5b4fc", badge: "DUO" },
+    ],
+    [
+      { title: "PYTHON", sub: "ESTUDE EM CASA", titleFont: SIGN_FONTS.poster, subFont: SIGN_FONTS.condensed, a: "#172554", b: "#1e3a8a", ink: "#eff6ff", accent: "#fde68a", badge: "PY" },
+      { title: "Python", sub: "do zero ao avançado", titleFont: SIGN_FONTS.serif, subFont: SIGN_FONTS.script, a: "#0f172a", b: "#1d4ed8", ink: "#dbeafe", accent: "#93c5fd", badge: "AULA" },
+      { title: "estude", sub: "em casa, com calma", titleFont: SIGN_FONTS.script, subFont: SIGN_FONTS.marker, a: "#1e293b", b: "#312e81", ink: "#fef9c3", accent: "#facc15", badge: "CASA" },
+    ],
   ];
-  const adHues = ["#22d3ee", "#e879f9", "#fbbf24", "#fb7185"];
-  const hangAd = (cx: number, cz: number, w: number, d: number, h: number) => {
-    if (h < 9 || r() > 0.78) return;
-    const [title, sub] = adCopy[Math.floor(r() * adCopy.length)];
-    const hue = adHues[Math.floor(r() * adHues.length)];
+  const paintBillboard = (frame: (typeof campaigns)[number][number]) => {
     const [c, g] = canvas(512, 256);
     const wash = g.createLinearGradient(0, 0, 512, 256);
-    wash.addColorStop(0, "#05060f");
-    wash.addColorStop(0.45, hue);
-    wash.addColorStop(1, "#020617");
+    wash.addColorStop(0, frame.a);
+    wash.addColorStop(1, frame.b);
     g.fillStyle = wash;
     g.fillRect(0, 0, 512, 256);
-    g.fillStyle = "rgba(255,255,255,0.14)";
-    for (let y = 0; y < 256; y += 5) g.fillRect(0, y, 512, 1);
-    g.fillStyle = "#f8fafc";
-    g.font = "bold 72px sans-serif";
+    g.fillStyle = "rgba(255,255,255,0.07)";
+    for (let y = 0; y < 256; y += 4) g.fillRect(0, y, 512, 1);
+    g.strokeStyle = frame.accent;
+    g.lineWidth = 8;
+    g.strokeRect(12, 12, 488, 232);
+    g.fillStyle = frame.accent;
+    g.fillRect(32, 32, 108, 30);
+    g.fillStyle = "#020617";
+    g.font = `600 18px ${SIGN_FONTS.condensed}`;
     g.textAlign = "center";
-    g.fillText(title, 256, 118);
-    g.fillStyle = "#ecfeff";
-    g.font = "bold 32px sans-serif";
-    g.fillText(sub, 256, 176);
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, transparent: true, opacity: 1 });
-    const bw = Math.min(w, d) * 0.78;
-    const bh = Math.min(5.5, Math.max(2.2, h * 0.22));
+    g.textBaseline = "middle";
+    g.fillText(frame.badge, 86, 47);
+    const titleSize = frame.title.length > 11 ? 46 : frame.titleFont === SIGN_FONTS.script ? 54 : 68;
+    g.fillStyle = frame.ink;
+    g.font = `700 ${titleSize}px ${frame.titleFont}`;
+    g.fillText(frame.title, 256, 128);
+    g.strokeStyle = frame.accent;
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(96, 168);
+    g.lineTo(416, 168);
+    g.stroke();
+    g.fillStyle = frame.accent;
+    g.font = `600 26px ${frame.subFont}`;
+    g.fillText(frame.sub, 256, 206);
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    return map;
+  };
+  const hangAd = (cx: number, cz: number, w: number, d: number, h: number) => {
+    if (h < 9 || r() > 0.7) return;
+    const set = campaigns[Math.floor(r() * campaigns.length)];
+    const frames = set.map(paintBillboard);
+    const mat = new THREE.MeshBasicMaterial({ map: frames[0], toneMapped: false, transparent: true, opacity: 1 });
+    const bw = Math.min(w, d) * 0.82;
+    const bh = Math.min(5.8, Math.max(2.4, h * 0.2));
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), mat);
-    const y = Math.min(h - bh / 2 - 0.5, Math.max(4.4, h * 0.62));
+    const y = Math.min(h - bh / 2 - 0.6, Math.max(6.2, h * 0.58));
     const face = Math.floor(r() * 4);
     if (face === 0) plane.position.set(cx, y, cz - d / 2 - 0.22);
     else if (face === 1) {
@@ -1241,7 +1528,54 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     }
     plane.name = "billboard";
     scene.add(plane);
-    ads.push(plane);
+    ads.push({ mesh: plane, frames, cursor: 0, next: 1.5 + r() * 3 });
+  };
+  const storefronts = [
+    { name: "Café Maré", sub: "grão do cais", font: SIGN_FONTS.script, subFont: SIGN_FONTS.serif, bg: "#1c1410", ink: "#fde68a", accent: "#b45309" },
+    { name: "Banco Vértice", sub: "AGÊNCIA CENTRAL", font: SIGN_FONTS.serif, subFont: SIGN_FONTS.condensed, bg: "#0b1220", ink: "#e2e8f0", accent: "#94a3b8" },
+    { name: "Hotel Cais", sub: "SUÍTES", font: SIGN_FONTS.roman, subFont: SIGN_FONTS.serif, bg: "#1c1917", ink: "#f5e6c8", accent: "#d6b36a" },
+    { name: "Mercado", sub: "aberto agora", font: SIGN_FONTS.marker, subFont: SIGN_FONTS.script, bg: "#14532d", ink: "#ecfccb", accent: "#bef264" },
+    { name: "Oficina", sub: "PEÇAS · MOTO", font: SIGN_FONTS.condensed, subFont: SIGN_FONTS.poster, bg: "#111827", ink: "#f8fafc", accent: "#38bdf8" },
+    { name: "Farmácia", sub: "24 HORAS", font: SIGN_FONTS.serif, subFont: SIGN_FONTS.condensed, bg: "#052e16", ink: "#bbf7d0", accent: "#4ade80" },
+  ];
+  const placeShopSign = (cx: number, cz: number, w: number, d: number) => {
+    if (r() > 0.72) return;
+    const shop = storefronts[Math.floor(r() * storefronts.length)];
+    const [c, g] = canvas(512, 160);
+    g.fillStyle = shop.bg;
+    g.fillRect(0, 0, 512, 160);
+    g.strokeStyle = shop.accent;
+    g.lineWidth = 8;
+    g.strokeRect(8, 8, 496, 144);
+    g.fillStyle = shop.accent;
+    g.fillRect(24, 24, 496 - 48, 6);
+    g.fillStyle = shop.ink;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    const size = shop.name.length > 12 ? 42 : 54;
+    g.font = `700 ${size}px ${shop.font}`;
+    g.fillText(shop.name, 256, 78);
+    g.fillStyle = shop.accent;
+    g.font = `600 22px ${shop.subFont}`;
+    g.fillText(shop.sub, 256, 122);
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    const bw = Math.min(4.2, Math.max(2.4, Math.min(w, d) * 0.55));
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(bw, bw * 0.32), new THREE.MeshBasicMaterial({ map, toneMapped: false, side: THREE.DoubleSide }));
+    const face = Math.floor(r() * 4);
+    const y = 3.15;
+    if (face === 0) plane.position.set(cx, y, cz - d / 2 - 0.16);
+    else if (face === 1) {
+      plane.position.set(cx, y, cz + d / 2 + 0.16);
+      plane.rotation.y = Math.PI;
+    } else if (face === 2) {
+      plane.position.set(cx - w / 2 - 0.16, y, cz);
+      plane.rotation.y = -Math.PI / 2;
+    } else {
+      plane.position.set(cx + w / 2 + 0.16, y, cz);
+      plane.rotation.y = Math.PI / 2;
+    }
+    scene.add(plane);
   };
   const winQ = new THREE.Quaternion();
   const winUp = new THREE.Vector3(0, 0, 1);
@@ -1253,8 +1587,9 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
 
   const compound = { minX: blockStart(2), maxX: blockStart(2) + BLOCK, minZ: blockStart(2), maxZ: blockStart(2) + BLOCK };
 
-  const building = (cx: number, cz: number, w: number, d: number, h: number) => {
-    const district = THEMES[districtAt(cx, cz)] ?? theme;
+  const building = (cx: number, cz: number, w: number, d: number, h: number, asTower = false) => {
+    const base = THEMES[districtAt(cx, cz)] ?? theme;
+    const district = asTower ? { ...base, kind: "towers" as const } : base;
     const tint = district.palette[Math.floor(r() * district.palette.length)];
     const glassWall = district.kind === "towers" || district.kind === "corporate";
     const sideMat = (face: number) =>
@@ -1271,6 +1606,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     const body = mesh(new RoundedBoxGeometry(w, h, d, seg, round), [md, md, roofMat, roofMat, mw, mw], cx, h / 2, cz, scene);
     body.receiveShadow = true;
     addCol(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, h);
+    if (h > 5) placeShopSign(cx, cz, w, d);
 
     if (district.kind === "containers") {
       for (let y = 2.6; y < h; y += 2.6) box(w + 0.05, 0.08, d + 0.05, std({ color: "#1f1f1f" }), cx, y, cz, scene, false);
@@ -1397,6 +1733,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   for (let i = 0; i < GRID; i++) {
     for (let j = 0; j < GRID; j++) {
       if ((i === 2 && j === 2) || (i === 1 && j === 1)) continue;
+      const downtown = !(i === 0 && j === 0) && Math.max(Math.abs(i - 1), Math.abs(j - 1)) === 1;
       const bx = blockStart(i);
       const bz = blockStart(j);
       const lot = THEMES[districtAt(bx + 8, bz + 8)] ?? theme;
@@ -1406,7 +1743,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
           const cx = bx + span * (li + 0.5);
           const cz = bz + span * (lj + 0.5);
           const roll = r();
-          if (roll < 0.06 && !(i === 0 && j === 0)) {
+          if (!downtown && roll < 0.06 && !(i === 0 && j === 0)) {
             for (let k = 0; k < 2; k++) prop(cx - 2 + r() * 4, cz - 2 + r() * 4);
             const tree = buildTree(r, night);
             tree.position.set(cx, 0.2, cz);
@@ -1416,12 +1753,14 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
           }
           const [hmin, hmax] = lot.heights;
           let h = hmin + r() * (hmax - hmin);
-          if (lot.kind === "containers") h = 2.6 * (1 + Math.floor(r() * 4));
-          else if ((lot.kind === "towers" || lot.kind === "corporate") && r() > 0.34) h = 14 + r() * 16;
-          const w = lot.kind === "containers" ? span * 0.5 : span * 0.72;
-          const d = lot.kind === "containers" ? span * 0.86 : span * 0.72;
+          const centerLot = li === 1 && lj === 1;
+          if (downtown) h = centerLot ? 66 + r() * 16 : 44 + r() * 26;
+          else if (lot.kind === "containers") h = 2.6 * (1 + Math.floor(r() * 4));
+          else if ((lot.kind === "towers" || lot.kind === "corporate") && r() > 0.72) h = 20 + r() * 12;
+          const w = !downtown && lot.kind === "containers" ? span * 0.5 : span * 0.7;
+          const d = !downtown && lot.kind === "containers" ? span * 0.86 : span * 0.7;
           if (overlapsRoom(cx, cz, w, d)) continue;
-          building(cx, cz, w, d, h);
+          building(cx, cz, w, d, h, downtown);
         }
       }
     }
@@ -1465,6 +1804,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
 
   const nearSpot = (x: number, z: number, d: number) => spots.some((s) => Math.hypot(s.pos.x - x, s.pos.z - z) < d);
 
+  const parked: THREE.Group[] = [];
   const carColors = ["#2a2f36", "#b8bcc2", "#8e1b1b", "#1f3f8a", "#f1f1ef", "#1d5a45", "#c7a14a"];
   const kinds = ["sedan", "hatch", "sedan", "van"] as const;
   for (let n = 0; n < 16; n++) {
@@ -1485,6 +1825,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     car.position.set(x, 0, z);
     car.rotation.y = alongX ? Math.PI / 2 : 0;
     scene.add(car);
+    parked.push(car);
     const hl = car.userData.length / 2;
     if (alongX) addCol(x - hl, x + hl, z - 0.95, z + 0.95, 1.5);
     else addCol(x - 0.95, x + 0.95, z - hl, z + hl, 1.5);
@@ -1692,10 +2033,10 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   furnishHome(scene, addCol);
   placeRoom(SHOP_A.minX, SHOP_A.maxX, SHOP_A.minZ, SHOP_A.maxZ, "shop", SHOP_A.gap);
   placeRoom(SHOP_B.minX, SHOP_B.maxX, SHOP_B.minZ, SHOP_B.maxZ, "shop", SHOP_B.gap);
-  const armas = labelPlane("ARMAS", "#f87171");
+  const armas = designedSign("ARMAS", 3.6, 0.95);
   armas.position.set((SHOP_A.minX + SHOP_A.maxX) / 2, 2.7, SHOP_A.minZ - 0.06);
   scene.add(armas);
-  const motos = labelPlane("MOTOS", "#38bdf8");
+  const motos = designedSign("MOTOS", 3.6, 0.95);
   motos.position.set(SHOP_B.minX - 0.06, 2.7, (SHOP_B.minZ + SHOP_B.maxZ) / 2);
   motos.rotation.y = -Math.PI / 2;
   scene.add(motos);
@@ -1766,5 +2107,6 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     ships: port,
     elevator,
     ads,
+    parked,
   };
 }

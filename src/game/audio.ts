@@ -60,6 +60,15 @@ class Sound {
   private musicStep = 0;
   private listeners = new Set<() => void>();
   private alarmUntil = 0;
+  private rideVoice: {
+    kind: "bike" | "jet";
+    osc: OscillatorNode;
+    osc2: OscillatorNode;
+    filter: BiquadFilterNode;
+    gain: GainNode;
+    noiseGain: GainNode;
+    noise: AudioBufferSourceNode;
+  } | null = null;
   settings: Settings = { sfx: true };
 
   constructor() {
@@ -297,6 +306,122 @@ class Sound {
     }
   }
 
+  setRide(kind: "bike" | "jet" | "off", rpm: number) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    if (kind === "off" || !this.settings.sfx) {
+      if (this.rideVoice) {
+        this.rideVoice.gain.gain.setTargetAtTime(0.0001, t, 0.12);
+        this.rideVoice.noiseGain.gain.setTargetAtTime(0.0001, t, 0.12);
+      }
+      return;
+    }
+    if (!this.rideVoice || this.rideVoice.kind !== kind) {
+      this.killRide();
+      const osc = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      const noiseGain = ctx.createGain();
+      const noise = ctx.createBufferSource();
+      const noiseFilter = ctx.createBiquadFilter();
+      osc.type = "sawtooth";
+      osc2.type = kind === "jet" ? "square" : "triangle";
+      filter.type = "lowpass";
+      gain.gain.value = 0.0001;
+      noiseGain.gain.value = 0.0001;
+      noise.buffer = kind === "jet" ? this.noise : this.brown;
+      noise.loop = true;
+      noiseFilter.type = kind === "jet" ? "bandpass" : "lowpass";
+      noiseFilter.frequency.value = kind === "jet" ? 1600 : 220;
+      noiseFilter.Q.value = kind === "jet" ? 0.7 : 0.8;
+      osc.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain).connect(this.sfxBus);
+      noise.connect(noiseFilter).connect(noiseGain).connect(this.sfxBus);
+      osc.start();
+      osc2.start();
+      noise.start();
+      this.rideVoice = { kind, osc, osc2, filter, gain, noiseGain, noise };
+    }
+    const voice = this.rideVoice;
+    const rpmC = Math.max(0.12, Math.min(1.45, rpm));
+    if (kind === "bike") {
+      const f = 58 + rpmC * 118;
+      voice.osc.frequency.setTargetAtTime(f, t, 0.07);
+      voice.osc2.frequency.setTargetAtTime(f * 2.01, t, 0.07);
+      voice.filter.frequency.setTargetAtTime(240 + rpmC * 1500, t, 0.09);
+      voice.filter.Q.setTargetAtTime(4.2, t, 0.1);
+      voice.gain.gain.setTargetAtTime(0.05 + rpmC * 0.075, t, 0.08);
+      voice.noiseGain.gain.setTargetAtTime(0.01 + rpmC * 0.028, t, 0.1);
+    } else {
+      const f = 170 + rpmC * 280;
+      voice.osc.frequency.setTargetAtTime(f, t, 0.05);
+      voice.osc2.frequency.setTargetAtTime(f * 1.51, t, 0.05);
+      voice.filter.frequency.setTargetAtTime(900 + rpmC * 2400, t, 0.07);
+      voice.filter.Q.setTargetAtTime(2.4, t, 0.1);
+      voice.gain.gain.setTargetAtTime(0.04 + rpmC * 0.06, t, 0.06);
+      voice.noiseGain.gain.setTargetAtTime(0.028 + rpmC * 0.05, t, 0.07);
+    }
+  }
+
+  private killRide() {
+    const voice = this.rideVoice;
+    this.rideVoice = null;
+    if (!voice || !this.ctx) return;
+    const t = this.ctx.currentTime + 0.02;
+    try {
+      voice.osc.stop(t);
+      voice.osc2.stop(t);
+      voice.noise.stop(t);
+    } catch {
+      /* already stopped */
+    }
+  }
+
+  /** Pain cry: pitch rises and falls through two vowel formants. */
+  private cry(pitch: number, pan: number, vol: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.settings.sfx) return;
+    const bus = this.out(pan, 0.4);
+    const t = ctx.currentTime + 0.008;
+    const dur = 0.48;
+    const o = ctx.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(Math.max(50, pitch * 0.72), t);
+    o.frequency.exponentialRampToValueAtTime(pitch * 1.65, t + 0.07);
+    o.frequency.exponentialRampToValueAtTime(Math.max(45, pitch * 0.48), t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + 0.025);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * 0.5), t + 0.16);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const f1 = ctx.createBiquadFilter();
+    f1.type = "bandpass";
+    f1.frequency.setValueAtTime(680, t);
+    f1.frequency.linearRampToValueAtTime(1040, t + 0.08);
+    f1.frequency.linearRampToValueAtTime(520, t + dur);
+    f1.Q.value = 8;
+    const f2 = ctx.createBiquadFilter();
+    f2.type = "bandpass";
+    f2.frequency.setValueAtTime(1480, t);
+    f2.frequency.linearRampToValueAtTime(1980, t + 0.09);
+    f2.frequency.linearRampToValueAtTime(1100, t + dur);
+    f2.Q.value = 9;
+    const g1 = ctx.createGain();
+    g1.gain.value = 2.6;
+    const g2 = ctx.createGain();
+    g2.gain.value = 1.6;
+    o.connect(f1).connect(g1).connect(g);
+    o.connect(f2).connect(g2).connect(g);
+    g.connect(bus);
+    o.start(t);
+    o.stop(t + dur + 0.03);
+    this.noiseHit(t, 0.07, vol * 0.4, "highpass", 2200, bus);
+    this.noiseHit(t + 0.04, 0.16, vol * 0.22, "bandpass", 860, bus, 380);
+  }
+
   setEngines(voices: EngineVoice[]) {
     const ctx = this.ctx;
     if (!ctx) return;
@@ -485,12 +610,12 @@ class Sound {
       }
       case "enemyDown": {
         const b = this.out(pan, 0.3);
-        this.babble(95 + Math.random() * 30, 1, pan, 0.12 * v);
+        this.cry(130 + Math.random() * 40, pan, 0.16 * v);
         this.noiseHit(t + 0.35, 0.18, 0.35 * v, "lowpass", 400, b, 80, this.brown);
         break;
       }
       case "scream":
-        this.babble(260 + Math.random() * 90, 2, pan, 0.08 * v);
+        this.cry(230 + Math.random() * 80, pan, 0.22 * v);
         break;
       case "boom": {
         const b = this.out(pan, 1.2);
@@ -500,9 +625,8 @@ class Sound {
         break;
       }
       case "hurt": {
-        const b = this.out(pan, 0.2);
-        this.babble(140, 1, pan, 0.12 * v);
-        this.noiseHit(t, 0.12, 0.3 * v, "lowpass", 700, b, 100, this.brown);
+        this.cry(160 + Math.random() * 35, pan, 0.3 * v);
+        this.noiseHit(t, 0.12, 0.22 * v, "lowpass", 700, this.out(pan, 0.15), 100, this.brown);
         break;
       }
       case "alarm": {
