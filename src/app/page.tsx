@@ -47,10 +47,10 @@ export default function Home() {
         <NightField>
           <p className="font-mono text-[11px] tracking-[0.45em] text-cyan-200/60">00 · A DÍVIDA</p>
           <h1 className="mt-3 text-4xl font-light tracking-tight sm:text-6xl">Porto Seco</h1>
-          <div className="my-8 flex items-end justify-center gap-4 sm:gap-7">
+          <div className="my-8 flex max-w-3xl flex-wrap items-end justify-center gap-x-4 gap-y-5 sm:gap-x-6">
             {[...crew, ...villains].map((w) => (
               <div key={w} className="flex flex-col items-center gap-2">
-                <Portrait who={w} size={44} pose="idle" full />
+                <Portrait who={w} size={68} pose="idle" full />
                 <span className={`font-mono text-[10px] tracking-widest ${people[w].ally ? "text-cyan-200/80" : "text-rose-300/80"}`}>{people[w].name}</span>
               </div>
             ))}
