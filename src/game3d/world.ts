@@ -5,6 +5,7 @@ import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, COAST, coastReach, DANI_CHAIR, DECK,
 import { takeBike, takeCar } from "@/game3d/vehicles";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 export type DoorPlace = "home" | "shop" | "target" | "central";
 export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean; door?: DoorPlace; shut?: number; above?: number; bottom?: number; ride?: boolean; mark?: number };
@@ -330,8 +331,81 @@ function mesh(g: THREE.BufferGeometry, m: THREE.Material | THREE.Material[], x: 
   return o;
 }
 
+/** One draw for every static copy of a material. Cars, signs and anything that moves stay apart. */
+function batchStill(scene: THREE.Scene, moving: Set<THREE.Object3D>) {
+  const groups = new Map<string, THREE.Mesh[]>();
+  const visit = (o: THREE.Object3D) => {
+    if (moving.has(o)) return;
+    const mesh = o as THREE.Mesh;
+    if (
+      mesh.isMesh &&
+      !(o as THREE.InstancedMesh).isInstancedMesh &&
+      !(o as THREE.SkinnedMesh).isSkinnedMesh &&
+      !mesh.castShadow &&
+      mesh.children.length === 0 &&
+      mesh.geometry &&
+      !Array.isArray(mesh.material)
+    ) {
+      let parked = false;
+      for (let p: THREE.Object3D | null = mesh; p; p = p.parent) {
+        const u = p.userData;
+        if (u && (u.cabin || u.wheels || u.shadowProxy || u.live)) parked = true;
+      }
+      const mat = mesh.material as THREE.Material;
+      if (!parked && !mat.transparent && mat.opacity >= 1) {
+        const list = groups.get(mat.uuid);
+        if (list) list.push(mesh);
+        else groups.set(mat.uuid, [mesh]);
+      }
+    }
+    for (const child of o.children) visit(child);
+  };
+  for (const child of [...scene.children]) visit(child);
+  const alive = new Map<string, number>();
+  scene.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (mesh.isMesh && mesh.geometry) alive.set(mesh.geometry.uuid, (alive.get(mesh.geometry.uuid) ?? 0) + 1);
+  });
+  for (const list of groups.values()) {
+    if (list.length < 8) continue;
+    const keys = Object.keys(list[0].geometry.attributes).sort().join(",");
+    const same = list.filter((mesh) => mesh.geometry.index && Object.keys(mesh.geometry.attributes).sort().join(",") === keys);
+    if (same.length < 8) continue;
+    const geos: THREE.BufferGeometry[] = [];
+    for (const mesh of same) {
+      const geo = mesh.geometry.clone();
+      geo.applyMatrix4(mesh.matrixWorld);
+      geos.push(geo);
+    }
+    let merged: THREE.BufferGeometry | null = null;
+    try {
+      merged = mergeGeometries(geos, false);
+    } catch {
+      merged = null;
+    }
+    for (const geo of geos) geo.dispose();
+    if (!merged) continue;
+    const batch = new THREE.Mesh(merged, list[0].material);
+    batch.name = "batch";
+    batch.castShadow = false;
+    batch.receiveShadow = true;
+    batch.matrixAutoUpdate = false;
+    scene.add(batch);
+    for (const mesh of same) {
+      const left = (alive.get(mesh.geometry.uuid) ?? 1) - 1;
+      alive.set(mesh.geometry.uuid, left);
+      if (left === 0) mesh.geometry.dispose();
+      mesh.removeFromParent();
+    }
+  }
+}
+
 function box(w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number, parent: THREE.Object3D, shadow = true, round = 0) {
-  const g = round > 0 ? new RoundedBoxGeometry(w, h, d, 2, Math.min(round, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001)) : new THREE.BoxGeometry(w, h, d);
+  const longest = Math.max(w, h, d);
+  const rounded = round > 0.02 && (longest >= 4 || round >= 0.1);
+  const g = rounded
+    ? new RoundedBoxGeometry(w, h, d, 2, Math.min(round, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+    : new THREE.BoxGeometry(w, h, d);
   return mesh(g, mat, x, y, z, parent, shadow);
 }
 
@@ -1716,6 +1790,13 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     const seg = h > 20 ? 4 : 7;
     const body = mesh(new RoundedBoxGeometry(w, h, d, seg, round), [md, md, roofMat, roofMat, mw, mw], cx, h / 2, cz, scene);
     body.receiveShadow = true;
+    body.castShadow = false;
+    const shade = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+    shade.castShadow = true;
+    shade.receiveShadow = false;
+    shade.frustumCulled = false;
+    shade.name = "shadowProxy";
+    body.add(shade);
     addCol(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, h);
     if (h > 5) placeShopSign(cx, cz, w, d);
 
@@ -1736,7 +1817,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       roof.castShadow = true;
       scene.add(roof);
     } else {
-      box(w + 0.5, 0.4, d + 0.5, trimMat, cx, h + 0.1, cz, scene, true, 0.12);
+      box(w + 0.5, 0.4, d + 0.5, trimMat, cx, h + 0.1, cz, scene, false, 0.12);
       if (r() < 0.6) {
         const tank = mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.6, 18), tankMat, cx + (r() - 0.5) * (w - 3), h + 1.1, cz + (r() - 0.5) * (d - 3), scene);
         tank.castShadow = true;
@@ -2213,6 +2294,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     freeze(child);
     trimShadow(child);
   }
+  scene.updateMatrixWorld(true);
+  batchStill(scene, moving);
 
   const spawn = new THREE.Vector3(BIKE_PARK.x + 2.2, 0, BIKE_PARK.z);
   const allySpots = [

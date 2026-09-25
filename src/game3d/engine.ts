@@ -110,6 +110,22 @@ function segBox(a: THREE.Vector3, b: THREE.Vector3, c: Collider) {
   return t0;
 }
 
+const personShadeGeo = new THREE.CapsuleGeometry(0.32, 0.9, 2, 6);
+const personShadeMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+
+/** A capsule stands in for the soldier inside the shadow map once he is too far to read. */
+function pinShadow(root: THREE.Object3D) {
+  const proxy = new THREE.Mesh(personShadeGeo, personShadeMat);
+  proxy.position.y = 0.95;
+  proxy.castShadow = false;
+  proxy.receiveShadow = false;
+  proxy.visible = false;
+  proxy.name = "shadowProxy";
+  proxy.frustumCulled = false;
+  root.add(proxy);
+  root.userData.shadowProxy = proxy;
+}
+
 function buildDrone() {
   const g = new THREE.Group();
   const shell = new THREE.MeshStandardMaterial({ color: "#20252c", roughness: 0.35, metalness: 0.6 });
@@ -572,6 +588,7 @@ export class Game3D {
       const still = r() < 0.2;
       const rig = buildHuman(randomLook(r), { simple: true });
       rig.armed = false;
+      pinShadow(rig.root);
       this.scene.add(rig.root);
       this.peds.push({ rig, pos, yaw: 0, loop, wp: (wp + 1) % 4, dir: r() < 0.5 ? 1 : -1, speed: 1.1 + r() * 0.6, panic: 0, t: r() * 10, talkT: 2 + r() * 8, still, pitch: 100 + r() * 160, stepD: 0, hp: 5, dead: 0, hold: 0 });
     }
@@ -609,10 +626,31 @@ export class Game3D {
     });
   }
 
+  /** Full silhouette up close. Farther away the same person still throws a shadow, from a capsule. */
+  private castActor(root: THREE.Object3D, on: boolean, close: boolean) {
+    const mode = on ? (close ? 2 : 1) : 0;
+    if (root.userData.shadowMode === mode) return;
+    root.userData.shadowMode = mode;
+    const proxy = root.userData.shadowProxy as THREE.Mesh | undefined;
+    if (proxy) {
+      proxy.visible = mode === 1;
+      proxy.castShadow = mode === 1;
+    }
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || mesh === proxy) return;
+      mesh.castShadow = mode === 2;
+    });
+  }
+
   private makeDriver() {
     const rig = buildHuman(randomLook(this.r), { simple: true });
     rig.armed = false;
     rig.root.scale.setScalar(0.9);
+    rig.root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) mesh.castShadow = false;
+    });
     this.scene.add(rig.root);
     return rig;
   }
@@ -661,6 +699,7 @@ export class Game3D {
     else {
       const look = opts?.look ?? guardLook;
       rig = buildHuman(look, { simple: true });
+      pinShadow(rig.root);
       mesh = rig.root;
     }
     const pos = a.clone();
@@ -1761,7 +1800,8 @@ export class Game3D {
         this.pushFromCar(p.pos, c.pos, c.yaw, c.mesh.userData.length, 0.3);
       }
       p.rig.root.visible = near;
-      this.castNear(p.rig.root, near && cdx * cdx + cdz * cdz < 36 * 36);
+      const pedShadow = cdx * cdx + cdz * cdz;
+      this.castActor(p.rig.root, near && pedShadow < 36 * 36, pedShadow < 14 * 14);
       if (!near) continue;
       p.rig.root.position.copy(p.pos);
       p.rig.root.rotation.y = p.yaw;
@@ -2366,6 +2406,12 @@ export class Game3D {
     }
     e.mesh.position.copy(e.pos);
     e.mesh.rotation.y = e.yaw;
+    if (e.rig) {
+      const sdx = e.pos.x - this.camera.position.x;
+      const sdz = e.pos.z - this.camera.position.z;
+      const sd = sdx * sdx + sdz * sdz;
+      this.castActor(e.mesh, sd < 40 * 40, sd < 14 * 14);
+    }
     const top = e.kind === "drone" ? 0.9 : e.kind === "boss" ? 2.75 : 2.3;
     e.marker.visible = true;
     e.marker.position.set(e.pos.x, e.pos.y + top + Math.sin(this.t * 4 + e.t) * 0.08, e.pos.z);
