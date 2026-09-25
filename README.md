@@ -2,6 +2,8 @@
 
 Um jogo de ação no navegador para aprender Python do zero ao avançado.
 
+O jogo no ar: https://porto-seco.netlify.app
+
 Cole é motoboy em Porto Seco, está devendo para o agiota Kane e nunca programou. A hacker Maya recruta o Cole para derrubar a Vértice Segurança, a empresa de Victor Hale que controla a cidade. Ao longo de 30 missões em 6 capítulos, o jogador:
 
 - controla o Cole em 3D, em terceira pessoa, num bairro aberto com prédios, sacadas, toldos, árvores, postes, calçada de pedra portuguesa, pedestres andando e carros circulando: anda, corre, pula, atira com a pistola de choque e derruba seguranças, drones e chefes (todos com uma seta vermelha em cima da cabeça);
