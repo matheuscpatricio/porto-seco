@@ -211,6 +211,50 @@ export function policeRoster(missionsDone: number): { especial: number; federal:
 }
 
 /** Pushes two circles apart when they overlap. Returns null when they already clear. */
+export type SignalColor = "red" | "yellow" | "green";
+
+/** Twelve-second cycle: north-south, then east-west. `alongX` is an east-west street. */
+export function trafficSignal(t: number, alongX: boolean): SignalColor {
+  const u = ((t % 12) + 12) % 12;
+  const nsGo = u < 6.5;
+  const yellow = nsGo ? u >= 5 : u >= 11.5;
+  const go = alongX ? !nsGo : nsGo;
+  if (!go) return "red";
+  return yellow ? "yellow" : "green";
+}
+
+/** Ground rectangles. `len` runs along yaw, `wid` across it. */
+export function orientedOverlap(
+  ax: number,
+  az: number,
+  ayaw: number,
+  aLen: number,
+  aWid: number,
+  bx: number,
+  bz: number,
+  byaw: number,
+  bLen: number,
+  bWid: number,
+): boolean {
+  const dx = bx - ax;
+  const dz = bz - az;
+  const axes = [ayaw, ayaw + Math.PI / 2, byaw, byaw + Math.PI / 2];
+  const reach = (yaw: number, len: number, wid: number, sx: number, sz: number) =>
+    Math.abs(Math.sin(yaw) * sx + Math.cos(yaw) * sz) * (len / 2) + Math.abs(Math.cos(yaw) * sx - Math.sin(yaw) * sz) * (wid / 2);
+  for (const ang of axes) {
+    const sx = Math.sin(ang);
+    const sz = Math.cos(ang);
+    if (Math.abs(dx * sx + dz * sz) > reach(ayaw, aLen, aWid, sx, sz) + reach(byaw, bLen, bWid, sx, sz)) return false;
+  }
+  return true;
+}
+
+/** A stopped car does not knock Cole down. A moving car does, including while he rides. */
+export function rideImpact(carSpeed: number, rideSpeed: number, mounted: boolean): boolean {
+  if (mounted) return carSpeed > 4.2 || rideSpeed > 7.5;
+  return carSpeed > 7;
+}
+
 export function separateCircles(ax: number, az: number, bx: number, bz: number, minDist: number): { ax: number; az: number; bx: number; bz: number } | null {
   let dx = bx - ax;
   let dz = bz - az;

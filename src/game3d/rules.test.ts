@@ -33,8 +33,11 @@ import {
   overlapsStreet,
   policeAfterHack,
   roomExit,
+  orientedOverlap,
+  rideImpact,
   separateCircles,
   sharkHunts,
+  trafficSignal,
   shirtFor,
   SHOP_A,
   SHOP_B,
@@ -197,6 +200,22 @@ test("every fifth lesson slot is a sea getaway and street jobs call the police",
   assert.equal(policeAfterHack("entrega", false), true);
   assert.equal(policeAfterHack("mar", false), false);
   assert.equal(policeAfterHack("invasao", true), false);
+});
+
+test("signals alternate and a bike still meets a car the circle misses", () => {
+  assert.equal(trafficSignal(0, false), "green");
+  assert.equal(trafficSignal(0, true), "red");
+  assert.equal(trafficSignal(5.2, false), "yellow");
+  assert.equal(trafficSignal(8, true), "green");
+  assert.equal(trafficSignal(8, false), "red");
+  assert.equal(trafficSignal(11.7, true), "yellow");
+  assert.equal(orientedOverlap(0, 0, 0, 2.6, 1.6, 0, 2.5, 0, 4.4, 1.9), true);
+  assert.equal(separateCircles(0, 0, 0, 2.5, 2.2), null);
+  assert.equal(orientedOverlap(0, 0, 0, 2.6, 1.6, 0, 8, 0, 4.4, 1.9), false);
+  assert.equal(rideImpact(5, 0, false), false);
+  assert.equal(rideImpact(8, 0, false), true);
+  assert.equal(rideImpact(5, 2, true), true);
+  assert.equal(rideImpact(1, 9, true), true);
 });
 
 test("overlapping vehicles are pushed apart", () => {
