@@ -129,7 +129,7 @@ function shadowBox(w: number, h: number, d: number) {
   mesh.position.y = h / 2;
   mesh.castShadow = true;
   mesh.receiveShadow = false;
-  mesh.frustumCulled = false;
+  mesh.frustumCulled = true;
   mesh.name = "shadowProxy";
   return mesh;
 }

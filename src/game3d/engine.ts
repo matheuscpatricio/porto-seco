@@ -121,7 +121,7 @@ function pinShadow(root: THREE.Object3D) {
   proxy.receiveShadow = false;
   proxy.visible = false;
   proxy.name = "shadowProxy";
-  proxy.frustumCulled = false;
+  proxy.frustumCulled = true;
   root.add(proxy);
   root.userData.shadowProxy = proxy;
 }
@@ -269,6 +269,33 @@ export class Game3D {
   private readonly carF = new THREE.Vector3();
   private readonly carR = new THREE.Vector3();
   private readonly carRel = new THREE.Vector3();
+  private readonly pedTo = new THREE.Vector3();
+  private readonly pedSide = new THREE.Vector3();
+  private readonly pedDp = new THREE.Vector3();
+  private readonly aimEye = new THREE.Vector3();
+  private readonly aimChest = new THREE.Vector3();
+  private readonly aimTo = new THREE.Vector3();
+  private readonly bulletPrev = new THREE.Vector3();
+  private readonly bulletHit = new THREE.Vector3();
+  private readonly camRight = new THREE.Vector3();
+  private readonly camTarget = new THREE.Vector3();
+  private readonly camBack = new THREE.Vector3();
+  private readonly camWant = new THREE.Vector3();
+  private readonly camHold = new THREE.Vector3();
+  private readonly camAhead = new THREE.Vector3();
+  private readonly sndTo = new THREE.Vector3();
+  private readonly sndRight = new THREE.Vector3();
+  private readonly snd = { pan: 0, vol: 0 };
+  private readonly shakeOff = new THREE.Vector3();
+  private readonly homeMark = new THREE.Vector3(HOME_STUDY.x, 0, HOME_STUDY.z);
+  private readonly jetMark = new THREE.Vector3(JET.x, 0, JET.z);
+  private readonly pedGrid = new Map<number, Ped[]>();
+  private readonly pedLists: Ped[][] = [];
+  private pedListUsed = 0;
+  private readonly pedAwake = new Set<Ped>();
+  private readonly engineList: { pos: THREE.Vector3; speed: number; d: number }[] = [];
+  private readonly dueFns: { at: number; fn: () => void }[] = [];
+  private readonly vehicleBodies: { pos: THREE.Vector3; yaw: number; len: number; speed: number; kind: "traffic" | "cop" | "runner"; index: number }[] = [];
 
   constructor(
     public level: Level,
@@ -493,13 +520,13 @@ export class Game3D {
   /** True when a living guard is close and in front of the escort, not merely somewhere on the street. */
   private guardAhead(a: { pos: THREE.Vector3; path?: THREE.Vector3[]; wp: number }) {
     const goal = a.path?.[Math.min(a.wp, (a.path?.length ?? 1) - 1)];
-    const fwd = goal ? goal.clone().sub(a.pos) : new THREE.Vector3(0, 0, 1);
+    const fwd = goal ? this.aimEye.copy(goal).sub(a.pos) : this.aimEye.set(0, 0, 1);
     fwd.y = 0;
     if (fwd.lengthSq() < 0.04) return false;
     fwd.normalize();
     return this.enemies.some((e) => {
       if (e.hp <= 0 || e.kind === "drone") return false;
-      const rel = e.pos.clone().sub(a.pos);
+      const rel = this.aimChest.copy(e.pos).sub(a.pos);
       rel.y = 0;
       const dist = rel.length();
       if (dist > 9 || dist < 0.05) return false;
@@ -1089,11 +1116,13 @@ export class Game3D {
   /** Pan and distance volume for a world-space sound. */
   private at3(p: THREE.Vector3, range = 60) {
     const cam = this.camera.position;
-    const to = p.clone().sub(cam);
+    const to = this.sndTo.copy(p).sub(cam);
     const d = to.length();
-    const right = new THREE.Vector3(Math.cos(this.camYaw), 0, -Math.sin(this.camYaw)).multiplyScalar(-1);
+    const right = this.sndRight.set(Math.cos(this.camYaw), 0, -Math.sin(this.camYaw)).multiplyScalar(-1);
     const pan = d > 0.01 ? to.normalize().dot(right) : 0;
-    return { pan: pan * 0.9, vol: Math.max(0, 1 - d / range) ** 1.4 };
+    this.snd.pan = pan * 0.9;
+    this.snd.vol = Math.max(0, 1 - d / range) ** 1.4;
+    return this.snd;
   }
 
   private collide(pos: THREE.Vector3, radius: number, feet: number, ignoreRide = false) {
@@ -1167,7 +1196,7 @@ export class Game3D {
   }
 
   private targetPos(): THREE.Vector3 {
-    if (this.free || !this.step) return new THREE.Vector3(HOME_STUDY.x, 0, HOME_STUDY.z);
+    if (this.free || !this.step) return this.homeMark;
     const s = this.step;
     const L = this.layout;
     if (!s) return L.car.position;
@@ -1191,7 +1220,7 @@ export class Game3D {
       case "cops":
         return s.to;
       case "jet":
-        return this.jetting ? s.to : new THREE.Vector3(JET.x, 0, JET.z);
+        return this.jetting ? s.to : this.jetMark;
     }
   }
 
@@ -1244,9 +1273,18 @@ export class Game3D {
     dt = Math.max(0, Math.min(dt, 1 / 25));
     this.t += dt;
     this.phaseT += dt;
-    const due = this.queue.filter((q) => this.t >= q.at);
-    this.queue = this.queue.filter((q) => this.t < q.at);
-    due.forEach((q) => q.fn());
+    if (this.queue.length) {
+      const due = this.dueFns;
+      let dueN = 0;
+      let w = 0;
+      for (let i = 0; i < this.queue.length; i++) {
+        const q = this.queue[i];
+        if (this.t >= q.at) due[dueN++] = q;
+        else this.queue[w++] = q;
+      }
+      this.queue.length = w;
+      for (let i = 0; i < dueN; i++) due[i].fn();
+    }
     this.alarmT = Math.max(0, this.alarmT - dt);
     this.shake = Math.max(0, this.shake - dt);
     this.warnT = Math.max(0, this.warnT - dt);
@@ -1463,8 +1501,7 @@ export class Game3D {
     if (this.dani) animate(this.dani, "desk", this.t, dt);
     this.updateAllies(dt);
     const car = L.car;
-    this.driver.root.position.set(car.position.x, car.position.y + 0.25, car.position.z);
-    this.driver.root.position.add(new THREE.Vector3(Math.cos(car.rotation.y) * 0.4, 0, -Math.sin(car.rotation.y) * 0.4));
+    this.driver.root.position.set(car.position.x + Math.cos(car.rotation.y) * 0.4, car.position.y + 0.25, car.position.z - Math.sin(car.rotation.y) * 0.4);
     this.driver.root.rotation.y = car.rotation.y;
     animate(this.driver, "sit", this.t, dt);
 
@@ -1529,9 +1566,8 @@ export class Game3D {
     this.near = false;
     if (this.free && this.phase === "play") {
       if (control && input.use && !this.useHeld) {
-        const study = new THREE.Vector3(HOME_STUDY.x, P.pos.y, HOME_STUDY.z);
-        const shop = SHOPS.find((p) => P.pos.distanceTo(new THREE.Vector3(p.x, P.pos.y, p.z)) < 2.4);
-        if (P.pos.distanceTo(study) < 2.3) this.ev.onStudy?.();
+        const shop = SHOPS.find((p) => this.nearXZ(p.x, p.z, 2.4));
+        if (this.nearXZ(HOME_STUDY.x, HOME_STUDY.z, 2.3)) this.ev.onStudy?.();
         else if (shop) this.ev.onShop?.(shop.kind);
       }
       this.useHeld = input.use;
@@ -1543,12 +1579,12 @@ export class Game3D {
     }
     switch (s.k) {
       case "hack":
-        this.near = P.pos.distanceTo(new THREE.Vector3(L.terminal.x - 1.1, P.pos.y, L.terminal.z)) < 2.4;
+        this.near = this.nearXZ(L.terminal.x - 1.1, L.terminal.z, 2.4);
         if (control && this.near && input.use && !this.useHeld) this.setPhase("dive");
         break;
       case "go":
       case "contact":
-        if (P.pos.distanceTo(new THREE.Vector3(s.to.x, P.pos.y, s.to.z)) < 3) {
+        if (this.nearXZ(s.to.x, s.to.z, 3)) {
           this.ev.onToast(s.arrive, s.k === "contact" ? "good" : "bad");
           if (s.k === "contact") sound.sfx("pickup");
           if (s.k === "go" && s.spawnBoss && this.mission.bossAt) {
@@ -1566,7 +1602,7 @@ export class Game3D {
         break;
       case "chase": {
         const rn = this.runner;
-        if (rn && rn.state === "stopped" && P.pos.distanceTo(new THREE.Vector3(rn.pos.x, P.pos.y, rn.pos.z)) < 5) {
+        if (rn && rn.state === "stopped" && this.nearXZ(rn.pos.x, rn.pos.z, 5)) {
           const side = new THREE.Vector3(rn.pos.x + 3.4, 0, rn.pos.z);
           this.moveTerminal(side);
           this.lockLights.forEach((m, i, arr) => m.position.set(side.x - 0.05, 2.25, side.z - ((arr.length - 1) * 0.5) / 2 + i * 0.5));
@@ -1585,8 +1621,7 @@ export class Game3D {
           this.nextStep();
           break;
         }
-        const door = new THREE.Vector3(L.terminal.x - 1.1, P.pos.y, L.terminal.z);
-        if (control && P.pos.distanceTo(door) < 2.6 && input.use && !this.useHeld) {
+        if (control && this.nearXZ(L.terminal.x - 1.1, L.terminal.z, 2.6) && input.use && !this.useHeld) {
           this.ev.onToast("A Maya ainda não chegou. Fique perto dela — a seta mostra onde ela está.", "bad");
         }
         break;
@@ -1595,7 +1630,7 @@ export class Game3D {
         if (!this.boss || this.boss.hp <= 0) this.nextStep();
         break;
       case "cops":
-        if (P.pos.distanceTo(new THREE.Vector3(s.to.x, P.pos.y, s.to.z)) < 4.2) {
+        if (this.nearXZ(s.to.x, s.to.z, 4.2)) {
           for (const e of this.enemies) if (e.detail === "chase") e.hp = 0;
           this.ev.onToast("No porto a viatura perdeu você.", "good");
           this.checkpoint = P.pos.clone();
@@ -1603,7 +1638,7 @@ export class Game3D {
         }
         break;
       case "jet":
-        if (this.jetting && P.pos.distanceTo(new THREE.Vector3(s.to.x, P.pos.y, s.to.z)) < 7) {
+        if (this.jetting && this.nearXZ(s.to.x, s.to.z, 7)) {
           this.jetting = false;
           P.pos.set(JET.x, 0, JET.z);
           this.checkpoint = P.pos.clone();
@@ -1651,7 +1686,7 @@ export class Game3D {
           }
           const goal = a.path[a.wp];
           if (goal && !far) {
-            const to = goal.clone().sub(a.pos);
+            const to = this.pedTo.copy(goal).sub(a.pos);
             to.y = 0;
             if (to.length() < 0.5) a.wp++;
             else {
@@ -1665,7 +1700,7 @@ export class Game3D {
         this.collide(a.pos, 0.35, 0);
         a.rig.root.rotation.y = a.yaw;
       } else {
-        const d = P.pos.clone().sub(a.pos);
+        const d = this.pedTo.copy(P.pos).sub(a.pos);
         a.rig.root.rotation.y = Math.atan2(d.x, d.z);
         if (a.path && this.step && this.step.k !== "escort" && this.stepIdx > 0) pose = "idle";
       }
@@ -1689,8 +1724,20 @@ export class Game3D {
     const camPos = this.camera.position;
     const cell = 2;
     const pack = (x: number, z: number) => (Math.floor(x / cell) + 1024) * 4096 + (Math.floor(z / cell) + 1024);
-    const grid = new Map<number, Ped[]>();
-    const awake = new Set<Ped>();
+    const grid = this.pedGrid;
+    grid.clear();
+    this.pedListUsed = 0;
+    const awake = this.pedAwake;
+    awake.clear();
+    const takeList = () => {
+      let list = this.pedLists[this.pedListUsed];
+      if (!list) {
+        list = [];
+        this.pedLists.push(list);
+      } else list.length = 0;
+      this.pedListUsed++;
+      return list;
+    };
     for (const p of this.peds) {
       if (p.dead > 0) continue;
       const dx = p.pos.x - camPos.x;
@@ -1702,7 +1749,11 @@ export class Game3D {
       const key = pack(p.pos.x, p.pos.z);
       const list = grid.get(key);
       if (list) list.push(p);
-      else grid.set(key, [p]);
+      else {
+        const fresh = takeList();
+        fresh.push(p);
+        grid.set(key, fresh);
+      }
     }
     for (const p of this.peds) {
       p.t += dt;
@@ -1739,7 +1790,7 @@ export class Game3D {
       }
       let pose: Pose3 = "idle";
       if (p.panic > 0) {
-        const away = p.pos.clone().sub(P.pos);
+        const away = this.pedTo.copy(p.pos).sub(P.pos);
         away.y = 0;
         if (away.lengthSq() < 0.01) away.set(1, 0, 0);
         away.normalize();
@@ -1750,12 +1801,12 @@ export class Game3D {
       } else if (!p.still) {
         const pts = L.pedLoops[p.loop];
         const goal = pts[p.wp];
-        const to = goal.clone().sub(p.pos);
+        const to = this.pedTo.copy(goal).sub(p.pos);
         to.y = 0;
         if (to.length() < 0.6) p.wp = (p.wp + p.dir + 4) % 4;
         else {
           to.normalize();
-          const side = new THREE.Vector3(-to.z, 0, to.x);
+          const side = this.pedSide.set(-to.z, 0, to.x);
           const cx = Math.floor(p.pos.x / cell);
           const cz = Math.floor(p.pos.z / cell);
           for (let ix = -1; ix <= 1; ix++) {
@@ -1774,7 +1825,7 @@ export class Game3D {
             }
           }
           if (to.lengthSq() > 0.0001) to.normalize();
-          const blockedByPlayer = P.pos.distanceTo(p.pos) < 1.2 && P.pos.clone().sub(p.pos).dot(to) > 0;
+          const blockedByPlayer = P.pos.distanceTo(p.pos) < 1.2 && this.pedDp.copy(P.pos).sub(p.pos).dot(to) > 0;
           if (!blockedByPlayer) {
             p.pos.addScaledVector(to, p.speed * dt);
             pose = "walk";
@@ -1789,7 +1840,7 @@ export class Game3D {
       }
       p.pos.y = 0.2;
       this.collide(p.pos, 0.3, 0.2);
-      const dp = p.pos.clone().sub(P.pos);
+      const dp = this.pedDp.copy(p.pos).sub(P.pos);
       dp.y = 0;
       const dl = dp.length();
       if (dl < 0.65 && dl > 0.001) p.pos.addScaledVector(dp.normalize(), 0.65 - dl);
@@ -1883,12 +1934,17 @@ export class Game3D {
     return null;
   }
 
+  private nearXZ(x: number, z: number, r: number) {
+    const dx = this.player.pos.x - x;
+    const dz = this.player.pos.z - z;
+    return dx * dx + dz * dz < r * r;
+  }
+
   private tryRide(control: boolean, input: Input3): boolean {
     if (!control || !input.use || this.useHeld) return false;
     const P = this.player;
-    const terminal = new THREE.Vector3(this.layout.terminal.x - 1.1, P.pos.y, this.layout.terminal.z);
-    const hackNear = this.step?.k === "hack" && P.pos.distanceTo(terminal) < 2.4;
-    if (!this.jetting && !this.mounted && P.pos.distanceTo(new THREE.Vector3(JET.x, P.pos.y, JET.z)) < 2.8) {
+    const hackNear = this.step?.k === "hack" && this.nearXZ(this.layout.terminal.x - 1.1, this.layout.terminal.z, 2.4);
+    if (!this.jetting && !this.mounted && this.nearXZ(JET.x, JET.z, 2.8)) {
       this.jetting = true;
       this.mounted = false;
       this.ev.onToast(this.step?.k === "jet" ? "Você subiu no jet ski. Vá até a boia." : "Você subiu no jet ski. No mar o tubarão não morde.", "good");
@@ -1900,8 +1956,8 @@ export class Game3D {
       this.ev.onToast("Você desceu do jet ski.", "info");
       return true;
     }
-    const atLift = P.pos.distanceTo(new THREE.Vector3(ELEVATOR.x, P.pos.y, ELEVATOR.z)) < 2.5;
-    const atRoofLift = P.pos.y > ROOF - 2 && P.pos.distanceTo(new THREE.Vector3(TOWER.x, P.pos.y, 77.4)) < 2.6;
+    const atLift = this.nearXZ(ELEVATOR.x, ELEVATOR.z, 2.5);
+    const atRoofLift = P.pos.y > ROOF - 2 && this.nearXZ(TOWER.x, 77.4, 2.6);
     if (!hackNear && atLift && P.pos.y < 4) {
       this.startLift(true);
       return true;
@@ -1910,7 +1966,7 @@ export class Game3D {
       this.startLift(false);
       return true;
     }
-    if (!hackNear && P.pos.y > ROOF - 1.5 && P.pos.distanceTo(new THREE.Vector3(CENTRAL_PHONE.x, P.pos.y, CENTRAL_PHONE.z)) < 2.6) {
+    if (!hackNear && P.pos.y > ROOF - 1.5 && this.nearXZ(CENTRAL_PHONE.x, CENTRAL_PHONE.z, 2.6)) {
       this.ev.onHelp?.();
       return true;
     }
@@ -1954,7 +2010,7 @@ export class Game3D {
     if (this.step?.k !== "cops" || this.phase !== "play") return;
     if (!this.cops.length) this.spawnCops();
     for (const c of this.cops) {
-      const to = this.player.pos.clone().sub(c.pos);
+      const to = this.aimTo.copy(this.player.pos).sub(c.pos);
       to.y = 0;
       const dist = to.length();
       const want = dist < 2.6 ? 1.5 : 10.5;
@@ -1965,9 +2021,9 @@ export class Game3D {
         while (d < -Math.PI) d += Math.PI * 2;
         c.yaw += d * Math.min(1, dt * 2.2);
       }
-      const ahead = new THREE.Vector3(c.pos.x + Math.sin(c.yaw) * 1.4, 0, c.pos.z + Math.cos(c.yaw) * 1.4);
+      const ahead = this.aimEye.set(c.pos.x + Math.sin(c.yaw) * 1.4, 0, c.pos.z + Math.cos(c.yaw) * 1.4);
       if (this.solidAt(ahead.x, ahead.z, 0.7)) c.speed *= 0.35;
-      c.pos.addScaledVector(new THREE.Vector3(Math.sin(c.yaw), 0, Math.cos(c.yaw)), c.speed * dt);
+      c.pos.addScaledVector(this.aimChest.set(Math.sin(c.yaw), 0, Math.cos(c.yaw)), c.speed * dt);
       c.mesh.position.copy(c.pos);
       c.mesh.rotation.y = c.yaw;
       this.castNear(c.mesh, c.pos.distanceTo(this.camera.position) < 34);
@@ -2016,20 +2072,20 @@ export class Game3D {
     const k = Math.min(1, ride.t / 6.4);
     const high = DECK;
     const low = 0.2;
-    const cabin = new THREE.Vector3(ELEVATOR.x, ride.up ? low : high, 66.8);
-    const deck = new THREE.Vector3(TOWER.x, ride.up ? high : low, ride.up ? 83.2 : ELEVATOR.z);
+    const cabin = this.camTarget.set(ELEVATOR.x, ride.up ? low : high, 66.8);
+    const deck = this.camBack.set(TOWER.x, ride.up ? high : low, ride.up ? 83.2 : ELEVATOR.z);
     let pos: THREE.Vector3;
     if (k < 0.14) {
-      pos = ride.start.clone().lerp(cabin, k / 0.14);
+      pos = this.camWant.copy(ride.start).lerp(cabin, k / 0.14);
       pos.y = ride.up ? low : high;
     } else if (k < 0.86) {
       const u = (k - 0.14) / 0.72;
       const e = u * u * (3 - 2 * u);
-      pos = cabin.clone();
+      pos = this.camWant.copy(cabin);
       pos.y = (ride.up ? low : high) + (ride.up ? high - low : low - high) * e;
     } else {
       const u = (k - 0.86) / 0.14;
-      pos = cabin.clone().lerp(deck, u);
+      pos = this.camWant.copy(cabin).lerp(deck, u);
       pos.y = ride.up ? high : low;
     }
     P.pos.copy(pos);
@@ -2048,25 +2104,56 @@ export class Game3D {
     }
   }
 
+  private takeBody(slot: number, pos: THREE.Vector3, yaw: number, len: number, speed: number, kind: "traffic" | "cop" | "runner", index: number) {
+    let b = this.vehicleBodies[slot];
+    if (!b) {
+      b = { pos, yaw, len, speed, kind, index };
+      this.vehicleBodies[slot] = b;
+    } else {
+      b.pos = pos;
+      b.yaw = yaw;
+      b.len = len;
+      b.speed = speed;
+      b.kind = kind;
+      b.index = index;
+    }
+    return b;
+  }
+
+  private setBodySpeed(b: { speed: number; kind: "traffic" | "cop" | "runner"; index: number }, n: number) {
+    b.speed = n;
+    if (b.kind === "traffic") this.traffic[b.index].speed = n;
+    else if (b.kind === "cop") this.cops[b.index].speed = n;
+    else if (this.runner) this.runner.speed = n;
+  }
+
   private resolveVehicles() {
-    const bodies: { pos: THREE.Vector3; yaw: number; len: number; speed: number; setSpeed: (n: number) => void }[] = [];
     const lenOf = (mesh: THREE.Object3D) => (mesh.userData.length as number) || 4.4;
-    for (const c of this.traffic) bodies.push({ pos: c.pos, yaw: c.yaw, len: lenOf(c.mesh), speed: c.speed, setSpeed: (n) => (c.speed = n) });
-    for (const c of this.cops) bodies.push({ pos: c.pos, yaw: c.yaw, len: lenOf(c.mesh), speed: c.speed, setSpeed: (n) => (c.speed = n) });
+    let n = 0;
+    for (let i = 0; i < this.traffic.length; i++) {
+      const c = this.traffic[i];
+      this.takeBody(n++, c.pos, c.yaw, lenOf(c.mesh), c.speed, "traffic", i);
+    }
+    for (let i = 0; i < this.cops.length; i++) {
+      const c = this.cops[i];
+      this.takeBody(n++, c.pos, c.yaw, lenOf(c.mesh), c.speed, "cop", i);
+    }
     if (this.runner) {
       const rn = this.runner;
-      bodies.push({ pos: rn.pos, yaw: rn.yaw, len: lenOf(rn.mesh), speed: rn.speed, setSpeed: (n) => (rn.speed = n) });
+      this.takeBody(n++, rn.pos, rn.yaw, lenOf(rn.mesh), rn.speed, "runner", 0);
     }
+    const bodies = this.vehicleBodies;
     const parked = this.layout.car.position;
-    for (const b of bodies) {
+    for (let i = 0; i < n; i++) {
+      const b = bodies[i];
       const sep = separateCircles(b.pos.x, b.pos.z, parked.x, parked.z, 3.3);
       if (!sep) continue;
       b.pos.x = sep.ax;
       b.pos.z = sep.az;
-      b.setSpeed(b.speed * 0.2);
+      this.setBodySpeed(b, b.speed * 0.2);
     }
-    for (let i = 0; i < bodies.length; i++) {
-      for (let j = i + 1; j < bodies.length; j++) {
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
         const a = bodies[i];
         const b = bodies[j];
         const sep = separateCircles(a.pos.x, a.pos.z, b.pos.x, b.pos.z, 3.15);
@@ -2075,22 +2162,24 @@ export class Game3D {
         a.pos.z = sep.az;
         b.pos.x = sep.bx;
         b.pos.z = sep.bz;
-        a.setSpeed(a.speed * 0.35);
-        b.setSpeed(b.speed * 0.35);
+        this.setBodySpeed(a, a.speed * 0.35);
+        this.setBodySpeed(b, b.speed * 0.35);
       }
     }
     const P = this.player;
     const bike = this.layout.bikes[this.ride];
     if (!this.mounted) {
-      for (const b of bodies) {
+      for (let i = 0; i < n; i++) {
+        const b = bodies[i];
         const sep = separateCircles(b.pos.x, b.pos.z, bike.position.x, bike.position.z, 2.7);
         if (!sep) continue;
         b.pos.x = sep.ax;
         b.pos.z = sep.az;
-        b.setSpeed(b.speed * 0.25);
+        this.setBodySpeed(b, b.speed * 0.25);
       }
     }
-    for (const b of bodies) {
+    for (let i = 0; i < n; i++) {
+      const b = bodies[i];
       const before = b.speed;
       const mountedHit = this.mounted && orientedOverlap(P.pos.x, P.pos.z, P.yaw, 2.6, 1.6, b.pos.x, b.pos.z, b.yaw, b.len, 1.95);
       const sep = separateCircles(P.pos.x, P.pos.z, b.pos.x, b.pos.z, this.mounted ? 1.35 : 2.2);
@@ -2102,7 +2191,7 @@ export class Game3D {
         b.pos.x = push.bx;
         b.pos.z = push.bz;
       }
-      b.setSpeed(b.speed * 0.2);
+      this.setBodySpeed(b, b.speed * 0.2);
       if (rideImpact(before, this.rideSpeed, this.mounted) && P.downT <= 0 && this.phase === "play" && !this.jetting) {
         P.hp = 0;
         P.downT = 1.6;
@@ -2253,20 +2342,19 @@ export class Game3D {
         rn.state = "stopped";
         this.ev.onToast("O carro do mensageiro morreu no cruzamento! Chegue perto.", "good");
       } else {
-        const lane = goal.clone();
-        const to = lane.sub(rn.pos);
+        const to = this.aimTo.copy(goal).sub(rn.pos);
         to.y = 0;
         if (to.length() < 2) rn.path.shift();
         else {
           const dist = P.pos.distanceTo(rn.pos);
           const want = dist > 40 ? 3 : dist < 10 ? 8.5 : 6.8;
-          const ob = this.obstacleAhead(rn.pos, new THREE.Vector3(Math.sin(rn.yaw), 0, Math.cos(rn.yaw)), rn, false);
+          const ob = this.obstacleAhead(rn.pos, this.carF.set(Math.sin(rn.yaw), 0, Math.cos(rn.yaw)), rn, false);
           rn.speed += ((ob && ob !== "player" ? 1 : want) - rn.speed) * Math.min(1, dt * 2);
           let d = Math.atan2(to.x, to.z) - rn.yaw;
           while (d > Math.PI) d -= Math.PI * 2;
           while (d < -Math.PI) d += Math.PI * 2;
           rn.yaw += d * Math.min(1, dt * 3.5);
-          rn.pos.addScaledVector(new THREE.Vector3(Math.sin(rn.yaw), 0, Math.cos(rn.yaw)), rn.speed * dt);
+          rn.pos.addScaledVector(this.aimEye.set(Math.sin(rn.yaw), 0, Math.cos(rn.yaw)), rn.speed * dt);
           for (const p of this.peds) if (p.pos.distanceTo(rn.pos) < 6) p.panic = Math.max(p.panic, 3.5);
         }
       }
@@ -2283,25 +2371,50 @@ export class Game3D {
   }
 
   private updateEngines() {
-    const cam = this.camera.position;
-    const list: { pos: THREE.Vector3; speed: number }[] = this.traffic.map((c) => ({ pos: c.pos, speed: c.speed }));
-    if (this.runner) list.push({ pos: this.runner.pos, speed: this.runner.speed + 2 });
-    if (this.phase === "escape") list.push({ pos: this.layout.car.position, speed: this.carSpeed + 3 });
-    else list.push({ pos: this.layout.car.position, speed: 0.5 });
     if (this.phase === "hack" || this.phase === "result") {
       sound.setEngines([]);
       sound.setRide("off", 0);
       return;
     }
-    const voices = list
-      .map((c) => ({ c, d: c.pos.distanceTo(cam) }))
-      .filter((x) => x.d < 50)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, 3)
-      .map(({ c }) => {
-        const a = this.at3(c.pos, 50);
-        return { gain: a.vol, pan: a.pan, rpm: Math.min(1.6, 0.25 + c.speed / 10) };
-      });
+    const cam = this.camera.position;
+    const list = this.engineList;
+    let n = 0;
+    const push = (pos: THREE.Vector3, speed: number) => {
+      const dx = pos.x - cam.x;
+      const dy = pos.y - cam.y;
+      const dz = pos.z - cam.z;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d >= 50) return;
+      let slot = list[n];
+      if (!slot) {
+        slot = { pos, speed, d };
+        list.push(slot);
+      } else {
+        slot.pos = pos;
+        slot.speed = speed;
+        slot.d = d;
+      }
+      n++;
+    };
+    for (const c of this.traffic) push(c.pos, c.speed);
+    if (this.runner) push(this.runner.pos, this.runner.speed + 2);
+    push(this.layout.car.position, this.phase === "escape" ? this.carSpeed + 3 : 0.5);
+    const m = Math.min(3, n);
+    for (let i = 0; i < m; i++) {
+      let best = i;
+      for (let j = i + 1; j < n; j++) if (list[j].d < list[best].d) best = j;
+      if (best !== i) {
+        const tmp = list[i];
+        list[i] = list[best];
+        list[best] = tmp;
+      }
+    }
+    const voices = [];
+    for (let i = 0; i < m; i++) {
+      const c = list[i];
+      const a = this.at3(c.pos, 50);
+      voices.push({ gain: a.vol, pan: a.pan, rpm: Math.min(1.6, 0.25 + c.speed / 10) });
+    }
     sound.setEngines(voices);
     if (this.mounted) sound.setRide("bike", Math.min(1.35, 0.28 + this.rideSpeed / 12));
     else if (this.jetting) sound.setRide("jet", Math.min(1.35, 0.34 + this.rideSpeed / 14));
@@ -2365,8 +2478,10 @@ export class Game3D {
     const L = this.layout;
     const inside = P.pos.x > L.compound.minX && P.pos.z > L.compound.minZ && P.pos.z < L.compound.maxZ;
     const zoneOk = e.zone === 1 || this.hacked || inside;
-    const eye = e.pos.clone().add(new THREE.Vector3(0, e.kind === "drone" ? 0 : 1.5, 0));
-    const chest = P.pos.clone().add(new THREE.Vector3(0, 1.2, 0));
+    const eye = this.aimEye.copy(e.pos);
+    eye.y += e.kind === "drone" ? 0 : 1.5;
+    const chest = this.aimChest.copy(P.pos);
+    chest.y += 1.2;
     const dist = eye.distanceTo(chest);
     const range = e.kind === "boss" ? 26 : e.kind === "drone" ? 24 : 20;
     const hostile = e.faction === "caveira" || e.detail === "chase" || e.detail === "street" || !e.rank || this.wanted > 0 || this.provoked;
@@ -2379,7 +2494,7 @@ export class Game3D {
       e.pos.y = 7 + Math.sin(e.t * 2) * 0.4;
       e.mesh.children.forEach((c) => c.name === "rotor" && (c.rotation.y += dt * 40));
     } else if (sees) {
-      const to = chest.clone().sub(eye);
+      const to = this.aimTo.copy(chest).sub(eye);
       e.yaw = Math.atan2(to.x, to.z);
       const keep = e.kind === "boss" ? 7 : 9;
       if (dist > keep) {
@@ -2390,7 +2505,7 @@ export class Game3D {
       }
     } else {
       const goal = e.toB ? e.b : e.a;
-      const to = goal.clone().sub(e.pos);
+      const to = this.aimTo.copy(goal).sub(e.pos);
       to.y = 0;
       if (to.length() < 0.6) e.toB = !e.toB;
       else {
@@ -2459,7 +2574,7 @@ export class Game3D {
   private updateBullets(dt: number) {
     const P = this.player;
     for (const b of this.bullets) {
-      const prev = b.mesh.position.clone();
+      const prev = this.bulletPrev.copy(b.mesh.position);
       b.mesh.position.addScaledVector(b.vel, dt);
       b.life -= dt;
       const pos = b.mesh.position;
@@ -2486,7 +2601,8 @@ export class Game3D {
         }
         for (const e of this.enemies) {
           if (e.hp <= 0) continue;
-          const c = e.pos.clone().add(new THREE.Vector3(0, e.kind === "drone" ? 0 : e.kind === "boss" ? 1.1 : 0.95, 0));
+          const c = this.bulletHit.copy(e.pos);
+          c.y += e.kind === "drone" ? 0 : e.kind === "boss" ? 1.1 : 0.95;
           const rad = e.kind === "drone" ? 0.8 : 0.7;
           if (Math.abs(pos.x - c.x) < rad && Math.abs(pos.z - c.z) < rad && Math.abs(pos.y - c.y) < (e.kind === "drone" ? 0.6 : 1.0)) {
             b.life = 0;
@@ -2522,7 +2638,8 @@ export class Game3D {
           }
         }
       } else if (P.inv <= 0 && P.downT <= 0) {
-        const c = P.pos.clone().add(new THREE.Vector3(0, 1.1, 0));
+        const c = this.bulletHit.copy(P.pos);
+        c.y += 1.1;
         if (pos.distanceTo(c) < 0.55) {
           b.life = 0;
           P.hp -= b.damage;
@@ -2545,39 +2662,49 @@ export class Game3D {
     let look: THREE.Vector3;
     if (this.phase === "brief") {
       const a = this.t * 0.15 + 0.6;
-      const c = P.pos.clone().add(new THREE.Vector3(1.5, 0, 1.5));
-      pos = c.clone().add(new THREE.Vector3(Math.sin(a) * 6.5, 2.6, Math.cos(a) * 6.5));
-      look = c.clone().add(new THREE.Vector3(0, 1.3, 0));
+      const c = this.camTarget.copy(P.pos);
+      c.x += 1.5;
+      c.z += 1.5;
+      pos = this.camWant.copy(c);
+      pos.x += Math.sin(a) * 6.5;
+      pos.y += 2.6;
+      pos.z += Math.cos(a) * 6.5;
+      look = this.camAhead.copy(c);
+      look.y += 1.3;
     } else if (this.phase === "dive" || (this.phase === "surface" && this.phaseT < 1.1)) {
-      const screen = new THREE.Vector3(L.terminal.x - 0.31, 1.55, L.terminal.z);
-      const over = new THREE.Vector3(L.terminal.x - 3.2, 2.1, L.terminal.z - 1.1);
-      const mid = new THREE.Vector3(L.terminal.x - 1.8, 1.8, L.terminal.z - 0.5);
-      const close = new THREE.Vector3(L.terminal.x - 0.5, 1.55, L.terminal.z);
+      const screen = this.camTarget.set(L.terminal.x - 0.31, 1.55, L.terminal.z);
+      const over = this.camBack.set(L.terminal.x - 3.2, 2.1, L.terminal.z - 1.1);
+      const mid = this.camRight.set(L.terminal.x - 1.8, 1.8, L.terminal.z - 0.5);
+      const close = this.camHold.set(L.terminal.x - 0.5, 1.55, L.terminal.z);
       const k = this.phase === "dive" ? Math.min(1, this.phaseT / 1.7) : 1 - Math.min(1, this.phaseT / 1.1);
       const e = k * k * (3 - 2 * k);
-      pos = e < 0.6 ? over.clone().lerp(mid, e / 0.6) : mid.clone().lerp(close, (e - 0.6) / 0.4);
+      pos = e < 0.6 ? this.camWant.copy(over).lerp(mid, e / 0.6) : this.camWant.copy(mid).lerp(close, (e - 0.6) / 0.4);
       look = screen;
       if (this.phase === "dive" && this.phaseT > 1.8) this.setPhase("hack");
       if (this.phase === "surface" && this.phaseT >= 1.05 && this.queue.length === 0) this.setPhase("play");
       snap = true;
     } else if (this.phase === "escape" || this.phase === "done") {
       const car = L.car;
-      const back = new THREE.Vector3(-Math.sin(car.rotation.y), 0, -Math.cos(car.rotation.y));
-      pos = car.position.clone().addScaledVector(back, 9).add(new THREE.Vector3(0, 4, 0));
-      look = car.position.clone().add(new THREE.Vector3(0, 1, 0));
+      const back = this.camBack.set(-Math.sin(car.rotation.y), 0, -Math.cos(car.rotation.y));
+      pos = this.camWant.copy(car.position).addScaledVector(back, 9);
+      pos.y += 4;
+      look = this.camAhead.copy(car.position);
+      look.y += 1;
     } else if (this.lift) {
       const y = P.pos.y;
-      pos = new THREE.Vector3(TOWER.x + 18, y + 7, 48);
-      look = new THREE.Vector3(ELEVATOR.x, y + 1.4, 66.6);
+      pos = this.camWant.set(TOWER.x + 18, y + 7, 48);
+      look = this.camAhead.set(ELEVATOR.x, y + 1.4, 66.6);
       snap = true;
     } else {
       const fx = Math.sin(this.camYaw);
       const fz = Math.cos(this.camYaw);
-      const right = new THREE.Vector3(-fz, 0, fx);
-      const target = P.pos.clone().add(new THREE.Vector3(0, 1.55, 0)).addScaledVector(right, 0.55);
+      const right = this.camRight.set(-fz, 0, fx);
+      const target = this.camTarget.copy(P.pos);
+      target.y += 1.55;
+      target.addScaledVector(right, 0.55);
       const dist = 4.6;
-      const back = new THREE.Vector3(-fx * Math.cos(this.camPitch), Math.sin(this.camPitch), -fz * Math.cos(this.camPitch));
-      let want = target.clone().addScaledVector(back, dist);
+      const back = this.camBack.set(-fx * Math.cos(this.camPitch), Math.sin(this.camPitch), -fz * Math.cos(this.camPitch));
+      const want = this.camWant.copy(target).addScaledVector(back, dist);
       let tmin = 1;
       const clipCam = (c: Collider) => {
         if (c.ride || c.top < 0 || c.top > 900) return false;
@@ -2587,9 +2714,12 @@ export class Game3D {
       };
       this.eachNear(target.x, target.z, clipCam);
       this.eachNear(want.x, want.z, clipCam);
-      if (tmin < 1) want = target.clone().lerp(want, Math.max(0.15, tmin - 0.08));
+      if (tmin < 1) {
+        this.camHold.copy(want);
+        want.copy(target).lerp(this.camHold, Math.max(0.15, tmin - 0.08));
+      }
       pos = want;
-      look = target.clone().addScaledVector(new THREE.Vector3(fx, 0, fz), 3);
+      look = this.camAhead.copy(target).addScaledVector(this.camHold.set(fx, 0, fz), 3);
     }
     const k = snap ? 1 : Math.min(1, dt * 10);
     this.camPos.lerp(pos, k);
@@ -2599,7 +2729,7 @@ export class Game3D {
       this.camLook.copy(look);
     }
     this.camera.position.copy(this.camPos);
-    if (this.shake > 0) this.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake, 0));
+    if (this.shake > 0) this.camera.position.add(this.shakeOff.set((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake, 0));
     this.camera.lookAt(this.camLook);
   }
 

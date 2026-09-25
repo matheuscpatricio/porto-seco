@@ -400,6 +400,77 @@ function batchStill(scene: THREE.Scene, moving: Set<THREE.Object3D>) {
   }
 }
 
+const shadeChunkGeo = new THREE.BoxGeometry(1, 1, 1);
+const shadeChunkMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+const shadeDummy = new THREE.Object3D();
+const shadePos = new THREE.Vector3();
+
+/** Bakes static building shadow boxes into one mesh per city block. Same triangles, fewer draws. */
+function chunkShadows(scene: THREE.Scene, moving: Set<THREE.Object3D>) {
+  const cell = 32;
+  const groups = new Map<string, THREE.Mesh[]>();
+  const anchored = (o: THREE.Object3D) => {
+    for (let p: THREE.Object3D | null = o; p; p = p.parent) {
+      if (moving.has(p)) return false;
+      const u = p.userData;
+      if (u && (u.cabin || u.wheels || u.live)) return false;
+    }
+    return true;
+  };
+  scene.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || mesh.name !== "shadowProxy" || !mesh.castShadow || !anchored(mesh)) return;
+    const params = (mesh.geometry as THREE.BoxGeometry).parameters;
+    if (!params || typeof params.width !== "number") return;
+    mesh.getWorldPosition(shadePos);
+    const key = `${Math.floor(shadePos.x / cell)}:${Math.floor(shadePos.z / cell)}`;
+    const list = groups.get(key);
+    if (list) list.push(mesh);
+    else groups.set(key, [mesh]);
+  });
+  for (const list of groups.values()) {
+    const geos: THREE.BufferGeometry[] = [];
+    for (const mesh of list) {
+      const params = (mesh.geometry as THREE.BoxGeometry).parameters;
+      const geo = shadeChunkGeo.clone();
+      mesh.updateWorldMatrix(true, false);
+      mesh.matrixWorld.decompose(shadeDummy.position, shadeDummy.quaternion, shadeDummy.scale);
+      shadeDummy.scale.x *= params.width;
+      shadeDummy.scale.y *= params.height;
+      shadeDummy.scale.z *= params.depth;
+      shadeDummy.updateMatrix();
+      geo.applyMatrix4(shadeDummy.matrix);
+      geos.push(geo);
+    }
+    let merged: THREE.BufferGeometry | null = null;
+    try {
+      merged = mergeGeometries(geos, false);
+    } catch {
+      merged = null;
+    }
+    for (const geo of geos) geo.dispose();
+    if (!merged) {
+      for (const mesh of list) mesh.frustumCulled = true;
+      continue;
+    }
+    merged.computeBoundingSphere();
+    const chunk = new THREE.Mesh(merged, shadeChunkMat);
+    chunk.name = "shadowChunk";
+    chunk.castShadow = true;
+    chunk.receiveShadow = false;
+    chunk.frustumCulled = true;
+    chunk.matrixAutoUpdate = false;
+    scene.add(chunk);
+    for (const mesh of list) {
+      mesh.castShadow = false;
+      mesh.removeFromParent();
+      mesh.geometry.dispose();
+      const mat = mesh.material;
+      if (!Array.isArray(mat)) mat.dispose();
+    }
+  }
+}
+
 function box(w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number, parent: THREE.Object3D, shadow = true, round = 0) {
   const longest = Math.max(w, h, d);
   const rounded = round > 0.02 && (longest >= 4 || round >= 0.1);
@@ -1794,7 +1865,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     const shade = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
     shade.castShadow = true;
     shade.receiveShadow = false;
-    shade.frustumCulled = false;
+    shade.frustumCulled = true;
     shade.name = "shadowProxy";
     body.add(shade);
     addCol(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, h);
@@ -2296,6 +2367,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   }
   scene.updateMatrixWorld(true);
   batchStill(scene, moving);
+  chunkShadows(scene, moving);
 
   const spawn = new THREE.Vector3(BIKE_PARK.x + 2.2, 0, BIKE_PARK.z);
   const allySpots = [

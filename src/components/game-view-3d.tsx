@@ -321,6 +321,14 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
       let last = performance.now();
       let lastNear = false;
       let frames = 0;
+      let hpText = "";
+      let objText = "";
+      let barW = "";
+      let barBg = "";
+      let arrowTf = "";
+      let bossW = "";
+      let bossNm = "";
+      let bossDisp = "";
       const loop = (now: number) => {
         const dt = Math.max(0, (now - last) / 1000);
         last = now;
@@ -360,23 +368,58 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
         }
         if (hpBarRef.current && hpLabelRef.current) {
           const pct = Math.max(0, Math.min(1, h.hp / h.maxHp));
-          hpBarRef.current.style.width = `${pct * 100}%`;
-          hpBarRef.current.style.background = pct > 0.55 ? "#34d399" : pct > 0.28 ? "#fbbf24" : "#ef4444";
-          hpLabelRef.current.textContent = String(Math.max(0, Math.ceil(h.hp)));
+          const w = `${pct * 100}%`;
+          const bg = pct > 0.55 ? "#34d399" : pct > 0.28 ? "#fbbf24" : "#ef4444";
+          const label = String(Math.max(0, Math.ceil(h.hp)));
+          if (w !== barW) {
+            barW = w;
+            hpBarRef.current.style.width = w;
+          }
+          if (bg !== barBg) {
+            barBg = bg;
+            hpBarRef.current.style.background = bg;
+          }
+          if (label !== hpText) {
+            hpText = label;
+            hpLabelRef.current.textContent = label;
+          }
         }
-        if (arrowRef.current) arrowRef.current.style.transform = `rotate(${-h.angle}rad)`;
+        if (arrowRef.current) {
+          const tf = `rotate(${-h.angle}rad)`;
+          if (tf !== arrowTf) {
+            arrowTf = tf;
+            arrowRef.current.style.transform = tf;
+          }
+        }
         if (h.hub !== hubRef.current) {
           hubRef.current = h.hub;
           setHub(h.hub);
         }
         if (objRef.current) {
           const unit = h.heat > 0 ? POLICE_RANK[policeRank(h.heat)].name : "";
-          objRef.current.textContent = `${h.script}${h.steps ? ` ${h.step}/${h.steps}` : ""} · ${h.objective} · ${h.distance} m${unit ? ` · ${unit}` : ""}`;
+          const text = `${h.script}${h.steps ? ` ${h.step}/${h.steps}` : ""} · ${h.objective} · ${h.distance} m${unit ? ` · ${unit}` : ""}`;
+          if (text !== objText) {
+            objText = text;
+            objRef.current.textContent = text;
+          }
         }
-        if (bossRef.current) bossRef.current.style.display = h.boss ? "block" : "none";
+        if (bossRef.current) {
+          const disp = h.boss ? "block" : "none";
+          if (disp !== bossDisp) {
+            bossDisp = disp;
+            bossRef.current.style.display = disp;
+          }
+        }
         if (h.boss && bossBarRef.current && bossNameRef.current) {
-          bossBarRef.current.style.width = `${h.boss.pct * 100}%`;
-          bossNameRef.current.textContent = h.boss.name;
+          const w = `${h.boss.pct * 100}%`;
+          if (w !== bossW) {
+            bossW = w;
+            bossBarRef.current.style.width = w;
+          }
+          if (h.boss.name !== bossNm) {
+            bossNm = h.boss.name;
+            bossNameRef.current.textContent = h.boss.name;
+          }
         }
         if (mapRef.current && frames % 3 === 0 && (game.phase === "play" || game.phase === "open")) drawMinimap(mapRef.current, game.minimap());
         if (alarmRef.current) alarmRef.current.style.opacity = h.alarm ? String(0.25 + Math.sin(now / 90) * 0.15) : "0";
