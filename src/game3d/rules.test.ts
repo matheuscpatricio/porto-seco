@@ -214,8 +214,8 @@ test("signals alternate and a bike still meets a car the circle misses", () => {
   assert.equal(orientedOverlap(0, 0, 0, 2.6, 1.6, 0, 8, 0, 4.4, 1.9), false);
   assert.equal(rideImpact(5, 0, false), false);
   assert.equal(rideImpact(8, 0, false), true);
-  assert.equal(rideImpact(5, 2, true), true);
-  assert.equal(rideImpact(1, 9, true), true);
+  assert.equal(rideImpact(5, 2, true), false);
+  assert.equal(rideImpact(12, 9, true), false);
 });
 
 test("overlapping vehicles are pushed apart", () => {

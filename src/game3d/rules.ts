@@ -249,9 +249,9 @@ export function orientedOverlap(
   return true;
 }
 
-/** A stopped car does not knock Cole down. A moving car does, including while he rides. */
-export function rideImpact(carSpeed: number, rideSpeed: number, mounted: boolean): boolean {
-  if (mounted) return carSpeed > 4.2 || rideSpeed > 7.5;
+/** A moving car knocks Cole down on foot. On the motorcycle the crash only shoves him. */
+export function rideImpact(carSpeed: number, _rideSpeed: number, mounted: boolean): boolean {
+  if (mounted) return false;
   return carSpeed > 7;
 }
 

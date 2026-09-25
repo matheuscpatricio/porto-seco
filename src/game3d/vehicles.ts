@@ -50,6 +50,8 @@ export function takeCar(color: string, kind: "sedan" | "hatch" | "van" = "sedan"
     .map((n) => model.getObjectByName(n))
     .filter((o): o is THREE.Object3D => !!o);
   g.userData.length = 4.45 * s;
+  const cabin: THREE.Object3D[] = [];
+  const rims: THREE.Object3D[] = [];
   const tint = new THREE.Color(color);
   model.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -61,9 +63,79 @@ export function takeCar(color: string, kind: "sedan" | "hatch" | "van" = "sedan"
       return copy;
     };
     mesh.material = Array.isArray(mesh.material) ? mesh.material.map(paint) : paint(mesh.material);
+    mesh.castShadow = false;
+    let detail = false;
+    for (let p: THREE.Object3D | null = mesh; p; p = p.parent) {
+      const n = p.name || "";
+      if (n.startsWith("Interior") || n.includes("Brake") || n.includes("Wiper") || n.includes("HoodInterior")) detail = true;
+    }
+    if (detail) cabin.push(mesh);
   });
+  g.userData.cabin = cabin;
+  g.userData.rims = rims;
+  const lods: THREE.Object3D[] = [];
+  g.updateMatrixWorld(true);
+  for (const w of g.userData.wheels as THREE.Object3D[]) {
+    const spokes: THREE.Mesh[] = [];
+    w.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      let named = false;
+      for (let p: THREE.Object3D | null = mesh; p && p !== w; p = p.parent) {
+        if ((p.name || "").includes("Rim")) named = true;
+      }
+      if (named) spokes.push(mesh);
+    });
+    if (!spokes.length) continue;
+    rims.push(...spokes);
+    let radius = 0;
+    const center = new THREE.Vector3();
+    for (const mesh of spokes) {
+      const geo = mesh.geometry;
+      if (!geo.boundingSphere) geo.computeBoundingSphere();
+      const sphere = geo.boundingSphere!;
+      const el = mesh.matrixWorld.elements;
+      const s = Math.hypot(el[0], el[1], el[2]);
+      const r = sphere.radius * s;
+      if (r <= radius) continue;
+      radius = r;
+      center.copy(sphere.center).applyMatrix4(mesh.matrixWorld);
+    }
+    w.worldToLocal(center);
+    const ws = Math.hypot(w.matrixWorld.elements[0], w.matrixWorld.elements[1], w.matrixWorld.elements[2]) || 1;
+    const localR = radius / ws;
+    if (!lodWheelGeo) lodWheelGeo = new THREE.CylinderGeometry(1, 1, 1, 12);
+    const lod = new THREE.Mesh(lodWheelGeo, lodWheelMat);
+    lod.scale.set(localR * 0.92, localR * 0.38, localR * 0.92);
+    lod.rotation.z = Math.PI / 2;
+    lod.position.copy(center);
+    lod.castShadow = false;
+    lod.receiveShadow = false;
+    lod.visible = false;
+    lod.name = "lodWheel";
+    w.add(lod);
+    lods.push(lod);
+  }
+  g.userData.lodWheels = lods;
+  const proxy = shadowBox(1.85 * s, 1.25, 4.15 * s);
+  g.userData.shadowProxy = proxy;
+  g.add(proxy);
   return g;
 }
+
+/** A box stands in for the high-poly mesh inside the shadow map. The car and the bike still draw in full. */
+function shadowBox(w: number, h: number, d: number) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+  mesh.position.y = h / 2;
+  mesh.castShadow = true;
+  mesh.receiveShadow = false;
+  mesh.frustumCulled = false;
+  mesh.name = "shadowProxy";
+  return mesh;
+}
+
+const lodWheelMat = new THREE.MeshStandardMaterial({ color: "#161616", roughness: 0.86, metalness: 0.18 });
+let lodWheelGeo: THREE.CylinderGeometry | null = null;
 
 const RIDE_PAINT: Record<RideId, string> = {
   entrega: "#dc2626",
@@ -245,10 +317,13 @@ export function takeBike(style: RideId) {
       copy.color.set("#ffffff");
     }
     mesh.material = copy;
-    mesh.castShadow = true;
+    mesh.castShadow = false;
     mesh.receiveShadow = true;
   });
   g.add(model);
+  const proxy = shadowBox(0.72, 1.15, 2.15);
+  g.userData.shadowProxy = proxy;
+  g.add(proxy);
   g.userData.wheels = wheels;
   g.userData.length = 2.2;
   return g;

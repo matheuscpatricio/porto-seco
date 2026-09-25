@@ -64,8 +64,9 @@ type Enemy = {
   damage: number;
   fireGap: number;
   t: number;
+  hold: number;
 };
-type Ped = { rig: Rig; pos: THREE.Vector3; yaw: number; loop: number; wp: number; dir: 1 | -1; speed: number; panic: number; t: number; talkT: number; still: boolean; pitch: number; stepD: number; hp: number; dead: number };
+type Ped = { rig: Rig; pos: THREE.Vector3; yaw: number; loop: number; wp: number; dir: 1 | -1; speed: number; panic: number; t: number; talkT: number; still: boolean; pitch: number; stepD: number; hp: number; dead: number; hold: number };
 type Traffic = { mesh: THREE.Group; driver: Rig; pos: THREE.Vector3; from: [number, number]; to: [number, number]; speed: number; want: number; blockedT: number; honkT: number; ignoreT: number; yaw: number };
 type Bullet = { mesh: THREE.Mesh; vel: THREE.Vector3; mine: boolean; life: number; damage: number };
 type Particle = { mesh: THREE.Mesh; vel: THREE.Vector3; life: number };
@@ -242,6 +243,16 @@ export class Game3D {
   private cops: { mesh: THREE.Group; driver: Rig; pos: THREE.Vector3; yaw: number; speed: number }[] = [];
   private owned = false;
   private targetDoor: Collider | null = null;
+  private colGrid = new Map<number, Collider[]>();
+  private colStamp = 1;
+  private shadowMark = new THREE.Vector3(1e9, 1e9, 1e9);
+  private shadowT = -1;
+  private nodeCache = new Map<number, THREE.Vector3>();
+  private readonly laneA = new THREE.Vector3();
+  private readonly laneB = new THREE.Vector3();
+  private readonly carF = new THREE.Vector3();
+  private readonly carR = new THREE.Vector3();
+  private readonly carRel = new THREE.Vector3();
 
   constructor(
     public level: Level,
@@ -277,6 +288,7 @@ export class Game3D {
     fill.position.set(-36, 32, -22);
     this.scene.add(fill, fill.target);
 
+    this.indexColliders();
     if (M.terminal) this.moveTerminal(M.terminal);
     if (M.pickup) this.moveCar(this.openCurb(M.pickup.pos, M.pickup.yaw), M.pickup.yaw);
 
@@ -376,7 +388,49 @@ export class Game3D {
 
     this.player.yaw = this.camYaw + Math.PI;
     this.placeTargetDoor();
+    this.indexColliders();
     this.updateCamera(1, true);
+  }
+
+  private indexColliders() {
+    this.colGrid.clear();
+    const cell = 16;
+    const pad = 8;
+    for (const c of this.layout.colliders) {
+      if (c.ride) continue;
+      const x0 = Math.floor((c.minX - pad) / cell);
+      const x1 = Math.floor((c.maxX + pad) / cell);
+      const z0 = Math.floor((c.minZ - pad) / cell);
+      const z1 = Math.floor((c.maxZ + pad) / cell);
+      for (let x = x0; x <= x1; x++) {
+        for (let z = z0; z <= z1; z++) {
+          const key = (x + 512) * 4096 + (z + 512);
+          const list = this.colGrid.get(key);
+          if (list) list.push(c);
+          else this.colGrid.set(key, [c]);
+        }
+      }
+    }
+  }
+
+  /** Visits colliders near a point once. A true return from `fn` stops the walk. */
+  private eachNear(x: number, z: number, fn: (c: Collider) => boolean) {
+    const cell = 16;
+    const ix = Math.floor(x / cell);
+    const iz = Math.floor(z / cell);
+    const stamp = ++this.colStamp;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const list = this.colGrid.get((ix + dx + 512) * 4096 + (iz + dz + 512));
+        if (!list) continue;
+        for (const c of list) {
+          if (c.mark === stamp) continue;
+          c.mark = stamp;
+          if (fn(c)) return true;
+        }
+      }
+    }
+    return false;
   }
 
   private placeTargetDoor() {
@@ -397,6 +451,7 @@ export class Game3D {
     L.kiosk.position.copy(spot);
     Object.assign(L.kioskCollider, { minX: spot.x - 0.35, maxX: spot.x + 0.35, minZ: spot.z - 0.5, maxZ: spot.z + 0.5 });
     if (this.targetDoor) this.placeTargetDoor();
+    this.indexColliders();
   }
 
   /** Puts the kiosk on open sidewalk, screen facing the street, with room to stand in front of it. */
@@ -437,11 +492,7 @@ export class Game3D {
   }
 
   private solidAt(x: number, z: number, pad: number, ignore?: Collider) {
-    for (const c of this.layout.colliders) {
-      if (c === ignore || c.top < 1 || c.top > 80) continue;
-      if (x + pad > c.minX && x - pad < c.maxX && z + pad > c.minZ && z - pad < c.maxZ) return true;
-    }
-    return false;
+    return this.eachNear(x, z, (c) => c !== ignore && c.top >= 1 && c.top <= 80 && x + pad > c.minX && x - pad < c.maxX && z + pad > c.minZ && z - pad < c.maxZ);
   }
 
   private moveCar(p: THREE.Vector3, yaw: number) {
@@ -451,6 +502,7 @@ export class Game3D {
     const c = L.car.userData.collider as Collider;
     const along = Math.abs(Math.sin(yaw)) > 0.5;
     Object.assign(c, along ? { minX: p.x - 2.2, maxX: p.x + 2.2, minZ: p.z - 1, maxZ: p.z + 1 } : { minX: p.x - 1, maxX: p.x + 1, minZ: p.z - 2.2, maxZ: p.z + 2.2 });
+    this.indexColliders();
   }
 
   /** Slides the escape car along the curb until the player can walk up to the driver's door. */
@@ -521,7 +573,7 @@ export class Game3D {
       const rig = buildHuman(randomLook(r), { simple: true });
       rig.armed = false;
       this.scene.add(rig.root);
-      this.peds.push({ rig, pos, yaw: 0, loop, wp: (wp + 1) % 4, dir: r() < 0.5 ? 1 : -1, speed: 1.1 + r() * 0.6, panic: 0, t: r() * 10, talkT: 2 + r() * 8, still, pitch: 100 + r() * 160, stepD: 0, hp: 5, dead: 0 });
+      this.peds.push({ rig, pos, yaw: 0, loop, wp: (wp + 1) % 4, dir: r() < 0.5 ? 1 : -1, speed: 1.1 + r() * 0.6, panic: 0, t: r() * 10, talkT: 2 + r() * 8, still, pitch: 100 + r() * 160, stepD: 0, hp: 5, dead: 0, hold: 0 });
     }
     const colors = ["#2a2f36", "#b8bcc2", "#8e1b1b", "#1f3f8a", "#f1f1ef", "#1d5a45", "#c7a14a", "#5b3a7a"];
     const kinds = ["sedan", "hatch", "sedan", "van", "hatch"] as const;
@@ -546,6 +598,11 @@ export class Game3D {
   private castNear(root: THREE.Object3D, on: boolean) {
     if (root.userData.shadow === on) return;
     root.userData.shadow = on;
+    const proxy = root.userData.shadowProxy as THREE.Mesh | undefined;
+    if (proxy) {
+      proxy.castShadow = on;
+      return;
+    }
     root.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (mesh.isMesh) mesh.castShadow = on;
@@ -563,21 +620,35 @@ export class Game3D {
   private seatDriver(rig: Rig, pos: THREE.Vector3, yaw: number) {
     rig.root.position.set(pos.x + Math.cos(yaw) * 0.4, pos.y + 0.25, pos.z - Math.sin(yaw) * 0.4);
     rig.root.rotation.y = yaw;
-    const near = pos.distanceTo(this.camera.position) < 70;
-    rig.root.visible = near;
-    if (near) animate(rig, "sit", this.t, 1 / 60);
+    const dx = pos.x - this.camera.position.x;
+    const dz = pos.z - this.camera.position.z;
+    const d2 = dx * dx + dz * dz;
+    rig.root.visible = d2 < 46 * 46;
+    if (d2 < 26 * 26) animate(rig, "sit", this.t, 1 / 60);
   }
 
   private node(n: [number, number]) {
-    return new THREE.Vector3(streetCenter(n[0]), 0, streetCenter(n[1]));
+    const key = n[0] * 32 + n[1];
+    let v = this.nodeCache.get(key);
+    if (!v) {
+      v = new THREE.Vector3(streetCenter(n[0]), 0, streetCenter(n[1]));
+      this.nodeCache.set(key, v);
+    }
+    return v;
+  }
+
+  private laneInto(from: [number, number], to: [number, number], s: number, out: THREE.Vector3) {
+    const a = this.node(from);
+    const b = this.node(to);
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const inv = 1 / (Math.hypot(dx, dz) || 1);
+    out.set(a.x + dx * s + -dz * inv * LANE, 0, a.z + dz * s + dx * inv * LANE);
+    return out;
   }
 
   private lanePoint(from: [number, number], to: [number, number], s: number) {
-    const a = this.node(from);
-    const b = this.node(to);
-    const d = b.clone().sub(a).normalize();
-    const off = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(LANE);
-    return a.lerp(b, s).add(off);
+    return this.laneInto(from, to, s, new THREE.Vector3());
   }
 
   private spawn(kind: Enemy["kind"], a: THREE.Vector3, b: THREE.Vector3, zone: 1 | 2, opts?: { look?: (typeof guardLook); rank?: PoliceRank; detail?: "street" | "chase" | "patrol"; hp?: number; damage?: number; faction?: "caveira" }) {
@@ -624,6 +695,7 @@ export class Game3D {
       police: !!rank,
       name: stats?.name,
       t: Math.random() * 10,
+      hold: 0,
     };
     this.enemies.push(e);
     return e;
@@ -986,11 +1058,11 @@ export class Game3D {
   }
 
   private collide(pos: THREE.Vector3, radius: number, feet: number, ignoreRide = false) {
-    for (const c of this.layout.colliders) {
-      if (c.ride && ignoreRide) continue;
-      if (c.above != null && feet < c.above) continue;
-      if (c.bottom != null && feet < c.bottom) continue;
-      if (c.top <= feet + 0.35) continue;
+    const apply = (c: Collider) => {
+      if (c.ride && ignoreRide) return false;
+      if (c.above != null && feet < c.above) return false;
+      if (c.bottom != null && feet < c.bottom) return false;
+      if (c.top <= feet + 0.35) return false;
       const cx = Math.max(c.minX, Math.min(pos.x, c.maxX));
       const cz = Math.max(c.minZ, Math.min(pos.z, c.maxZ));
       const dx = pos.x - cx;
@@ -1010,15 +1082,17 @@ export class Game3D {
           else pos.z = c.maxZ + radius;
         }
       }
-    }
+      return false;
+    };
+    if (!ignoreRide) apply(this.layout.rideCol);
+    this.eachNear(pos.x, pos.z, apply);
   }
 
   /** Pushes `pos` out of a moving car's footprint. Returns true on contact. */
   private pushFromCar(pos: THREE.Vector3, car: THREE.Vector3, yaw: number, len: number, radius: number) {
-    const f = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-    const rt = new THREE.Vector3(f.z, 0, -f.x);
-    const rel = pos.clone().sub(car);
-    rel.y = 0;
+    const f = this.carF.set(Math.sin(yaw), 0, Math.cos(yaw));
+    const rt = this.carR.set(f.z, 0, -f.x);
+    const rel = this.carRel.set(pos.x - car.x, 0, pos.z - car.z);
     const a = rel.dot(f);
     const b = rel.dot(rt);
     const ha = len / 2 + radius;
@@ -1033,23 +1107,24 @@ export class Game3D {
 
   private groundAt(pos: THREE.Vector3, feet: number) {
     let g = 0;
-    for (const c of this.layout.colliders) {
-      if (c.ride) continue;
-      if (c.above != null && feet < c.above) continue;
-      if (c.top > feet + 0.4 || c.top > 200) continue;
+    this.eachNear(pos.x, pos.z, (c) => {
+      if (c.ride || (c.above != null && feet < c.above) || c.top > feet + 0.4 || c.top > 200) return false;
       if (pos.x + R > c.minX && pos.x - R < c.maxX && pos.z + R > c.minZ && pos.z - R < c.maxZ) g = Math.max(g, c.top);
-    }
+      return false;
+    });
     return g;
   }
 
   private blocked(a: THREE.Vector3, b: THREE.Vector3) {
-    for (const c of this.layout.colliders) {
-      if (c.ride) continue;
-      if (c.top < 0 || c.top > 900) continue;
-      const t = segBox(a, b, c);
-      if (t >= 0 && t < 1) return true;
-    }
-    return false;
+    const hit = (x: number, z: number) =>
+      this.eachNear(x, z, (c) => {
+        if (c.ride || c.top < 0 || c.top > 900) return false;
+        const t = segBox(a, b, c);
+        return t >= 0 && t < 1;
+      });
+    const mx = (a.x + b.x) / 2;
+    const mz = (a.z + b.z) / 2;
+    return hit(a.x, a.z) || hit(b.x, b.z) || hit(mx, mz) || hit((a.x + mx) / 2, (a.z + mz) / 2) || hit((b.x + mx) / 2, (b.z + mz) / 2);
   }
 
   private targetPos(): THREE.Vector3 {
@@ -1686,11 +1761,17 @@ export class Game3D {
         this.pushFromCar(p.pos, c.pos, c.yaw, c.mesh.userData.length, 0.3);
       }
       p.rig.root.visible = near;
-      this.castNear(p.rig.root, near && p.pos.distanceTo(camPos) < 36);
+      this.castNear(p.rig.root, near && cdx * cdx + cdz * cdz < 36 * 36);
       if (!near) continue;
       p.rig.root.position.copy(p.pos);
       p.rig.root.rotation.y = p.yaw;
-      animate(p.rig, pose, p.t, dt, p.speed);
+      p.hold += dt;
+      const closePed = cdx * cdx + cdz * cdz < 22 * 22;
+      if (closePed || p.hold >= 0.1) {
+        const step = closePed ? dt : p.hold;
+        p.hold = 0;
+        animate(p.rig, pose, p.t, step, p.speed);
+      }
       p.talkT -= dt;
       if (p.talkT <= 0) {
         p.talkT = 4 + Math.random() * 7;
@@ -1725,23 +1806,40 @@ export class Game3D {
   }
 
   private obstacleAhead(pos: THREE.Vector3, f: THREE.Vector3, self: unknown, ignoreCars: boolean) {
-    const rt = new THREE.Vector3(f.z, 0, -f.x);
-    const check = (q: THREE.Vector3, reach: number, width: number) => {
-      const rel = q.clone().sub(pos);
-      const a = rel.dot(f);
-      return a > 0.5 && a < reach && Math.abs(rel.dot(rt)) < width;
+    const rtX = f.z;
+    const rtZ = -f.x;
+    const check = (x: number, z: number, reach: number, width: number) => {
+      const dx = x - pos.x;
+      const dz = z - pos.z;
+      const ahead = dx * f.x + dz * f.z;
+      return ahead > 0.5 && ahead < reach && Math.abs(dx * rtX + dz * rtZ) < width;
     };
     if (this.mounted) {
-      if (check(this.player.pos, 4.2, 1.2)) return "car";
-    } else if (check(this.player.pos, 7.5, 1.6)) return "player";
-    if (!this.mounted && check(this.layout.bikes[this.ride].position, 7.2, 1.35)) return "car";
-    for (const p of this.peds) if (p.dead <= 0 && p.hp > 0 && check(p.pos, 6.5, 1.5)) return "ped";
-    for (const e of this.enemies) if (e.hp > 0 && e.kind !== "drone" && check(e.pos, 6.5, 1.5)) return "ped";
-    for (const a of this.allies) if (check(a.pos, 6.5, 1.5)) return "ped";
+      if (check(this.player.pos.x, this.player.pos.z, 4.2, 1.2)) return "car";
+    } else if (check(this.player.pos.x, this.player.pos.z, 7.5, 1.6)) return "player";
+    if (!this.mounted) {
+      const bike = this.layout.bikes[this.ride].position;
+      if (check(bike.x, bike.z, 7.2, 1.35)) return "car";
+    }
+    for (const p of this.peds) {
+      if (p.dead > 0 || p.hp <= 0) continue;
+      const dx = p.pos.x - pos.x;
+      const dz = p.pos.z - pos.z;
+      if (dx * dx + dz * dz > 49) continue;
+      if (check(p.pos.x, p.pos.z, 6.5, 1.5)) return "ped";
+    }
+    for (const e of this.enemies) {
+      if (e.hp <= 0 || e.kind === "drone") continue;
+      const dx = e.pos.x - pos.x;
+      const dz = e.pos.z - pos.z;
+      if (dx * dx + dz * dz > 49) continue;
+      if (check(e.pos.x, e.pos.z, 6.5, 1.5)) return "ped";
+    }
+    for (const a of this.allies) if (check(a.pos.x, a.pos.z, 6.5, 1.5)) return "ped";
     if (ignoreCars) return null;
-    for (const c of this.traffic) if (c !== self && check(c.pos, 8, 1.4)) return "car";
-    if (check(this.layout.car.position, 8, 1.4)) return "car";
-    if (this.runner && this.runner !== self && check(this.runner.pos, 8, 1.4)) return "car";
+    for (const c of this.traffic) if (c !== self && check(c.pos.x, c.pos.z, 8, 1.4)) return "car";
+    if (check(this.layout.car.position.x, this.layout.car.position.z, 8, 1.4)) return "car";
+    if (this.runner && this.runner !== self && check(this.runner.pos.x, this.runner.pos.z, 8, 1.4)) return "car";
     return null;
   }
 
@@ -2016,16 +2114,19 @@ export class Game3D {
   private updateTraffic(dt: number) {
     this.paintSignals();
     for (const c of this.traffic) {
-      const a = this.lanePoint(c.from, c.to, 0);
-      const b = this.lanePoint(c.from, c.to, 1);
-      const seg = b.clone().sub(a);
-      const f = seg.clone().normalize();
+      const a = this.laneInto(c.from, c.to, 0, this.laneA);
+      const b = this.laneInto(c.from, c.to, 1, this.laneB);
+      const sdx = b.x - a.x;
+      const sdz = b.z - a.z;
+      const segLen = Math.hypot(sdx, sdz) || 1;
+      const fx = sdx / segLen;
+      const fz = sdz / segLen;
       c.ignoreT = Math.max(0, c.ignoreT - dt);
-      const ob = this.obstacleAhead(c.pos, new THREE.Vector3(Math.sin(c.yaw), 0, Math.cos(c.yaw)), c, c.ignoreT > 0);
+      const ob = this.obstacleAhead(c.pos, this.carF.set(Math.sin(c.yaw), 0, Math.cos(c.yaw)), c, c.ignoreT > 0);
       const dodge = ob === "car" ? (Math.sin(c.pos.x * 0.37 + c.pos.z * 0.21) >= 0 ? 1 : -1) : 0;
-      const alongX = Math.abs(f.x) > Math.abs(f.z);
+      const alongX = Math.abs(fx) > Math.abs(fz);
       const sig = trafficSignal(this.t, alongX);
-      const stopAt = this.lightAhead(c.pos, Math.atan2(f.x, f.z));
+      const stopAt = this.lightAhead(c.pos, Math.atan2(fx, fz));
       let want = ob === "car" ? Math.max(2.2, c.want * 0.45) : ob ? 0 : c.want;
       if (stopAt < Infinity) {
         if (sig === "red") want = 0;
@@ -2045,23 +2146,30 @@ export class Game3D {
           c.blockedT = 0;
         }
       } else c.blockedT = 0;
-      const rel = c.pos.clone().sub(a);
-      const s = rel.dot(f);
-      const ahead = a.clone().addScaledVector(f, Math.min(seg.length(), s + 5));
-      const steer = ahead.sub(c.pos);
-      steer.y = 0;
-      if (steer.lengthSq() > 0.01) {
-        let d = Math.atan2(steer.x, steer.z) - c.yaw;
+      const s = (c.pos.x - a.x) * fx + (c.pos.z - a.z) * fz;
+      const aheadDist = Math.min(segLen, s + 5);
+      const steerX = a.x + fx * aheadDist - c.pos.x;
+      const steerZ = a.z + fz * aheadDist - c.pos.z;
+      if (steerX * steerX + steerZ * steerZ > 0.01) {
+        let d = Math.atan2(steerX, steerZ) - c.yaw;
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
         c.yaw += d * Math.min(1, dt * 3);
       }
-      c.pos.addScaledVector(new THREE.Vector3(Math.sin(c.yaw), 0, Math.cos(c.yaw)), c.speed * dt);
-      if (dodge) c.pos.addScaledVector(new THREE.Vector3(Math.cos(c.yaw), 0, -Math.sin(c.yaw)), dodge * 2.4 * dt);
-      const show = c.pos.distanceTo(this.camera.position) < 68;
+      c.pos.x += Math.sin(c.yaw) * c.speed * dt;
+      c.pos.z += Math.cos(c.yaw) * c.speed * dt;
+      if (dodge) {
+        c.pos.x += Math.cos(c.yaw) * dodge * 2.4 * dt;
+        c.pos.z -= Math.sin(c.yaw) * dodge * 2.4 * dt;
+      }
+      const cam = this.camera.position;
+      const cdx = c.pos.x - cam.x;
+      const cdz = c.pos.z - cam.z;
+      const show = cdx * cdx + cdz * cdz < 68 * 68;
       c.mesh.visible = show;
-      this.castNear(c.mesh, show && c.pos.distanceTo(this.camera.position) < 34);
-      if (s > seg.length() - 1) {
+      this.dressCabin(c.mesh, show);
+      this.castNear(c.mesh, show && cdx * cdx + cdz * cdz < 34 * 34);
+      if (s > segLen - 1) {
         const [i, j] = c.to;
         const opts: [number, number][] = ([
           [i + 1, j],
@@ -2080,8 +2188,9 @@ export class Game3D {
       if (show) for (const w of c.mesh.userData.wheels as THREE.Group[]) w.rotation.x += c.speed * dt * 2.5;
     }
     this.layout.parked.forEach((car, i) => {
-      const show = car.position.distanceTo(this.camera.position) < 64;
+      const show = car.position.distanceToSquared(this.camera.position) < 64 * 64;
       car.visible = show;
+      this.dressCabin(car, show);
       const rig = this.curbDrivers[i];
       if (!rig) return;
       if (!show) rig.root.visible = false;
@@ -2265,7 +2374,15 @@ export class Game3D {
     e.marker.scale.setScalar((e.kind === "boss" ? 1.4 : e.rank === "federal" ? 1.35 : e.rank === "especial" ? 1.15 : 1) * pulse);
     if (e.rig) {
       e.rig.armed = true;
-      animate(e.rig, e.shootT > 0 ? "shoot" : e.moving ? (sees ? "run" : "walk") : "idle", e.t, dt, sees ? 0.8 : 0.7);
+      const edx = e.pos.x - this.camera.position.x;
+      const edz = e.pos.z - this.camera.position.z;
+      const closeEnemy = edx * edx + edz * edz < 22 * 22 || dist * dist < 16 * 16;
+      e.hold += dt;
+      if (closeEnemy || e.hold >= 0.1) {
+        const step = closeEnemy ? dt : e.hold;
+        e.hold = 0;
+        animate(e.rig, e.shootT > 0 ? "shoot" : e.moving ? (sees ? "run" : "walk") : "idle", e.t, step, sees ? 0.8 : 0.7);
+      }
     }
 
     if (!sees) return;
@@ -2416,12 +2533,14 @@ export class Game3D {
       const back = new THREE.Vector3(-fx * Math.cos(this.camPitch), Math.sin(this.camPitch), -fz * Math.cos(this.camPitch));
       let want = target.clone().addScaledVector(back, dist);
       let tmin = 1;
-      for (const c of L.colliders) {
-        if (c.ride) continue;
-        if (c.top < 0 || c.top > 900) continue;
+      const clipCam = (c: Collider) => {
+        if (c.ride || c.top < 0 || c.top > 900) return false;
         const t = segBox(target, want, c);
         if (t >= 0 && t < tmin) tmin = t;
-      }
+        return false;
+      };
+      this.eachNear(target.x, target.z, clipCam);
+      this.eachNear(want.x, want.z, clipCam);
       if (tmin < 1) want = target.clone().lerp(want, Math.max(0.15, tmin - 0.08));
       pos = want;
       look = target.clone().addScaledVector(new THREE.Vector3(fx, 0, fz), 3);
@@ -2439,8 +2558,42 @@ export class Game3D {
   }
 
   render(renderer: THREE.WebGLRenderer) {
-    if (this.phase === "hack" || this.phase === "result") renderer.render(this.cyber.scene, this.cyber.camera);
-    else renderer.render(this.scene, this.camera);
+    if (this.phase === "hack" || this.phase === "result") {
+      renderer.render(this.cyber.scene, this.cyber.camera);
+      return;
+    }
+    renderer.shadowMap.autoUpdate = false;
+    const p = this.player.pos;
+    const dx = p.x - this.shadowMark.x;
+    const dy = p.y - this.shadowMark.y;
+    const dz = p.z - this.shadowMark.z;
+    const dirty = dx * dx + dy * dy + dz * dz > 0.0025 || this.t - this.shadowT > 0.12;
+    renderer.shadowMap.needsUpdate = dirty;
+    if (dirty) {
+      this.shadowMark.set(p.x, p.y, p.z);
+      this.shadowT = this.t;
+    }
+    renderer.render(this.scene, this.camera);
+  }
+
+  /** Close cars keep the cabin and the rims. Farther out the body stays and the spokes become a tire. */
+  private dressCabin(root: THREE.Object3D, show: boolean) {
+    const cabin = root.userData.cabin as THREE.Object3D[] | undefined;
+    const rims = root.userData.rims as THREE.Object3D[] | undefined;
+    if (!cabin && !rims) return;
+    const dx = root.position.x - this.camera.position.x;
+    const dz = root.position.z - this.camera.position.z;
+    const d2 = dx * dx + dz * dz;
+    const detail = show && d2 < 16 * 16;
+    const rimsOn = show && d2 < 26 * 26;
+    if (root.userData.cabinOn === detail && root.userData.rimsOn === rimsOn && root.userData.carShown === show) return;
+    root.userData.cabinOn = detail;
+    root.userData.rimsOn = rimsOn;
+    root.userData.carShown = show;
+    if (cabin) for (const part of cabin) part.visible = detail;
+    if (rims) for (const part of rims) part.visible = rimsOn;
+    const lods = root.userData.lodWheels as THREE.Object3D[] | undefined;
+    if (lods) for (const part of lods) part.visible = show && !rimsOn;
   }
 
   resize(w: number, h: number) {
