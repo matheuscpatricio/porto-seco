@@ -186,29 +186,27 @@ const DOCKS = [28, 44, 72, 36, 96, 54, 30, 68, 42, 58];
 function CityBoot({ pct, label }: { pct: number; label: string }) {
   const width = `${Math.max(6, Math.round(pct * 100))}%`;
   return (
-    <div className="absolute inset-0 z-20 overflow-hidden" role="status" aria-live="polite">
-      <div className="absolute inset-0 bg-gradient-to-b from-[#3b246b] via-[#c4b5fd] to-[#1e1b4b]" />
-      <div className="absolute left-1/2 top-[16%] h-28 w-[70%] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(224,196,255,0.75),transparent_70%)]" />
-      <div className="absolute inset-x-0 bottom-[38%] flex h-28 items-end gap-1 px-[6%] sm:h-40 sm:gap-2">
+    <div className="absolute inset-0 z-20 overflow-hidden bg-[#07060c]" role="status" aria-live="polite">
+      <div className="absolute inset-x-0 bottom-[34%] flex h-24 items-end gap-3 px-[12%] opacity-70 sm:h-32">
         {DOCKS.map((h, i) => (
-          <div key={i} className="relative flex-1 bg-[#120c16]/90" style={{ height: `${h}%` }}>
-            <div className={`absolute right-[18%] top-[18%] h-1.5 w-1.5 rounded-full bg-sky-300 ${i % 3 === 0 ? "anim-lamp" : "opacity-70"}`} />
+          <div key={i} className="relative flex-1 bg-white/10" style={{ height: `${h}%` }}>
+            <div className={`absolute right-[22%] top-[16%] h-1 w-1 bg-cyan-200 ${i % 3 === 0 ? "anim-lamp" : "opacity-50"}`} />
           </div>
         ))}
       </div>
-      <div className="absolute inset-x-0 bottom-0 h-[40%] overflow-hidden bg-gradient-to-b from-[#1a5670] to-[#071018]">
-        <div className="anim-tide absolute inset-y-0 left-0 w-[200%] bg-[repeating-linear-gradient(90deg,transparent_0,transparent_42px,rgba(255,255,255,0.14)_42px,rgba(255,255,255,0.14)_43px)]" />
-        <div className="absolute inset-x-0 top-0 h-px bg-amber-100/80" />
+      <div className="absolute inset-x-0 bottom-0 h-[36%] overflow-hidden bg-[#05080d]">
+        <div className="anim-tide absolute inset-y-0 left-0 w-[200%] opacity-40 bg-[repeating-linear-gradient(90deg,transparent_0,transparent_64px,rgba(165,243,252,0.16)_64px,rgba(165,243,252,0.16)_65px)]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-cyan-200/50" />
       </div>
-      <div className="relative z-10 flex h-[58%] flex-col items-center justify-center px-5 text-center">
-        <p className="text-[10px] font-semibold tracking-[0.38em] text-amber-100/85 sm:text-[11px]">ILHA DE VÉRTICE</p>
-        <h1 className="mt-2 text-4xl font-black tracking-tight text-white drop-shadow-md sm:text-6xl">Porto Seco</h1>
-        <p className="mt-3 max-w-sm text-sm text-violet-50/90">O Cole espera na doca, armadura vermelha e moto ligada.</p>
-        <div className="mt-8 w-full max-w-xs sm:max-w-sm">
-          <div className="h-1.5 overflow-hidden rounded-full bg-black/45">
-            <div className="h-full rounded-full bg-gradient-to-r from-amber-100 via-orange-400 to-rose-400 transition-[width] duration-500 ease-out" style={{ width }} />
+      <div className="relative z-10 flex h-[62%] flex-col items-center justify-center px-5 text-center">
+        <p className="font-mono text-[10px] tracking-[0.45em] text-cyan-200/60">ILHA DE VÉRTICE</p>
+        <h1 className="mt-3 text-4xl font-light tracking-tight text-white sm:text-6xl">Porto Seco</h1>
+        <p className="mt-3 max-w-xs text-sm text-white/45">O Cole espera na doca.</p>
+        <div className="mt-10 w-full max-w-xs">
+          <div className="h-px overflow-hidden bg-white/15">
+            <div className="h-full bg-cyan-200/80 transition-[width] duration-500 ease-out" style={{ width }} />
           </div>
-          <p className="mt-3 text-xs tracking-wide text-white/85">{label}</p>
+          <p className="mt-3 font-mono text-[11px] tracking-wide text-white/45">{label}</p>
         </div>
       </div>
     </div>

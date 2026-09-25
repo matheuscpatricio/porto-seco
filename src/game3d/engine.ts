@@ -202,6 +202,8 @@ export class Game3D {
   near = false;
   checkpoint: THREE.Vector3;
   private phaseT = 0;
+  private signalPaint = "";
+  private adPulse = -1;
   private queue: { at: number; fn: () => void }[] = [];
   private jumpHeld = false;
   private useHeld = false;
@@ -1364,12 +1366,16 @@ export class Game3D {
     const bt = this.targetPos();
     beacon.position.set(bt.x, 30, bt.z);
     (beacon.material as THREE.MeshBasicMaterial).opacity = 0.12 + Math.sin(this.t * 3) * 0.05;
+    const pulse = Math.floor(this.t * 5);
+    const pulseOn = pulse !== this.adPulse;
+    if (pulseOn) this.adPulse = pulse;
     for (const ad of L.ads) {
       if (this.t > ad.next) {
         ad.cursor = (ad.cursor + 1) % ad.frames.length;
         (ad.mesh.material as THREE.MeshBasicMaterial).map = ad.frames[ad.cursor];
         ad.next = this.t + 4.2 + (ad.cursor % 3) * 0.35;
       }
+      if (!pulseOn) continue;
       const mat = ad.mesh.material as THREE.MeshBasicMaterial;
       mat.opacity = 0.86 + Math.sin(this.t * 5 + ad.cursor) * 0.14;
     }
@@ -1567,10 +1573,29 @@ export class Game3D {
     const L = this.layout;
     const P = this.player;
     const camPos = this.camera.position;
+    const cell = 2;
+    const pack = (x: number, z: number) => (Math.floor(x / cell) + 1024) * 4096 + (Math.floor(z / cell) + 1024);
+    const grid = new Map<number, Ped[]>();
+    const awake = new Set<Ped>();
+    for (const p of this.peds) {
+      if (p.dead > 0) continue;
+      const dx = p.pos.x - camPos.x;
+      const dz = p.pos.z - camPos.z;
+      const px = p.pos.x - P.pos.x;
+      const pz = p.pos.z - P.pos.z;
+      if (dx * dx + dz * dz > 50 * 50 && px * px + pz * pz > 28 * 28) continue;
+      awake.add(p);
+      const key = pack(p.pos.x, p.pos.z);
+      const list = grid.get(key);
+      if (list) list.push(p);
+      else grid.set(key, [p]);
+    }
     for (const p of this.peds) {
       p.t += dt;
       p.panic = Math.max(0, p.panic - dt);
-      const near = p.pos.distanceTo(camPos) < 48;
+      const cdx = p.pos.x - camPos.x;
+      const cdz = p.pos.z - camPos.z;
+      const near = cdx * cdx + cdz * cdz < 48 * 48;
       if (p.dead > 0) {
         p.dead -= dt;
         p.pos.y = 0.2;
@@ -1578,6 +1603,24 @@ export class Game3D {
         p.rig.root.position.copy(p.pos);
         if (p.dead <= 0) this.respawnPed(p);
         else if (near) animate(p.rig, "down", p.t, dt);
+        continue;
+      }
+      if (!awake.has(p)) {
+        p.rig.root.visible = false;
+        if (!p.still && p.panic <= 0) {
+          const goal = L.pedLoops[p.loop][p.wp];
+          const dx = goal.x - p.pos.x;
+          const dz = goal.z - p.pos.z;
+          const len = Math.hypot(dx, dz);
+          if (len < 0.6) p.wp = (p.wp + p.dir + 4) % 4;
+          else {
+            const step = Math.min(len, p.speed * dt);
+            p.pos.x += (dx / len) * step;
+            p.pos.z += (dz / len) * step;
+            p.yaw = Math.atan2(dx, dz);
+          }
+        }
+        p.pos.y = 0.2;
         continue;
       }
       let pose: Pose3 = "idle";
@@ -1599,14 +1642,22 @@ export class Game3D {
         else {
           to.normalize();
           const side = new THREE.Vector3(-to.z, 0, to.x);
-          for (const other of this.peds) {
-            if (other === p || other.dead > 0) continue;
-            const rel = other.pos.clone().sub(p.pos);
-            rel.y = 0;
-            const dist = rel.length();
-            if (dist > 1.7 || dist < 0.05 || rel.dot(to) <= 0) continue;
-            const sign = Math.sign(rel.dot(side)) || (p.dir > 0 ? 1 : -1);
-            to.addScaledVector(side, -sign * (1.7 - dist) * 1.6);
+          const cx = Math.floor(p.pos.x / cell);
+          const cz = Math.floor(p.pos.z / cell);
+          for (let ix = -1; ix <= 1; ix++) {
+            for (let iz = -1; iz <= 1; iz++) {
+              const list = grid.get((cx + ix + 1024) * 4096 + (cz + iz + 1024));
+              if (!list) continue;
+              for (const other of list) {
+                if (other === p) continue;
+                const dx = other.pos.x - p.pos.x;
+                const dz = other.pos.z - p.pos.z;
+                const dist = Math.hypot(dx, dz);
+                if (dist > 1.7 || dist < 0.05 || dx * to.x + dz * to.z <= 0) continue;
+                const sign = Math.sign(dx * side.x + dz * side.z) || (p.dir > 0 ? 1 : -1);
+                to.addScaledVector(side, -sign * (1.7 - dist) * 1.6);
+              }
+            }
           }
           if (to.lengthSq() > 0.0001) to.normalize();
           const blockedByPlayer = P.pos.distanceTo(p.pos) < 1.2 && P.pos.clone().sub(p.pos).dot(to) > 0;
@@ -1628,7 +1679,12 @@ export class Game3D {
       dp.y = 0;
       const dl = dp.length();
       if (dl < 0.65 && dl > 0.001) p.pos.addScaledVector(dp.normalize(), 0.65 - dl);
-      for (const c of this.traffic) this.pushFromCar(p.pos, c.pos, c.yaw, c.mesh.userData.length, 0.3);
+      for (const c of this.traffic) {
+        const dx = c.pos.x - p.pos.x;
+        const dz = c.pos.z - p.pos.z;
+        if (dx * dx + dz * dz > 81) continue;
+        this.pushFromCar(p.pos, c.pos, c.yaw, c.mesh.userData.length, 0.3);
+      }
       p.rig.root.visible = near;
       this.castNear(p.rig.root, near && p.pos.distanceTo(camPos) < 36);
       if (!near) continue;
@@ -1642,22 +1698,28 @@ export class Game3D {
         if (a.vol > 0.05 && p.panic <= 0 && this.phase === "play") sound.babble(p.pitch, 3 + Math.floor(Math.random() * 6), a.pan, 0.09 * a.vol);
       }
     }
-    for (let i = 0; i < this.peds.length; i++) {
-      const a = this.peds[i];
-      if (a.dead > 0) continue;
-      for (let j = i + 1; j < this.peds.length; j++) {
-        const b = this.peds[j];
-        if (b.dead > 0) continue;
-        const sep = separateCircles(a.pos.x, a.pos.z, b.pos.x, b.pos.z, 0.85);
-        if (!sep) continue;
-        a.pos.x = sep.ax;
-        a.pos.z = sep.az;
-        b.pos.x = sep.bx;
-        b.pos.z = sep.bz;
-        a.rig.root.position.x = a.pos.x;
-        a.rig.root.position.z = a.pos.z;
-        b.rig.root.position.x = b.pos.x;
-        b.rig.root.position.z = b.pos.z;
+    for (const a of awake) {
+      const cx = Math.floor(a.pos.x / cell);
+      const cz = Math.floor(a.pos.z / cell);
+      for (let ix = 0; ix <= 1; ix++) {
+        for (let iz = -1; iz <= 1; iz++) {
+          if (ix === 0 && iz < 0) continue;
+          const list = grid.get((cx + ix + 1024) * 4096 + (cz + iz + 1024));
+          if (!list) continue;
+          for (const b of list) {
+            if (b === a) continue;
+            const sep = separateCircles(a.pos.x, a.pos.z, b.pos.x, b.pos.z, 0.85);
+            if (!sep) continue;
+            a.pos.x = sep.ax;
+            a.pos.z = sep.az;
+            b.pos.x = sep.bx;
+            b.pos.z = sep.bz;
+            a.rig.root.position.x = a.pos.x;
+            a.rig.root.position.z = a.pos.z;
+            b.rig.root.position.x = b.pos.x;
+            b.rig.root.position.z = b.pos.z;
+          }
+        }
       }
     }
   }
@@ -1938,6 +2000,9 @@ export class Game3D {
   }
 
   private paintSignals() {
+    const mark = `${trafficSignal(this.t, false)}:${trafficSignal(this.t, true)}`;
+    if (mark === this.signalPaint) return;
+    this.signalPaint = mark;
     const paint = (lamp: { red: THREE.MeshStandardMaterial; yellow: THREE.MeshStandardMaterial; green: THREE.MeshStandardMaterial }, alongX: boolean) => {
       const color = trafficSignal(this.t, alongX);
       lamp.red.emissiveIntensity = color === "red" ? 2.6 : 0.04;

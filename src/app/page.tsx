@@ -10,7 +10,7 @@ import { ACHIEVEMENTS, isUnlocked, markIntroSeen, resetProgress, useProgress } f
 import Link from "next/link";
 import { sound } from "@/game/audio";
 import { requestGameFullscreen } from "@/game/fullscreen";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
 const crew: Who[] = ["leo", "dani", "rui", "bia"];
 const villains: Who[] = ["vidal", "caveira"];
@@ -31,11 +31,11 @@ export default function Home() {
     return (
       <>
         <TopBar />
-        <main className="relative flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-orange-600/30 via-rose-950/40 to-background px-4 py-16">
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-300">Porto Seco, 2026</p>
-          <h1 className="mt-1 text-center text-4xl font-black uppercase tracking-tight sm:text-6xl">A dívida</h1>
-          <p className="mt-4 text-sm text-white/70">Abrindo a cidade…</p>
-        </main>
+        <NightField>
+          <p className="font-mono text-[11px] tracking-[0.45em] text-cyan-200/60">VÉRTICE</p>
+          <h1 className="mt-4 text-5xl font-light tracking-tight sm:text-7xl">Porto Seco</h1>
+          <p className="mt-6 font-mono text-xs text-white/40">Abrindo a cidade</p>
+        </NightField>
       </>
     );
   }
@@ -44,28 +44,28 @@ export default function Home() {
     return (
       <>
         <TopBar />
-        <main className="relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-orange-600/30 via-rose-950/40 to-background px-4 py-8">
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-300">Porto Seco, 2026</p>
-          <h1 className="mt-1 text-center text-4xl font-black uppercase tracking-tight sm:text-6xl">A dívida</h1>
-          <div className="my-6 flex items-end gap-2 sm:gap-6">
+        <NightField>
+          <p className="font-mono text-[11px] tracking-[0.45em] text-cyan-200/60">00 · A DÍVIDA</p>
+          <h1 className="mt-3 text-4xl font-light tracking-tight sm:text-6xl">Porto Seco</h1>
+          <div className="my-8 flex items-end justify-center gap-4 sm:gap-7">
             {[...crew, ...villains].map((w) => (
-              <div key={w} className="flex flex-col items-center">
-                <Portrait who={w} size={56} pose="idle" full />
-                <span className={`text-[10px] font-bold ${people[w].ally ? "text-sky-300" : "text-rose-300"}`}>{people[w].name}</span>
+              <div key={w} className="flex flex-col items-center gap-2">
+                <Portrait who={w} size={44} pose="idle" full />
+                <span className={`font-mono text-[10px] tracking-widest ${people[w].ally ? "text-cyan-200/80" : "text-rose-300/80"}`}>{people[w].name}</span>
               </div>
             ))}
           </div>
-          <div className="w-full max-w-2xl">
+          <div className="w-full max-w-xl">
             <Dialogue
               lines={prologue}
-              doneLabel="Começar ▶"
+              doneLabel="Entrar"
               onDone={() => {
                 setReplay(false);
                 markIntroSeen();
               }}
             />
           </div>
-        </main>
+        </NightField>
       </>
     );
   }
@@ -73,65 +73,63 @@ export default function Home() {
   return (
     <>
       <TopBar />
-      <main className="mx-auto w-full max-w-6xl px-4 pb-16">
-        <section className="relative mt-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-orange-600/40 via-rose-900/40 to-slate-950 p-6 sm:p-10">
-          <div className="relative z-10 max-w-xl">
-            <p className="text-xs font-black uppercase tracking-[0.3em] text-orange-300">Um jogo de ação para aprender Python do zero</p>
-            <h1 className="mt-2 text-4xl font-black uppercase leading-none tracking-tight sm:text-6xl">Porto Seco</h1>
-            <p className="mt-3 text-white/80">
-              O Cole é motoboy, está endividado e nunca programou. Com a ajuda da Maya, ele corre, pula, enfrenta os capangas do Kane e hackeia a cidade inteira, aprendendo
-              Python a cada missão. A ilha tem costa irregular. A polícia só reage a um hack ou a uma morte, e a água funda traz um tubarão.
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <LinkButton size="lg" href={done ? `/level/${nextLevel.id}?hub=1` : `/level/${nextLevel.id}`} className="bg-orange-500 text-black hover:bg-orange-400">
-                {done ? "Continuar a história" : "Começar a história"} ▶
+      <main className="relative mx-auto w-full max-w-5xl px-5 pb-24">
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/50 to-transparent" />
+        <section className="grid items-end gap-10 pt-16 sm:pt-24 lg:grid-cols-[1.4fr_0.6fr]">
+          <div>
+            <p className="font-mono text-[11px] tracking-[0.45em] text-cyan-200/60">ILHA DE VÉRTICE</p>
+            <h1 className="mt-4 text-5xl font-light tracking-tight text-white sm:text-7xl">Porto Seco</h1>
+            <p className="mt-5 max-w-md text-sm leading-relaxed text-white/55">Cole aprende Python na rua. Cada missão abre um sistema da cidade.</p>
+            <div className="mt-8 flex flex-wrap items-center gap-6">
+              <LinkButton
+                size="lg"
+                href={done ? `/level/${nextLevel.id}?hub=1` : `/level/${nextLevel.id}`}
+                className="h-11 rounded-none border border-cyan-200/50 bg-cyan-200/10 px-6 font-normal tracking-[0.18em] text-cyan-50 uppercase hover:bg-cyan-200/20"
+              >
+                {done ? "Continuar" : "Entrar"}
               </LinkButton>
-              <button className="text-sm text-white/70 underline hover:text-white" onClick={() => setReplay(true)}>
-                Rever a introdução
+              <button className="font-mono text-[11px] tracking-[0.22em] text-white/40 uppercase hover:text-white" onClick={() => setReplay(true)}>
+                Introdução
               </button>
             </div>
-            <p className="mt-3 text-xs text-white/60">
-              {done} de {allLevels.length} missões concluídas · R$ {p.money} · a moto fica na calçada · o ponto azul no mapa é o arranha-céu da Maya, no centro · na sala da cobertura, E entra no computador e a aula não tira o pagamento · lojas de armas e de motos gastam o pagamento · Teclado: ← → andar, ↑ pular, F atirar, E hackeia, sobe na moto e abre o computador da torre · No celular há botões na tela
-            </p>
           </div>
-          <div className="pointer-events-none absolute bottom-0 right-4 hidden items-end gap-3 md:flex">
-            {crew.map((w) => (
-              <Portrait key={w} who={w} size={70} pose={w === "leo" ? "run" : "idle"} full />
-            ))}
-          </div>
+          <dl className="grid grid-cols-3 gap-px border border-white/10 bg-white/10 font-mono text-[11px] lg:grid-cols-1">
+            <Stat k="Missões" v={`${done}/${allLevels.length}`} />
+            <Stat k="Carteira" v={`R$ ${p.money}`} />
+            <Stat k="Próxima" v={nextLevel.id} />
+          </dl>
         </section>
+        <p className="mt-8 max-w-xl font-mono text-[11px] leading-5 text-white/35">
+          WASD anda · setas giram a câmera · espaço pula · F atira · E usa a moto, o terminal e o computador da Maya. No celular, o joystick fica à esquerda.
+        </p>
 
-        <div className="mt-6 space-y-4">
-          {worlds.map((w) => {
+        <div className="mt-16 space-y-10">
+          {worlds.map((w, wi) => {
             const worldDone = w.levels.filter((l) => p.stars[l.id]).length;
             return (
-              <section key={w.id} className="overflow-hidden rounded-2xl border border-white/10 bg-card">
-                <div className={`flex items-center gap-4 bg-gradient-to-r ${w.color} px-5 py-3`}>
-                  <span className="text-3xl">{w.emoji}</span>
-                  <div className="flex-1">
-                    <h2 className="text-lg font-black text-white">{w.name}</h2>
-                    <p className="text-xs text-white/80">{w.subtitle}</p>
+              <section key={w.id}>
+                <div className="flex items-baseline justify-between gap-4 border-b border-white/10 pb-3">
+                  <div>
+                    <p className="font-mono text-[10px] tracking-[0.35em] text-cyan-200/50">0{wi + 1}</p>
+                    <h2 className="mt-1 text-lg font-light tracking-wide">{w.name.replace(/^Capítulo \d+: /, "")}</h2>
+                    <p className="text-xs text-white/40">{w.subtitle}</p>
                   </div>
-                  <span className="rounded-full bg-black/30 px-3 py-1 text-sm font-bold text-white">
+                  <span className="font-mono text-xs text-white/45">
                     {worldDone}/{w.levels.length}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-5">
+                <div className="mt-3 grid grid-cols-1 gap-px bg-white/10 sm:grid-cols-5">
                   {w.levels.map((l) => {
                     const open = isUnlocked(p, l.id);
                     const inner = (
-                      <div
-                        className={`flex h-full flex-col gap-1 rounded-xl border p-3 transition ${
-                          open ? "border-white/10 bg-white/[0.03] hover:-translate-y-0.5 hover:border-orange-400/60" : "cursor-not-allowed border-white/5 opacity-40"
-                        } ${l.boss ? "ring-1 ring-rose-500/50" : ""}`}
-                      >
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{l.boss ? `Chefe: ${people[l.boss].name}` : `Missão ${l.id}`}</span>
-                          <span>{open ? `${l.xp} XP` : "🔒"}</span>
+                      <div className={`flex h-full min-h-28 flex-col gap-2 bg-[#07060c] p-3 transition ${open ? "hover:bg-white/[0.04]" : "opacity-35"}`}>
+                        <div className="flex items-center justify-between font-mono text-[10px] tracking-wider text-white/35">
+                          <span>{l.boss ? people[l.boss].name : l.id}</span>
+                          <span>{open ? `${l.xp}` : "—"}</span>
                         </div>
-                        <p className="font-bold leading-tight">{l.title}</p>
-                        <p className="text-[11px] text-muted-foreground">{l.target}</p>
-                        <Stars n={p.stars[l.id] ?? 0} size="text-sm" />
+                        <p className="text-sm font-medium leading-tight">{l.title}</p>
+                        <p className="line-clamp-2 text-[11px] text-white/35">{l.target}</p>
+                        <Stars n={p.stars[l.id] ?? 0} size="text-xs" />
                       </div>
                     );
                     return open ? (
@@ -148,22 +146,40 @@ export default function Home() {
           })}
         </div>
 
-        <section className="mt-8 rounded-2xl border border-white/10 bg-card p-5">
-          <h2 className="mb-3 font-bold">🏆 Conquistas</h2>
-          <ul className="grid gap-2 sm:grid-cols-2">
+        <section className="mt-16 border-t border-white/10 pt-8">
+          <h2 className="font-mono text-[11px] tracking-[0.35em] text-white/40">CONQUISTAS</h2>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
             {Object.entries(ACHIEVEMENTS).map(([k, label]) => (
-              <li key={k} className={`rounded-lg px-3 py-2 text-sm ${p.achievements.includes(k) ? "bg-emerald-500/15" : "bg-white/[0.03] text-muted-foreground"}`}>
-                {p.achievements.includes(k) ? "✅" : "⬜"} {label}
+              <li key={k} className={`border-l px-3 py-2 text-sm ${p.achievements.includes(k) ? "border-cyan-200/70 text-white" : "border-white/10 text-white/35"}`}>
+                {label}
               </li>
             ))}
           </ul>
           {done > 0 && (
-            <button className="mt-4 text-xs text-muted-foreground underline" onClick={() => confirm("Apagar todo o progresso?") && resetProgress()}>
+            <button className="mt-6 font-mono text-[11px] tracking-widest text-white/30 uppercase hover:text-white" onClick={() => confirm("Apagar todo o progresso?") && resetProgress()}>
               Recomeçar do zero
             </button>
           )}
         </section>
       </main>
     </>
+  );
+}
+
+function NightField({ children }: { children: ReactNode }) {
+  return (
+    <main className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-5 py-16 text-center">
+      <div className="pointer-events-none absolute inset-x-0 top-1/3 h-px bg-gradient-to-r from-transparent via-cyan-200/40 to-transparent" />
+      {children}
+    </main>
+  );
+}
+
+function Stat({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="bg-[#07060c] px-4 py-3">
+      <dt className="tracking-[0.22em] text-white/35 uppercase">{k}</dt>
+      <dd className="mt-1 text-sm text-cyan-50">{v}</dd>
+    </div>
   );
 }

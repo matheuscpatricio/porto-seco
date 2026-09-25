@@ -70,18 +70,15 @@ export function TopBar() {
   const p = useProgress();
   const w = wizardLevel(p.xp);
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-background/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-2.5">
-        <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-          <span className="rounded bg-rose-600 px-1.5 py-0.5 font-mono text-xs font-black text-white">PY</span>
-          <span className="hidden font-black uppercase tracking-widest sm:inline">Porto Seco</span>
+    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#07060c]/80 backdrop-blur">
+      <div className="mx-auto flex max-w-5xl items-center gap-4 px-5 py-3">
+        <Link href="/" className="font-light tracking-[0.22em] text-white/90 uppercase">
+          Porto Seco
         </Link>
         <div className="flex flex-1 items-center gap-3">
-          <span className="whitespace-nowrap rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
-            Reputação nv. {w.level}
-          </span>
-          <Progress value={w.pct} className="h-2 max-w-48" />
-          <span className="whitespace-nowrap text-xs text-muted-foreground">{p.xp} XP</span>
+          <span className="whitespace-nowrap font-mono text-[10px] tracking-[0.2em] text-cyan-200/70 uppercase">Nv. {w.level}</span>
+          <Progress value={w.pct} className="max-w-40" />
+          <span className="whitespace-nowrap font-mono text-[10px] text-white/35">{p.xp} XP</span>
         </div>
         {p.streak > 0 && <span className="text-sm" title="Dias seguidos">🔥 {p.streak}</span>}
         <SoundToggles />

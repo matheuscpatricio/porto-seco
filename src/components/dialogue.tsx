@@ -70,14 +70,14 @@ export function Dialogue({
   }, [advance]);
 
   return (
-    <div className="anim-pop w-full rounded-xl border border-white/15 bg-black/80 p-3 shadow-2xl backdrop-blur sm:p-4">
+    <div className="anim-pop w-full border border-white/10 bg-black/75 p-3 backdrop-blur sm:p-4">
       <div className="flex cursor-pointer gap-3" onClick={advance}>
-        <div className={`overflow-hidden rounded-lg border-2 ${person.ally ? "border-sky-400/60 bg-sky-950" : "border-rose-500/60 bg-rose-950"}`}>
+        <div className={`overflow-hidden border ${person.ally ? "border-cyan-200/40" : "border-rose-300/40"}`}>
           <Portrait who={line.who} size={compact ? 56 : 72} />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className={`text-xs font-black uppercase tracking-wider ${person.ally ? "text-sky-300" : "text-rose-300"}`}>
-            {person.name} <span className="font-medium normal-case tracking-normal text-white/50">· {person.role}</span>
+        <div className="min-w-0 flex-1 text-left">
+          <p className={`font-mono text-[10px] tracking-[0.28em] uppercase ${person.ally ? "text-cyan-200/80" : "text-rose-300/80"}`}>
+            {person.name} <span className="tracking-normal text-white/40">· {person.role}</span>
           </p>
           <p className={`mt-1 leading-relaxed text-white ${compact ? "text-sm" : "text-sm sm:text-base"}`}>
             <Md text={closeTicks(typed)} />
