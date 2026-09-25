@@ -275,7 +275,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.42;
+      renderer.toneMappingExposure = 1.26;
       const boot = async () => {
       try {
         await preloadScene((label, pct) => {
@@ -305,7 +305,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
       gameRef.current = game;
       game.scene.environment = envMap;
       if (process.env.NODE_ENV !== "production") (window as unknown as { __game: Game3D }).__game = game;
-      game.scene.environmentIntensity = world.id === "w2" || world.id === "w5" || world.id === "w6" ? 0.25 : 0.55;
+      game.scene.environmentIntensity = game.layout.night ? 0.32 : 0.55;
       const openHub = new URLSearchParams(window.location.search).get("hub") === "1";
       if (openHub) game.enterHub();
       else if (skipBrief) game.startPlay();

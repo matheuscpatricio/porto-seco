@@ -269,9 +269,9 @@ export class Game3D {
     sc.far = 200;
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.03;
-    this.sun.shadow.intensity = 0.42;
+    this.sun.shadow.intensity = theme.night ? 0.62 : 0.42;
     this.scene.add(this.sun, this.sun.target);
-    const fill = new THREE.DirectionalLight("#dbeafe", 1.35);
+    const fill = new THREE.DirectionalLight(theme.night ? "#b9a6e0" : "#dbeafe", theme.night ? 0.62 : 1.35);
     fill.position.set(-36, 32, -22);
     this.scene.add(fill, fill.target);
 
@@ -539,6 +539,15 @@ export class Game3D {
       this.traffic.push({ mesh, driver: this.makeDriver(), pos, from: f, to: t, speed: 0, want: 7 + r() * 4, blockedT: 0, honkT: 0, ignoreT: 0, yaw: 0 });
     }
     for (const car of this.layout.parked) this.curbDrivers.push(this.makeDriver());
+  }
+
+  private castNear(root: THREE.Object3D, on: boolean) {
+    if (root.userData.shadow === on) return;
+    root.userData.shadow = on;
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) mesh.castShadow = on;
+    });
   }
 
   private makeDriver() {
@@ -1366,7 +1375,10 @@ export class Game3D {
     this.updateEngines();
 
     const fog = this.scene.fog as THREE.Fog;
-    if (fog) fog.far = P.pos.y > 30 ? 560 : L.night ? 180 : 320;
+    if (fog) {
+      fog.near = P.pos.y > 30 ? 48 : 32;
+      fog.far = P.pos.y > 30 ? 560 : 270;
+    }
     this.sun.position.set(P.pos.x + 30, 60, P.pos.z + 20);
     this.sun.target.position.copy(P.pos);
   }
@@ -1599,6 +1611,7 @@ export class Game3D {
       if (dl < 0.65 && dl > 0.001) p.pos.addScaledVector(dp.normalize(), 0.65 - dl);
       for (const c of this.traffic) this.pushFromCar(p.pos, c.pos, c.yaw, c.mesh.userData.length, 0.3);
       p.rig.root.visible = near;
+      this.castNear(p.rig.root, near && p.pos.distanceTo(camPos) < 36);
       if (!near) continue;
       p.rig.root.position.copy(p.pos);
       p.rig.root.rotation.y = p.yaw;
@@ -1735,6 +1748,7 @@ export class Game3D {
       c.pos.addScaledVector(new THREE.Vector3(Math.sin(c.yaw), 0, Math.cos(c.yaw)), c.speed * dt);
       c.mesh.position.copy(c.pos);
       c.mesh.rotation.y = c.yaw;
+      this.castNear(c.mesh, c.pos.distanceTo(this.camera.position) < 34);
       this.seatDriver(c.driver, c.pos, c.yaw);
       for (const w of c.mesh.userData.wheels as THREE.Group[]) w.rotation.x += c.speed * dt * 2.5;
     }
@@ -1903,6 +1917,7 @@ export class Game3D {
       }
       c.pos.addScaledVector(new THREE.Vector3(Math.sin(c.yaw), 0, Math.cos(c.yaw)), c.speed * dt);
       if (dodge) c.pos.addScaledVector(new THREE.Vector3(Math.cos(c.yaw), 0, -Math.sin(c.yaw)), dodge * 2.4 * dt);
+      this.castNear(c.mesh, c.pos.distanceTo(this.camera.position) < 34);
       if (s > seg.length() - 1) {
         const [i, j] = c.to;
         const opts: [number, number][] = ([

@@ -27,7 +27,7 @@ export type Theme = {
 };
 
 export const THEMES: Record<string, Theme> = {
-  w1: { sky: ["#c4b5fd", "#f8f4ff"], fog: "#f7f3ff", sun: "#fff8ff", sunIntensity: 4.1, hemi: ["#f7f3ff", "#b7a8d4", 1.75], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [10, 24], night: false, peds: 56, traffic: 11 },
+  w1: { sky: ["#100818", "#3d2d68"], fog: "#1a1028", sun: "#d6c7ff", sunIntensity: 1.15, hemi: ["#9b8ec9", "#140c22", 0.85], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [10, 24], night: true, peds: 56, traffic: 11 },
   w2: { sky: ["#070b1f", "#2b3566"], fog: "#1b2246", sun: "#b8c8ff", sunIntensity: 0.9, hemi: ["#8ea6ff", "#1b1b2e", 0.45], kind: "towers", palette: ["#5b6778", "#3e4b63", "#6f7b8a", "#44615d", "#57565e"], heights: [32, 68], night: true, peds: 30, traffic: 8 },
   w3: { sky: ["#5d97c9", "#cfe0e2"], fog: "#a9c3c6", sun: "#fff3dc", sunIntensity: 2.4, hemi: ["#d6ecee", "#3a4545", 0.65], kind: "containers", palette: ["#a8322b", "#2c5aa0", "#2f7a47", "#c08f1e", "#cf6a2a", "#2a7c8c"], heights: [2.6, 10.4], night: false, peds: 28, traffic: 6 },
   w4: { sky: ["#7f8fa6", "#e0b27a"], fog: "#b89468", sun: "#ffd29a", sunIntensity: 2.2, hemi: ["#f2d3a0", "#3a2a1a", 0.65], kind: "sheds", palette: ["#8d8680", "#6b6661", "#aaa39c", "#8c4a1f", "#57524d"], heights: [9, 18], night: false, peds: 30, traffic: 6 },
@@ -203,19 +203,43 @@ function facadeTextures(base: string, night: boolean, kind: Theme["kind"], r: ()
 }
 
 function skyTexture(top: string, bottom: string, sun: string, night: boolean) {
-  const [c, g] = canvas(16, 512);
-  const grd = g.createLinearGradient(0, 0, 0, 512);
+  const W = night ? 512 : 16;
+  const H = 512;
+  const [c, g] = canvas(W, H);
+  const grd = g.createLinearGradient(0, 0, 0, H);
   grd.addColorStop(0, top);
-  grd.addColorStop(0.62, bottom);
-  grd.addColorStop(1, bottom);
+  grd.addColorStop(0.58, bottom);
+  grd.addColorStop(1, night ? "#2a2048" : bottom);
   g.fillStyle = grd;
-  g.fillRect(0, 0, 16, 512);
-  if (!night) {
+  g.fillRect(0, 0, W, H);
+  if (night) {
+    g.fillStyle = "#f7f3ff";
+    for (let i = 0; i < 110; i++) {
+      const x = Math.random() * W;
+      const y = Math.random() * H * 0.78;
+      const s = Math.random() < 0.07 ? 2.4 : 1.1;
+      g.globalAlpha = 0.4 + Math.random() * 0.6;
+      g.fillRect(x, y, s, s);
+    }
+    g.globalAlpha = 1;
+    const moon = g.createRadialGradient(392, 78, 6, 392, 78, 56);
+    moon.addColorStop(0, "#fffaf2");
+    moon.addColorStop(0.35, "#f4e8ff");
+    moon.addColorStop(1, "rgba(244,232,255,0)");
+    g.fillStyle = moon;
+    g.beginPath();
+    g.arc(392, 78, 56, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#fff9f0";
+    g.beginPath();
+    g.arc(392, 78, 15, 0, Math.PI * 2);
+    g.fill();
+  } else {
     const glow = g.createLinearGradient(0, 260, 0, 330);
     glow.addColorStop(0, "rgba(255,255,255,0)");
     glow.addColorStop(1, sun + "55");
     g.fillStyle = glow;
-    g.fillRect(0, 260, 16, 70);
+    g.fillRect(0, 260, W, 70);
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -358,9 +382,28 @@ function leafTexture() {
 
 const LEAF_MAP = typeof document === "undefined" ? null : leafTexture();
 
+const treeMats = new Map<string, { bark: THREE.MeshStandardMaterial; leaf: THREE.MeshStandardMaterial }>();
+
+function matsForTree(night: boolean) {
+  const key = night ? "night" : "day";
+  const hit = treeMats.get(key);
+  if (hit) return hit;
+  const bark = std({ color: night ? "#3f2e22" : "#6b4a32", roughness: 0.95 });
+  const leaf = new THREE.MeshStandardMaterial({
+    color: night ? "#16301f" : "#3d7a3a",
+    map: LEAF_MAP,
+    alphaTest: 0.35,
+    roughness: 0.85,
+    side: THREE.DoubleSide,
+  });
+  const pair = { bark, leaf };
+  treeMats.set(key, pair);
+  return pair;
+}
+
 function buildTree(r: () => number, night: boolean) {
   const g = new THREE.Group();
-  const bark = std({ color: night ? "#3f2e22" : "#6b4a32", roughness: 0.95 });
+  const { bark, leaf: leafMat } = matsForTree(night);
   let y = 0.15;
   let x = 0;
   let z = 0;
@@ -375,13 +418,6 @@ function buildTree(r: () => number, night: boolean) {
     z += (r() - 0.5) * 0.16;
     y += h * 0.92;
   }
-  const leafMat = new THREE.MeshStandardMaterial({
-    color: night ? "#16301f" : ["#3d7a3a", "#4c8c3e", "#2f6a32"][Math.floor(r() * 3)],
-    map: LEAF_MAP,
-    alphaTest: 0.35,
-    roughness: 0.85,
-    side: THREE.DoubleSide,
-  });
   const broad = r() > 0.45;
   if (broad) {
     for (let i = 0; i < 14; i++) {
@@ -390,14 +426,14 @@ function buildTree(r: () => number, night: boolean) {
       const ring = i < 8 ? 0.7 : 0.35;
       leaf.position.set(x + Math.cos(a) * ring, y + 0.2 + (i % 3) * 0.28, z + Math.sin(a) * ring);
       leaf.lookAt(x, leaf.position.y + 0.2, z);
-      leaf.castShadow = true;
+      leaf.castShadow = false;
       g.add(leaf);
     }
   } else {
     for (let i = 0; i < 4; i++) {
       const cone = new THREE.Mesh(new THREE.ConeGeometry(1.15 - i * 0.22, 1.15, 8), leafMat);
       cone.position.set(x, y + i * 0.55, z);
-      cone.castShadow = true;
+      cone.castShadow = false;
       g.add(cone);
     }
   }
@@ -469,8 +505,8 @@ function addCoast(scene: THREE.Scene, night: boolean) {
   });
   lobes.count = bushes.length * 5;
   shrubs.count = bushes.length * 4;
-  lobes.castShadow = true;
-  shrubs.castShadow = true;
+  lobes.castShadow = false;
+  shrubs.castShadow = false;
   scene.add(lobes, shrubs);
 
   const segN = 6;
@@ -520,8 +556,8 @@ function addCoast(scene: THREE.Scene, night: boolean) {
   trunks.count = palms.length * segN;
   fronds.count = palms.length * 8;
   nuts.count = palms.length * 3;
-  trunks.castShadow = true;
-  fronds.castShadow = true;
+  trunks.castShadow = false;
+  fronds.castShadow = false;
   scene.add(trunks, fronds, nuts);
 
   const rockGeo = new THREE.DodecahedronGeometry(0.7, 0);
@@ -1325,7 +1361,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   };
 
   scene.background = skyTexture(theme.sky[0], theme.sky[1], theme.sun, night);
-  scene.fog = new THREE.Fog(theme.fog, night ? 40 : 96, night ? 150 : 340);
+  scene.fog = new THREE.Fog(theme.fog, night ? 32 : 96, night ? 270 : 340);
 
   const water = new THREE.Mesh(new THREE.PlaneGeometry(SEA_SPAN, SEA_SPAN), seaMaterial());
   water.name = "sea";
@@ -1336,7 +1372,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   const sandMat = photoMaterial("coast_sand_01", 32, 32, { disp: 0.045, rough: 0.96 });
   sandMat.alphaMap = coastMask(sandSpan, -COAST, "sand");
   sandMat.alphaTest = 0.45;
-  const sand = new THREE.Mesh(new THREE.PlaneGeometry(sandSpan, sandSpan, 160, 160), sandMat);
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(sandSpan, sandSpan, 80, 80), sandMat);
   sand.rotation.x = -Math.PI / 2;
   sand.position.set(SIZE / 2, -0.08, SIZE / 2);
   sand.receiveShadow = true;
@@ -1345,22 +1381,22 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   const grassMat = photoMaterial("grass_ground", 26, 26, { disp: 0.02, rough: 0.95 });
   grassMat.alphaMap = coastMask(grassSpan, -GREEN, "grass");
   grassMat.alphaTest = 0.45;
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(grassSpan, grassSpan, 140, 140), grassMat);
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(grassSpan, grassSpan, 72, 72), grassMat);
   grass.rotation.x = -Math.PI / 2;
   grass.position.set(SIZE / 2, -0.045, SIZE / 2);
   grass.receiveShadow = true;
   scene.add(grass);
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(SIZE, SIZE, 200, 200),
-    photoMaterial("asphalt_02", 46, 46, { disp: 0.028, color: night ? "#c5ccd8" : "#ffffff", rough: 0.94 }),
+    new THREE.PlaneGeometry(SIZE, SIZE, 96, 96),
+    photoMaterial("asphalt_02", 46, 46, { disp: 0.028, color: night ? "#8e97a6" : "#ffffff", rough: 0.94 }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(SIZE / 2, 0, SIZE / 2);
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const sidewalk = photoMaterial("concrete_floor_02", 8, 8, { rough: 0.88, color: themeId === "w1" ? "#f3efe8" : "#d4d0cb" });
-  const curbMat = std({ color: "#b7b2aa", roughness: 0.8 });
+  const sidewalk = photoMaterial("concrete_floor_02", 8, 8, { rough: 0.88, color: night ? "#b7b2a8" : themeId === "w1" ? "#f3efe8" : "#d4d0cb" });
+  const curbMat = std({ color: night ? "#8d8880" : "#b7b2aa", roughness: 0.8 });
   for (let i = 0; i < GRID; i++) {
     for (let j = 0; j < GRID; j++) {
       const cx = blockStart(i) + BLOCK / 2;
@@ -2074,6 +2110,31 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   jet.position.set(JET.x, 0, JET.z);
   scene.add(jet);
   for (const c of addCoast(scene, night)) addCol(c.minX, c.maxX, c.minZ, c.maxZ, 3);
+
+  const moving = new Set<THREE.Object3D>([jet, car, elevator, gateMesh, beacon, ...port, bikes.entrega, bikes.esportiva, bikes.noturna]);
+  const freeze = (o: THREE.Object3D) => {
+    if (moving.has(o)) return;
+    o.updateMatrix();
+    o.matrixAutoUpdate = false;
+    for (const child of o.children) freeze(child);
+  };
+  const trimShadow = (o: THREE.Object3D) => {
+    if (moving.has(o)) return;
+    const m = o as THREE.Mesh;
+    if (m.isMesh && m.castShadow) {
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      if (mats.some((mat) => mat.transparent || mat.alphaTest > 0)) m.castShadow = false;
+      else {
+        if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+        if ((m.geometry.boundingSphere?.radius ?? 1) < 2) m.castShadow = false;
+      }
+    }
+    for (const child of o.children) trimShadow(child);
+  };
+  for (const child of scene.children) {
+    freeze(child);
+    trimShadow(child);
+  }
 
   const spawn = new THREE.Vector3(BIKE_PARK.x + 2.2, 0, BIKE_PARK.z);
   const allySpots = [
