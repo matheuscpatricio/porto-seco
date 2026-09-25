@@ -268,7 +268,11 @@ export class Game3D {
     sc.far = 200;
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.03;
+    this.sun.shadow.intensity = 0.42;
     this.scene.add(this.sun, this.sun.target);
+    const fill = new THREE.DirectionalLight("#dbeafe", 1.35);
+    fill.position.set(-36, 32, -22);
+    this.scene.add(fill, fill.target);
 
     if (M.terminal) this.moveTerminal(M.terminal);
     if (M.pickup) this.moveCar(this.openCurb(M.pickup.pos, M.pickup.yaw), M.pickup.yaw);

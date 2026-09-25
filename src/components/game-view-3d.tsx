@@ -275,7 +275,7 @@ export const GameView3D = forwardRef<GameHandle, ViewProps>(
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.18;
+      renderer.toneMappingExposure = 1.42;
       const boot = async () => {
       try {
         await preloadScene((label, pct) => {

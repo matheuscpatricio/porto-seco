@@ -26,7 +26,7 @@ export type Theme = {
 };
 
 export const THEMES: Record<string, Theme> = {
-  w1: { sky: ["#6d4ea8", "#f3e8ff"], fog: "#f4ecff", sun: "#f7f2ff", sunIntensity: 3.4, hemi: ["#f6f0ff", "#6d5b8c", 1.3], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [5, 11], night: false, peds: 42, traffic: 7 },
+  w1: { sky: ["#c4b5fd", "#f8f4ff"], fog: "#f7f3ff", sun: "#fff8ff", sunIntensity: 4.1, hemi: ["#f7f3ff", "#b7a8d4", 1.75], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [5, 11], night: false, peds: 42, traffic: 7 },
   w2: { sky: ["#070b1f", "#2b3566"], fog: "#1b2246", sun: "#b8c8ff", sunIntensity: 0.9, hemi: ["#8ea6ff", "#1b1b2e", 0.45], kind: "towers", palette: ["#5b6778", "#3e4b63", "#6f7b8a", "#44615d", "#57565e"], heights: [18, 48], night: true, peds: 30, traffic: 8 },
   w3: { sky: ["#5d97c9", "#cfe0e2"], fog: "#a9c3c6", sun: "#fff3dc", sunIntensity: 2.4, hemi: ["#d6ecee", "#3a4545", 0.65], kind: "containers", palette: ["#a8322b", "#2c5aa0", "#2f7a47", "#c08f1e", "#cf6a2a", "#2a7c8c"], heights: [2.6, 10.4], night: false, peds: 28, traffic: 6 },
   w4: { sky: ["#7f8fa6", "#e0b27a"], fog: "#b89468", sun: "#ffd29a", sunIntensity: 2.2, hemi: ["#f2d3a0", "#3a2a1a", 0.65], kind: "sheds", palette: ["#8d8680", "#6b6661", "#aaa39c", "#8c4a1f", "#57524d"], heights: [5, 9], night: false, peds: 30, traffic: 6 },
@@ -1281,10 +1281,6 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     win.instanceMatrix.needsUpdate = true;
     scene.add(win);
   };
-  placeWins(darkWins, new THREE.MeshPhysicalMaterial({ color: "#163044", roughness: 0.06, metalness: 0.55, envMapIntensity: 1.3, transparent: true, opacity: 0.72 }));
-  placeWins(litWins, new THREE.MeshStandardMaterial({ color: "#e0f2fe", emissive: "#38bdf8", emissiveIntensity: 3.1, roughness: 0.35 }));
-  placeWins(deepWins, new THREE.MeshStandardMaterial({ color: "#1e3a8a", emissive: "#2563eb", emissiveIntensity: 2.2, roughness: 0.4 }));
-
   const crateMat = std({ color: "#8a5a2b", roughness: 0.95 });
   const binMat = std({ color: "#2f5d3a", roughness: 0.6 });
   const barrelMat = std({ color: "#1d4ed8", roughness: 0.5, metalness: 0.4 });
@@ -1341,6 +1337,9 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       }
     }
   }
+  placeWins(darkWins, new THREE.MeshPhysicalMaterial({ color: "#163044", roughness: 0.06, metalness: 0.55, envMapIntensity: 1.3, transparent: true, opacity: 0.72 }));
+  placeWins(litWins, new THREE.MeshStandardMaterial({ color: "#e0f2fe", emissive: "#38bdf8", emissiveIntensity: 3.1, roughness: 0.35 }));
+  placeWins(deepWins, new THREE.MeshStandardMaterial({ color: "#1e3a8a", emissive: "#2563eb", emissiveIntensity: 2.2, roughness: 0.4 }));
 
   const spots: Spot[] = [];
   const areaName = (i: number, j: number) => ["Rua da Feira", "Av. do Porto", "Travessa Seca", "Rua das Palmeiras", "Largo do Mercado", "Rua do Cais", "Av. Central", "Beco do Sal"][(i * 3 + j) % 8];
