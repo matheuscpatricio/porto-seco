@@ -2,7 +2,7 @@ export type ScriptKind = "invasao" | "entrega" | "perseguicao" | "escolta" | "fu
 
 export const BLOCK = 36;
 export const STREET = 14;
-export const GRID = 3;
+export const GRID = 4;
 export const ISLAND = GRID * BLOCK + (GRID + 1) * STREET;
 /** Grass and palms between the curb and the sand. */
 export const GREEN = 14;
@@ -11,9 +11,10 @@ export const SAND = 16;
 export const COAST = GREEN + SAND;
 
 const DISTRICTS = [
-  ["w1", "w2", "w3"],
-  ["w4", "w5", "w6"],
-  ["w2", "w3", "w6"],
+  ["w1", "w2", "w3", "w2"],
+  ["w4", "w5", "w6", "w5"],
+  ["w2", "w3", "w6", "w3"],
+  ["w1", "w4", "w2", "w6"],
 ];
 
 export function districtAt(x: number, z: number): string {
@@ -133,7 +134,7 @@ export function roomExit(x: number, z: number): { x: number; z: number } | null 
   return null;
 }
 
-const STREET_BANDS = [0, 1, 2, 3].map((i) => {
+const STREET_BANDS = Array.from({ length: GRID + 1 }, (_, i) => {
   const a = i * (BLOCK + STREET);
   return [a, a + STREET] as const;
 });
@@ -194,6 +195,11 @@ export function inSea(x: number, z: number): boolean {
 
 /** Water past this covers Cole and the shark attacks. */
 export const SWIM_HEIGHT = 1.75;
+
+/** The shark bites someone wading deep enough. A jet ski stays above the bite. */
+export function sharkHunts(jetting: boolean, depth: number): boolean {
+  return !jetting && depth >= SWIM_HEIGHT;
+}
 
 /** Ambient special and federal officers grow with the mission index. */
 export function policeRoster(missionsDone: number): { especial: number; federal: number } {

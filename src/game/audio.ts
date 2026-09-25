@@ -164,7 +164,15 @@ class Sound {
     }
     this.musicGain = ctx.createGain();
     this.musicGain.gain.value = 0;
-    this.musicGain.connect(this.master);
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i / 255) * 2 - 1;
+      curve[i] = Math.tanh(x * 2.6);
+    }
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = curve;
+    shaper.oversample = "2x";
+    this.musicGain.connect(shaper).connect(this.master);
     const delay = ctx.createDelay(0.6);
     delay.delayTime.value = 0.24;
     const damp = ctx.createBiquadFilter();
@@ -230,7 +238,7 @@ class Sound {
     if (a !== "day" && a !== "night") this.setEngines([]);
     const musical = a === "day" || a === "night" || a === "menu" || a === "cyber";
     this.musicOn = musical;
-    this.musicGain?.gain.setTargetAtTime(musical ? 0.7 : 0, t, 0.45);
+    this.musicGain?.gain.setTargetAtTime(musical ? 0.62 : 0, t, 0.45);
     if (musical && this.musicNext < t) this.musicNext = t + 0.06;
   }
 
@@ -241,33 +249,34 @@ class Sound {
     const horizon = ctx.currentTime + 0.28;
     while (this.musicNext < horizon) {
       this.playMusicStep(this.musicNext, this.musicStep);
-      this.musicStep = (this.musicStep + 1) % 16;
-      this.musicNext += 60 / 98 / 2;
+      this.musicStep = (this.musicStep + 1) % 32;
+      this.musicNext += 60 / 108 / 4;
     }
   }
 
   private playMusicStep(t: number, step: number) {
     const bus = this.musicGain!;
     const cyber = this.ambience === "cyber";
-    const bass = cyber
-      ? [33, 0, 33, 0, 40, 0, 36, 0, 33, 0, 31, 0, 36, 0, 28, 0]
-      : [45, 0, 45, 52, 0, 45, 48, 0, 43, 0, 43, 50, 0, 43, 48, 45];
+    const bass = [38, 0, 38, 0, 38, 0, 36, 0, 38, 0, 41, 0, 36, 0, 38, 0, 34, 0, 34, 0, 33, 0, 36, 0, 31, 0, 34, 0, 36, 0, 38, 0];
     const arp = cyber
-      ? [81, 84, 88, 91, 88, 84, 81, 76, 79, 83, 86, 91, 86, 83, 79, 76]
-      : [69, 72, 76, 79, 76, 72, 69, 67, 65, 69, 72, 76, 72, 69, 67, 64];
-    const kick = cyber ? [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0] : [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0];
-    const hat = [1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0];
-    const snare = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, cyber ? 1 : 0];
-    if (bass[step]) this.tone(t, midi(bass[step]), 0.22, "sawtooth", 0.07, bus, 240);
+      ? [70, 0, 73, 0, 77, 0, 73, 0, 0, 70, 0, 75, 0, 73, 0, 68, 65, 0, 68, 0, 72, 0, 68, 0, 0, 65, 0, 73, 0, 77, 0, 72]
+      : [62, 0, 65, 0, 69, 0, 65, 0, 0, 62, 0, 67, 0, 65, 0, 60, 58, 0, 62, 0, 65, 0, 62, 0, 0, 58, 0, 65, 0, 69, 0, 62];
+    const kick = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1];
+    const hat = [0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0];
+    const snare = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1];
+    if (bass[step]) this.tone(t, midi(bass[step]), 0.28, "sawtooth", 0.11, bus, 160);
     if (arp[step]) {
-      this.tone(t, midi(arp[step]), cyber ? 0.12 : 0.2, "square", 0.028, bus, cyber ? 1800 : 1400);
-      if (this.musicEcho) this.tone(t, midi(arp[step]), 0.16, "square", 0.016, this.musicEcho, 1600);
+      this.tone(t, midi(arp[step]), 0.16, "square", cyber ? 0.02 : 0.016, bus, cyber ? 900 : 720);
+      if (this.musicEcho) this.tone(t, midi(arp[step] - 12), 0.22, "sawtooth", 0.012, this.musicEcho, 640);
     }
-    if (kick[step]) this.tone(t, 130, 0.16, "sine", 0.16, bus, 200, 46);
-    if (hat[step]) this.noiseHit(t, 0.03, 0.025, "highpass", 7000, bus);
-    if (snare[step]) this.noiseHit(t, 0.12, 0.05, "bandpass", 1800, bus);
-    if (step % 8 === 0) {
-      for (const n of cyber ? [64, 67, 71] : [57, 60, 64]) this.tone(t, midi(n), 1.3, "sine", 0.018, bus, 900);
+    if (kick[step]) {
+      this.tone(t, 140, 0.2, "sine", 0.24, bus, 160, 34);
+      this.tone(t, 48, 0.26, "sine", 0.18, bus, 80);
+    }
+    if (hat[step]) this.noiseHit(t, 0.04, 0.012, "highpass", 6200, bus);
+    if (snare[step]) this.noiseHit(t, 0.16, 0.07, "bandpass", 980, bus, 420, this.brown);
+    if (step % 16 === 0) {
+      for (const n of cyber ? [58, 61, 65] : [50, 53, 57]) this.tone(t, midi(n), 1.6, "sawtooth", 0.02, bus, 420);
     }
   }
 

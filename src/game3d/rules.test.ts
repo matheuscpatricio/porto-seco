@@ -34,6 +34,7 @@ import {
   policeAfterHack,
   roomExit,
   separateCircles,
+  sharkHunts,
   shirtFor,
   SHOP_A,
   SHOP_B,
@@ -172,6 +173,13 @@ test("special and federal patrols grow with the mission", () => {
   assert.deepEqual(policeRoster(9), { especial: 4, federal: 1 });
   assert.deepEqual(policeRoster(15), { especial: 7, federal: 3 });
   assert.deepEqual(policeRoster(24), { especial: 10, federal: 6 });
+});
+
+test("the shark bites a swimmer and leaves the jet ski alone", () => {
+  assert.equal(sharkHunts(false, SWIM_HEIGHT), true);
+  assert.equal(sharkHunts(false, SWIM_HEIGHT + 1), true);
+  assert.equal(sharkHunts(true, SWIM_HEIGHT + 4), false);
+  assert.equal(sharkHunts(false, 1), false);
 });
 
 test("the bike is ridden on the street", () => {

@@ -1,6 +1,6 @@
 import type { RideId } from "@/lib/progress-rules";
 import { photoMaterial } from "@/game3d/pbr";
-import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, COAST, coastReach, DANI_CHAIR, DECK, districtAt, ELEVATOR, GREEN, HIDEOUT, HOME, ISLAND, JET, pastShore, PIER, QUAY, ROOF, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
+import { BERTHS, BIKE_PARK, BLOCK, CENTRAL, COAST, coastReach, DANI_CHAIR, DECK, districtAt, ELEVATOR, GREEN, GRID, HIDEOUT, HOME, ISLAND, JET, pastShore, PIER, QUAY, ROOF, SHOP_A, SHOP_B, STREET, TOWER, type RoomGap } from "@/game3d/rules";
 import { takeBike, takeCar } from "@/game3d/vehicles";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
@@ -8,7 +8,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 export type DoorPlace = "home" | "shop" | "target" | "central";
 export type Collider = { minX: number; maxX: number; minZ: number; maxZ: number; top: number; gate?: boolean; door?: DoorPlace; shut?: number; above?: number; bottom?: number };
 
-export { BLOCK, COAST, GREEN, STREET };
+export { BLOCK, COAST, GREEN, GRID, STREET };
 export const SIZE = ISLAND;
 
 export type Theme = {
@@ -26,12 +26,12 @@ export type Theme = {
 };
 
 export const THEMES: Record<string, Theme> = {
-  w1: { sky: ["#c4b5fd", "#f8f4ff"], fog: "#f7f3ff", sun: "#fff8ff", sunIntensity: 4.1, hemi: ["#f7f3ff", "#b7a8d4", 1.75], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [5, 11], night: false, peds: 42, traffic: 7 },
-  w2: { sky: ["#070b1f", "#2b3566"], fog: "#1b2246", sun: "#b8c8ff", sunIntensity: 0.9, hemi: ["#8ea6ff", "#1b1b2e", 0.45], kind: "towers", palette: ["#5b6778", "#3e4b63", "#6f7b8a", "#44615d", "#57565e"], heights: [18, 48], night: true, peds: 30, traffic: 8 },
+  w1: { sky: ["#c4b5fd", "#f8f4ff"], fog: "#f7f3ff", sun: "#fff8ff", sunIntensity: 4.1, hemi: ["#f7f3ff", "#b7a8d4", 1.75], kind: "houses", palette: ["#d9826b", "#e8b77a", "#e6d3a3", "#7fb3a8", "#c65b4f", "#a8c48a", "#efe7da"], heights: [10, 24], night: false, peds: 56, traffic: 11 },
+  w2: { sky: ["#070b1f", "#2b3566"], fog: "#1b2246", sun: "#b8c8ff", sunIntensity: 0.9, hemi: ["#8ea6ff", "#1b1b2e", 0.45], kind: "towers", palette: ["#5b6778", "#3e4b63", "#6f7b8a", "#44615d", "#57565e"], heights: [22, 54], night: true, peds: 30, traffic: 8 },
   w3: { sky: ["#5d97c9", "#cfe0e2"], fog: "#a9c3c6", sun: "#fff3dc", sunIntensity: 2.4, hemi: ["#d6ecee", "#3a4545", 0.65], kind: "containers", palette: ["#a8322b", "#2c5aa0", "#2f7a47", "#c08f1e", "#cf6a2a", "#2a7c8c"], heights: [2.6, 10.4], night: false, peds: 28, traffic: 6 },
-  w4: { sky: ["#7f8fa6", "#e0b27a"], fog: "#b89468", sun: "#ffd29a", sunIntensity: 2.2, hemi: ["#f2d3a0", "#3a2a1a", 0.65], kind: "sheds", palette: ["#8d8680", "#6b6661", "#aaa39c", "#8c4a1f", "#57524d"], heights: [5, 9], night: false, peds: 30, traffic: 6 },
-  w5: { sky: ["#07040f", "#2a1a4a"], fog: "#1b1233", sun: "#c9bbff", sunIntensity: 0.8, hemi: ["#a78bfa", "#120a22", 0.45], kind: "corporate", palette: ["#4a4d6b", "#35344f", "#51405f", "#3b3b40", "#5a4c7a"], heights: [22, 60], night: true, peds: 32, traffic: 9 },
-  w6: { sky: ["#0a0306", "#3b1018"], fog: "#2a0c12", sun: "#fdb4be", sunIntensity: 0.8, hemi: ["#fb7185", "#14060a", 0.4], kind: "corporate", palette: ["#3a3432", "#3b3b40", "#5a2a2a", "#2e2e33"], heights: [24, 64], night: true, peds: 28, traffic: 9 },
+  w4: { sky: ["#7f8fa6", "#e0b27a"], fog: "#b89468", sun: "#ffd29a", sunIntensity: 2.2, hemi: ["#f2d3a0", "#3a2a1a", 0.65], kind: "sheds", palette: ["#8d8680", "#6b6661", "#aaa39c", "#8c4a1f", "#57524d"], heights: [9, 18], night: false, peds: 30, traffic: 6 },
+  w5: { sky: ["#07040f", "#2a1a4a"], fog: "#1b1233", sun: "#c9bbff", sunIntensity: 0.8, hemi: ["#a78bfa", "#120a22", 0.45], kind: "corporate", palette: ["#4a4d6b", "#35344f", "#51405f", "#3b3b40", "#5a4c7a"], heights: [26, 58], night: true, peds: 32, traffic: 9 },
+  w6: { sky: ["#0a0306", "#3b1018"], fog: "#2a0c12", sun: "#fdb4be", sunIntensity: 0.8, hemi: ["#fb7185", "#14060a", 0.4], kind: "corporate", palette: ["#3a3432", "#3b3b40", "#5a2a2a", "#2e2e33"], heights: [28, 62], night: true, peds: 28, traffic: 9 },
 };
 
 export const LANE = 2.2;
@@ -65,6 +65,7 @@ export type Layout = {
   jet: THREE.Group;
   ships: THREE.Group[];
   elevator: THREE.Group;
+  ads: THREE.Mesh[];
 };
 
 function rng(seed: number) {
@@ -906,10 +907,10 @@ function buildSkyHideout(scene: THREE.Scene, night: boolean, addCol: (minX: numb
 
   const bezel = std({ color: "#020617", metalness: 0.5, roughness: 0.35 });
   const screens: [number, number, number, number, string, string, string[]][] = [
-    [80.15, 1.55, 1.35, 0.95, "variavel.py", "#34d399", ["nome = \"Leo\"", "idade = 23", "print(nome)"]],
+    [80.15, 1.55, 1.35, 0.95, "variavel.py", "#34d399", ["nome = \"Cole\"", "idade = 23", "print(nome)"]],
     [81.85, 1.72, 1.55, 1.15, "if porta", "#22d3ee", ["if aberta:", "    entrar()", "else:", "    esperar()"]],
     [83.55, 1.55, 1.35, 0.95, "for item", "#a3e635", ["for item in lista:", "    print(item)"]],
-    [82.0, 2.5, 2.2, 0.48, "DANI // AULA", "#67e8f9", ["escolha um modulo"]],
+    [82.0, 2.5, 2.2, 0.48, "MAYA // AULA", "#67e8f9", ["escolha um modulo"]],
     [84.85, 1.7, 0.72, 1.2, "log", "#fbbf24", ["> ok", "> passo 1", "> passo 2"]],
   ];
   for (const [x, h, w, ht, title, color, lines] of screens) {
@@ -1114,8 +1115,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
 
   const sidewalk = photoMaterial("concrete_floor_02", 8, 8, { rough: 0.88, color: themeId === "w1" ? "#f3efe8" : "#d4d0cb" });
   const curbMat = std({ color: "#b7b2aa", roughness: 0.8 });
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < 3; j++) {
+  for (let i = 0; i < GRID; i++) {
+    for (let j = 0; j < GRID; j++) {
       const cx = blockStart(i) + BLOCK / 2;
       const cz = blockStart(j) + BLOCK / 2;
       box(BLOCK + 3.4, 0.16, BLOCK + 3.4, curbMat, cx, 0.08, cz, scene, false, 0.08);
@@ -1133,8 +1134,9 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   };
   const yellowR: [number, number, number, number][] = [];
   const whiteR: [number, number, number, number][] = [];
-  const inCross = (v: number) => [0, 1, 2, 3].some((j) => Math.abs(v - streetCenter(j)) < STREET / 2 + 0.5);
-  for (let i = 0; i < 4; i++) {
+  const avenues = GRID + 1;
+  const inCross = (v: number) => Array.from({ length: avenues }, (_, j) => j).some((j) => Math.abs(v - streetCenter(j)) < STREET / 2 + 0.5);
+  for (let i = 0; i < avenues; i++) {
     const sc = streetCenter(i);
     for (let k = 0; k < SIZE; k += 5) {
       if (inCross(k + 1.25)) continue;
@@ -1143,7 +1145,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
         yellowR.push([k + 1.25, sc + o, 2.5, 0.14]);
       }
     }
-    for (let j = 0; j < 4; j++) {
+    for (let j = 0; j < avenues; j++) {
       const sj = streetCenter(j);
       for (let s = -5; s <= 5; s += 1.2) {
         for (const side of [-1, 1]) {
@@ -1162,6 +1164,85 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   const darkWins: THREE.Matrix4[] = [];
   const litWins: THREE.Matrix4[] = [];
   const deepWins: THREE.Matrix4[] = [];
+  const ledCyan: THREE.Matrix4[] = [];
+  const ledMag: THREE.Matrix4[] = [];
+  const ledAmber: THREE.Matrix4[] = [];
+  const ledWhite: THREE.Matrix4[] = [];
+  const ads: THREE.Mesh[] = [];
+  const ledBox = (list: THREE.Matrix4[], x: number, y: number, z: number, sx: number, sy: number, sz: number) => {
+    list.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(sx, sy, sz)));
+  };
+  const dressLeds = (cx: number, cz: number, w: number, d: number, h: number) => {
+    const bands = Math.max(2, Math.floor(h / 3.2));
+    const colors = [ledCyan, ledMag, ledAmber];
+    for (let b = 0; b < bands; b++) {
+      const y = 1.6 + (b * Math.max(2.4, h - 2.4)) / bands;
+      const list = colors[b % 3];
+      ledBox(list, cx, y, cz - d / 2 - 0.1, w * 0.94, 0.18, 0.1);
+      ledBox(list, cx, y, cz + d / 2 + 0.1, w * 0.94, 0.18, 0.1);
+      ledBox(list, cx - w / 2 - 0.1, y, cz, 0.1, 0.18, d * 0.94);
+      ledBox(list, cx + w / 2 + 0.1, y, cz, 0.1, 0.18, d * 0.94);
+    }
+    for (const [x, z] of [
+      [cx - w / 2, cz - d / 2],
+      [cx + w / 2, cz - d / 2],
+      [cx - w / 2, cz + d / 2],
+      [cx + w / 2, cz + d / 2],
+    ] as const) ledBox(ledWhite, x, h / 2, z, 0.16, h, 0.16);
+    ledBox(ledCyan, cx, h + 0.12, cz, w + 0.35, 0.14, d + 0.35);
+  };
+  const adCopy = [
+    ["VÉRTICE", "A ILHA NÃO DORME"],
+    ["PORTO SECO", "ABERTO 24H"],
+    ["NEON", "LUZ NO CAIS"],
+    ["OPEN", "SISTEMA ONLINE"],
+    ["NIGHT RUN", "COLE // MAYA"],
+    ["PYTHON", "ESTUDE EM CASA"],
+  ];
+  const adHues = ["#22d3ee", "#e879f9", "#fbbf24", "#fb7185"];
+  const hangAd = (cx: number, cz: number, w: number, d: number, h: number) => {
+    if (h < 9 || r() > 0.78) return;
+    const [title, sub] = adCopy[Math.floor(r() * adCopy.length)];
+    const hue = adHues[Math.floor(r() * adHues.length)];
+    const [c, g] = canvas(512, 256);
+    const wash = g.createLinearGradient(0, 0, 512, 256);
+    wash.addColorStop(0, "#05060f");
+    wash.addColorStop(0.45, hue);
+    wash.addColorStop(1, "#020617");
+    g.fillStyle = wash;
+    g.fillRect(0, 0, 512, 256);
+    g.fillStyle = "rgba(255,255,255,0.14)";
+    for (let y = 0; y < 256; y += 5) g.fillRect(0, y, 512, 1);
+    g.fillStyle = "#f8fafc";
+    g.font = "bold 72px sans-serif";
+    g.textAlign = "center";
+    g.fillText(title, 256, 118);
+    g.fillStyle = "#ecfeff";
+    g.font = "bold 32px sans-serif";
+    g.fillText(sub, 256, 176);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, transparent: true, opacity: 1 });
+    const bw = Math.min(w, d) * 0.78;
+    const bh = Math.min(5.5, Math.max(2.2, h * 0.22));
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), mat);
+    const y = Math.min(h - bh / 2 - 0.5, Math.max(4.4, h * 0.62));
+    const face = Math.floor(r() * 4);
+    if (face === 0) plane.position.set(cx, y, cz - d / 2 - 0.22);
+    else if (face === 1) {
+      plane.position.set(cx, y, cz + d / 2 + 0.22);
+      plane.rotation.y = Math.PI;
+    } else if (face === 2) {
+      plane.position.set(cx - w / 2 - 0.22, y, cz);
+      plane.rotation.y = -Math.PI / 2;
+    } else {
+      plane.position.set(cx + w / 2 + 0.22, y, cz);
+      plane.rotation.y = Math.PI / 2;
+    }
+    plane.name = "billboard";
+    scene.add(plane);
+    ads.push(plane);
+  };
   const winQ = new THREE.Quaternion();
   const winUp = new THREE.Vector3(0, 0, 1);
   const outward = new THREE.Vector3();
@@ -1193,6 +1274,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
 
     if (district.kind === "containers") {
       for (let y = 2.6; y < h; y += 2.6) box(w + 0.05, 0.08, d + 0.05, std({ color: "#1f1f1f" }), cx, y, cz, scene, false);
+      dressLeds(cx, cz, w, d, h);
+      hangAd(cx, cz, w, d, h);
       return;
     }
     if (district.kind === "houses") {
@@ -1216,6 +1299,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     if (district.kind === "sheds") {
       const door = std({ color: "#5b5550", roughness: 0.6, metalness: 0.5 });
       box(0.1, 4, 5, door, cx - w / 2 - 0.05, 2, cz, scene, false);
+      dressLeds(cx, cz, w, d, h);
+      hangAd(cx, cz, w, d, h);
       return;
     }
     box(w + 0.2, 0.25, d + 0.2, trimMat, cx, 3.4, cz, scene, false, 0.08);
@@ -1272,6 +1357,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
         }
       }
     }
+    dressLeds(cx, cz, w, d, h);
+    hangAd(cx, cz, w, d, h);
   };
 
   const placeWins = (list: THREE.Matrix4[], mat: THREE.Material) => {
@@ -1299,39 +1386,41 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     }
   };
 
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < 3; j++) {
-      if (i === 2 && j === 2) continue;
+  const lots = 3;
+  const overlapsRoom = (cx: number, cz: number, w: number, d: number) => {
+    const a0 = cx - w / 2 - 0.8;
+    const a1 = cx + w / 2 + 0.8;
+    const b0 = cz - d / 2 - 0.8;
+    const b1 = cz + d / 2 + 0.8;
+    return [HOME, SHOP_A, SHOP_B].some((room) => a0 < room.maxX && a1 > room.minX && b0 < room.maxZ && b1 > room.minZ);
+  };
+  for (let i = 0; i < GRID; i++) {
+    for (let j = 0; j < GRID; j++) {
+      if ((i === 2 && j === 2) || (i === 1 && j === 1)) continue;
       const bx = blockStart(i);
       const bz = blockStart(j);
       const lot = THEMES[districtAt(bx + 8, bz + 8)] ?? theme;
-      if (lot.kind === "corporate" && i === 1 && j === 1) continue;
-      for (let li = 0; li < 2; li++) {
-        for (let lj = 0; lj < 2; lj++) {
-          const cx = bx + 9 + li * 18;
-          const cz = bz + 9 + lj * 18;
-          const homeLot = i === 0 && j === 0 && li === 0 && lj === 0;
-          const shopLot = (i === 2 && j === 0 && li === 1 && lj === 0) || (i === 0 && j === 2 && li === 0 && lj === 1);
-          if (homeLot || shopLot) continue;
+      const span = BLOCK / lots;
+      for (let li = 0; li < lots; li++) {
+        for (let lj = 0; lj < lots; lj++) {
+          const cx = bx + span * (li + 0.5);
+          const cz = bz + span * (lj + 0.5);
           const roll = r();
-          if (roll < 0.2 && !(i === 0 && j === 0)) {
-            for (let k = 0; k < 3; k++) {
-              const x = cx - 5 + r() * 10;
-              const z = cz - 5 + r() * 10;
-              prop(x, z);
-              if (r() > 0.6) prop(x, z, 1.2);
-            }
+          if (roll < 0.06 && !(i === 0 && j === 0)) {
+            for (let k = 0; k < 2; k++) prop(cx - 2 + r() * 4, cz - 2 + r() * 4);
             const tree = buildTree(r, night);
-            tree.position.set(cx + 4, 0.2, cz - 4);
+            tree.position.set(cx, 0.2, cz);
             scene.add(tree);
-            addCol(cx + 3.8, cx + 4.2, cz - 4.2, cz - 3.8, 3);
+            addCol(cx - 0.2, cx + 0.2, cz - 0.2, cz + 0.2, 3);
             continue;
           }
           const [hmin, hmax] = lot.heights;
           let h = hmin + r() * (hmax - hmin);
           if (lot.kind === "containers") h = 2.6 * (1 + Math.floor(r() * 4));
-          const w = lot.kind === "containers" ? 6 : 12 + r() * 3;
-          const d = lot.kind === "containers" ? 14 : 12 + r() * 3;
+          else if ((lot.kind === "towers" || lot.kind === "corporate") && r() > 0.34) h = 14 + r() * 16;
+          const w = lot.kind === "containers" ? span * 0.5 : span * 0.72;
+          const d = lot.kind === "containers" ? span * 0.86 : span * 0.72;
+          if (overlapsRoom(cx, cz, w, d)) continue;
           building(cx, cz, w, d, h);
         }
       }
@@ -1340,20 +1429,31 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   placeWins(darkWins, new THREE.MeshPhysicalMaterial({ color: "#163044", roughness: 0.06, metalness: 0.55, envMapIntensity: 1.3, transparent: true, opacity: 0.72 }));
   placeWins(litWins, new THREE.MeshStandardMaterial({ color: "#e0f2fe", emissive: "#38bdf8", emissiveIntensity: 3.1, roughness: 0.35 }));
   placeWins(deepWins, new THREE.MeshStandardMaterial({ color: "#1e3a8a", emissive: "#2563eb", emissiveIntensity: 2.2, roughness: 0.4 }));
+  const placeLeds = (list: THREE.Matrix4[], color: string) => {
+    if (!list.length) return;
+    const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.8, roughness: 0.32, metalness: 0.2 });
+    const strip = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat, list.length);
+    list.forEach((m, i) => strip.setMatrixAt(i, m));
+    strip.instanceMatrix.needsUpdate = true;
+    scene.add(strip);
+  };
+  placeLeds(ledCyan, "#22d3ee");
+  placeLeds(ledMag, "#e879f9");
+  placeLeds(ledAmber, "#fbbf24");
+  placeLeds(ledWhite, "#e0f2fe");
 
   const spots: Spot[] = [];
   const areaName = (i: number, j: number) => ["Rua da Feira", "Av. do Porto", "Travessa Seca", "Rua das Palmeiras", "Largo do Mercado", "Rua do Cais", "Av. Central", "Beco do Sal"][(i * 3 + j) % 8];
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < 3; j++) {
-      if (i === 2 && j === 2) continue;
-      if ((THEMES[districtAt(blockStart(i) + 8, blockStart(j) + 8)] ?? theme).kind === "corporate" && i === 1 && j === 1) continue;
+  for (let i = 0; i < GRID; i++) {
+    for (let j = 0; j < GRID; j++) {
+      if ((i === 2 && j === 2) || (i === 1 && j === 1)) continue;
       spots.push({ pos: new THREE.Vector3(blockStart(i) + 0.7, 0, blockStart(j) + BLOCK / 2 + (r() - 0.5) * 8), area: areaName(i, j) });
     }
   }
 
   const pedLoops: THREE.Vector3[][] = [];
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < 3; j++) {
+  for (let i = 0; i < GRID; i++) {
+    for (let j = 0; j < GRID; j++) {
       const o = -1.15;
       const x0 = blockStart(i) + o;
       const z0 = blockStart(j) + o;
@@ -1369,14 +1469,14 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   const kinds = ["sedan", "hatch", "sedan", "van"] as const;
   for (let n = 0; n < 16; n++) {
     const alongX = r() > 0.5;
-    const line = Math.floor(r() * 4);
+    const line = Math.floor(r() * (GRID + 1));
     const pos = 20 + r() * (SIZE - 40);
     const side = r() > 0.5 ? 1 : -1;
     const x = alongX ? pos : streetCenter(line) + side * 4.9;
     const z = alongX ? streetCenter(line) + side * 4.9 : pos;
     if (Math.hypot(x - 7, z - 7) < 18) continue;
     if (x > compound.minX - 16 && z > compound.minZ - 16) continue;
-    if ([0, 1, 2, 3].some((j) => Math.abs((alongX ? x : z) - streetCenter(j)) < 9)) continue;
+    if (Array.from({ length: GRID + 1 }, (_, j) => j).some((j) => Math.abs((alongX ? x : z) - streetCenter(j)) < 9)) continue;
     const car = buildCar(carColors[n % carColors.length], kinds[n % kinds.length]);
     car.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -1389,8 +1489,8 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     if (alongX) addCol(x - hl, x + hl, z - 0.95, z + 0.95, 1.5);
     else addCol(x - 0.95, x + 0.95, z - hl, z + hl, 1.5);
   }
-  for (let i = 0; i < 4; i++) {
-    for (let j = 0; j < 4; j++) {
+  for (let i = 0; i < GRID + 1; i++) {
+    for (let j = 0; j < GRID + 1; j++) {
       const x = streetCenter(i) + 6.6;
       const z = streetCenter(j) + 6.6;
       const lamp = buildLamp(night);
@@ -1400,9 +1500,9 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
       addCol(x - 0.15, x + 0.15, z - 0.15, z + 0.15, 6);
     }
   }
-  for (let i = 0; i < 3; i++) {
-    for (let j = 0; j < 3; j++) {
-      if (i === 2 && j === 2) continue;
+  for (let i = 0; i < GRID; i++) {
+    for (let j = 0; j < GRID; j++) {
+      if ((i === 2 && j === 2) || (i === 1 && j === 1)) continue;
       for (let k = 0; k < 2; k++) {
         const x = blockStart(i) + 8 + k * 20;
         const z = blockStart(j) - 0.25;
@@ -1510,7 +1610,7 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
   const patrols1: [THREE.Vector3, THREE.Vector3][] = [];
   for (let n = 0; n < 40 && patrols1.length < 12; n++) {
     const alongX = r() > 0.5;
-    const line = Math.floor(r() * 4);
+    const line = Math.floor(r() * (GRID + 1));
     const pos = 20 + r() * (SIZE - 40);
     const off = (r() > 0.5 ? 1 : -1) * 5.6;
     const a = alongX ? new THREE.Vector3(pos - 10, 0, streetCenter(line) + off) : new THREE.Vector3(streetCenter(line) + off, 0, pos - 10);
@@ -1665,5 +1765,6 @@ export function buildWorld(scene: THREE.Scene, themeId: string, seed: number, ta
     jet,
     ships: port,
     elevator,
+    ads,
   };
 }

@@ -1,6 +1,6 @@
 import type { Level } from "@/content/types";
 import { BUOY, endingFor, liveScript, policeAfterHack, PORT_GATE } from "@/game3d/rules";
-import { BLOCK, blockStart, Layout, Spot, streetCenter } from "@/game3d/world";
+import { BLOCK, blockStart, GRID, Layout, Spot, streetCenter } from "@/game3d/world";
 import * as THREE from "three";
 
 export type ScriptKind = "invasao" | "entrega" | "perseguicao" | "escolta" | "fuga" | "confronto" | "mar";
@@ -63,7 +63,7 @@ function pickupNear(s: Spot) {
 
 function grid(v: number) {
   let best = 0;
-  for (let i = 1; i < 4; i++) if (Math.abs(streetCenter(i) - v) < Math.abs(streetCenter(best) - v)) best = i;
+  for (let i = 1; i < GRID + 1; i++) if (Math.abs(streetCenter(i) - v) < Math.abs(streetCenter(best) - v)) best = i;
   return streetCenter(best);
 }
 
@@ -103,8 +103,8 @@ export function buildMission(kind: ScriptKind, level: Level, L: Layout, index: n
         [1, 0],
       ];
       for (const [di, dj] of moves) {
-        const ni = Math.max(0, Math.min(3, i + di + (r() < 0.3 ? di : 0)));
-        const nj = Math.max(0, Math.min(3, j + dj));
+        const ni = Math.max(0, Math.min(GRID, i + di + (r() < 0.3 ? di : 0)));
+        const nj = Math.max(0, Math.min(GRID, j + dj));
         if (ni === i && nj === j) continue;
         i = ni;
         j = nj;

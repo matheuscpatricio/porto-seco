@@ -6,8 +6,8 @@ import { Cyber } from "@/game3d/cyber";
 import { animate, buildHuman, Pose3, Rig } from "@/game3d/human";
 import { buildMission, Mission, scriptFor, Step } from "@/game3d/missions";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
-import { BERTHS, canMount, CENTRAL_PHONE, DANI_CHAIR, decayWanted, DECK, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, PLAYER_MAX_HP, POLICE_RANK, policeRank, policeRankForMission, policeRoster, ROOF, roomExit, SECURITY_HIT, separateCircles, SHOPS, SWIM_HEIGHT, TOWER, waterDepth, type PoliceRank } from "@/game3d/rules";
-import { buildCar, buildWorld, Collider, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
+import { BERTHS, canMount, CENTRAL_PHONE, DANI_CHAIR, decayWanted, DECK, doorOpen, ELEVATOR, HIDEOUT, hitWanted, HOME_STUDY, indoors, inSea, JET, knockdownWanted, onPier, pastShore, PLAYER_MAX_HP, POLICE_RANK, policeRank, policeRankForMission, policeRoster, ROOF, roomExit, SECURITY_HIT, separateCircles, sharkHunts, SHOPS, SWIM_HEIGHT, TOWER, waterDepth, type PoliceRank } from "@/game3d/rules";
+import { buildCar, buildWorld, Collider, GRID, LANE, Layout, SIZE, streetCenter, THEMES, updateScreen } from "@/game3d/world";
 import * as THREE from "three";
 
 export type Phase = "brief" | "play" | "dive" | "hack" | "result" | "surface" | "open" | "escape" | "done";
@@ -524,8 +524,8 @@ export class Game3D {
     const kinds = ["sedan", "hatch", "sedan", "van", "hatch"] as const;
     for (let i = 0; i < nCars; i++) {
       const alongX = r() < 0.5;
-      const line = Math.floor(r() * 4);
-      const k = Math.floor(r() * 3);
+      const line = Math.floor(r() * (GRID + 1));
+      const k = Math.floor(r() * GRID);
       const from: [number, number] = alongX ? [k, line] : [line, k];
       const to: [number, number] = alongX ? [k + 1, line] : [line, k + 1];
       const flip = r() < 0.5;
@@ -671,7 +671,7 @@ export class Game3D {
     this.shark.visible = hunt;
     if (!hunt) return;
     this.sharkT += dt;
-    const bite = depth >= SWIM_HEIGHT;
+    const bite = sharkHunts(this.jetting, depth);
     const orbit = bite ? 1.35 : 4.4;
     const ang = this.sharkT * (bite ? 2.6 : 0.85);
     const y = Math.min(-0.45, P.pos.y + 0.7);
@@ -1183,6 +1183,17 @@ export class Game3D {
         this.ev.onToast("Você desceu da moto.", "info");
       }
       if (this.jetting && indoors(P.pos.x, P.pos.z)) this.jetting = false;
+      if (this.jetting && !onPier(P.pos.x, P.pos.z) && !inSea(P.pos.x, P.pos.z)) {
+        this.jetting = false;
+        this.ev.onToast("O jet ski encalhou. Você desceu na areia.", "info");
+      }
+      if (this.jetting && pastShore(P.pos.x, P.pos.z) > 46) {
+        const dx = SIZE / 2 - P.pos.x;
+        const dz = SIZE / 2 - P.pos.z;
+        const len = Math.hypot(dx, dz) || 1;
+        P.pos.x += (dx / len) * 2.4;
+        P.pos.z += (dz / len) * 2.4;
+      }
       if (input.jump && !this.jumpHeld && P.grounded) {
         P.vy = 8.2;
         P.grounded = false;
@@ -1276,7 +1287,7 @@ export class Game3D {
     const jet = L.jet;
     for (const id of ["entrega", "esportiva", "noturna"] as const) L.bikes[id].visible = id === this.ride;
     if (this.jetting) {
-      jet.position.set(P.pos.x, 0.05, P.pos.z);
+      jet.position.set(P.pos.x, 0.12, P.pos.z);
       jet.rotation.y = P.yaw;
     } else {
       jet.position.set(JET.x, 0.05, JET.z);
@@ -1317,13 +1328,17 @@ export class Game3D {
     const bt = this.targetPos();
     beacon.position.set(bt.x, 30, bt.z);
     (beacon.material as THREE.MeshBasicMaterial).opacity = 0.12 + Math.sin(this.t * 3) * 0.05;
+    L.ads.forEach((ad, i) => {
+      const mat = ad.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.86 + Math.sin(this.t * 5 + i * 0.8) * 0.14;
+    });
 
     if (this.phase === "hack" || this.phase === "result") this.cyber.update(dt, this.phase === "hack");
     this.updateCamera(dt);
     this.updateEngines();
 
     const fog = this.scene.fog as THREE.Fog;
-    if (fog) fog.far = P.pos.y > 30 ? 520 : L.night ? 150 : 200;
+    if (fog) fog.far = P.pos.y > 30 ? 560 : L.night ? 180 : 320;
     this.sun.position.set(P.pos.x + 30, 60, P.pos.z + 20);
     this.sun.target.position.copy(P.pos);
   }
@@ -1581,10 +1596,10 @@ export class Game3D {
     const P = this.player;
     const terminal = new THREE.Vector3(this.layout.terminal.x - 1.1, P.pos.y, this.layout.terminal.z);
     const hackNear = this.step?.k === "hack" && P.pos.distanceTo(terminal) < 2.4;
-    if (this.step?.k === "jet" && !this.jetting && P.pos.distanceTo(new THREE.Vector3(JET.x, P.pos.y, JET.z)) < 2.6) {
+    if (!this.jetting && !this.mounted && P.pos.distanceTo(new THREE.Vector3(JET.x, P.pos.y, JET.z)) < 2.8) {
       this.jetting = true;
       this.mounted = false;
-      this.ev.onToast("Você subiu no jet ski. Vá até a boia.", "good");
+      this.ev.onToast(this.step?.k === "jet" ? "Você subiu no jet ski. Vá até a boia." : "Você subiu no jet ski. No mar o tubarão não morde.", "good");
       sound.sfx("car");
       return true;
     }

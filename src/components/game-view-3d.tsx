@@ -8,7 +8,7 @@ import { connector } from "@/content/story";
 import { preloadScene } from "@/game3d/assets";
 import { Game3D, HackOutcome, Input3, Phase } from "@/game3d/engine";
 import { coastReach, PIER, POLICE_RANK, policeRank, QUAY } from "@/game3d/rules";
-import { BLOCK, blockStart, SIZE } from "@/game3d/world";
+import { BLOCK, blockStart, GRID, SIZE } from "@/game3d/world";
 import { purchaseRide, purchaseWeapon, useProgress } from "@/lib/progress";
 import { RIDES, WEAPONS, type RideId, type WeaponId } from "@/lib/progress-rules";
 import * as THREE from "three";
@@ -114,8 +114,8 @@ function drawMinimap(c: HTMLCanvasElement, m: ReturnType<Game3D["minimap"]>) {
   g.fill();
   g.fillStyle = "#3f4550";
   g.fillRect(0, 0, SIZE, SIZE);
-  for (let i = 0; i < 3; i++)
-    for (let j = 0; j < 3; j++) {
+  for (let i = 0; i < GRID; i++)
+    for (let j = 0; j < GRID; j++) {
       const inCompound = blockStart(i) === m.compound.minX && blockStart(j) === m.compound.minZ;
       g.fillStyle = inCompound ? "#4c3a6b" : "#5b6270";
       g.fillRect(blockStart(i) - 1.5, blockStart(j) - 1.5, BLOCK + 3, BLOCK + 3);
